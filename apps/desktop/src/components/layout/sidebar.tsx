@@ -180,7 +180,11 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         >
           <Waypoints size={15} /> Port forwarding
         </Button>
-        <Button className="justify-start" disabled title="Coming in M2">
+        <Button
+          className={cn("justify-start", section === "snippets" && "bg-active text-fg")}
+          aria-current={section === "snippets" ? "page" : undefined}
+          onClick={() => setSection("snippets")}
+        >
           <SquareTerminal size={15} /> Snippets
         </Button>
         <Button
