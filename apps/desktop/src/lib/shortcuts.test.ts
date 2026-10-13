@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aiShortcutLabel, appShortcut, isAiShortcut, isFindShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
+import { aiShortcutLabel, appShortcut, isAiShortcut, isAppChord, paneShortcut, isFindShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
 
 const chord = (overrides: Partial<KeyChord>): KeyChord => ({
   key: "b",
@@ -108,5 +108,27 @@ describe("isAiShortcut", () => {
     expect(isAiShortcut(chord("i", { metaKey: true, altKey: true }), true)).toBe(false);
     expect(aiShortcutLabel(true)).toBe("⌘I");
     expect(aiShortcutLabel(false)).toBe("Ctrl+Shift+I");
+  });
+});
+
+describe("paneShortcut", () => {
+  const chord = (key: string, mods: Partial<KeyChord> = {}): KeyChord => ({ key, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...mods });
+
+  it("splits and moves focus with the macOS chords", () => {
+    expect(paneShortcut(chord("d", { metaKey: true }), true)).toEqual({ action: "split", direction: "row" });
+    expect(paneShortcut(chord("D", { metaKey: true, shiftKey: true }), true)).toEqual({ action: "split", direction: "column" });
+    expect(paneShortcut(chord("ArrowLeft", { metaKey: true, altKey: true }), true)).toEqual({ action: "focus", direction: "left" });
+    expect(paneShortcut(chord("ArrowLeft", { metaKey: true }), true)).toBeNull();
+    expect(paneShortcut(chord("d", { ctrlKey: true }), true)).toBeNull();
+  });
+
+  it("uses Ctrl+Shift and Ctrl+Alt on Windows and Linux, leaving Ctrl+D (EOF) to the shell", () => {
+    expect(paneShortcut(chord("D", { ctrlKey: true, shiftKey: true }), false)).toEqual({ action: "split", direction: "row" });
+    expect(paneShortcut(chord("E", { ctrlKey: true, shiftKey: true }), false)).toEqual({ action: "split", direction: "column" });
+    expect(paneShortcut(chord("ArrowDown", { ctrlKey: true, altKey: true }), false)).toEqual({ action: "focus", direction: "down" });
+    expect(paneShortcut(chord("d", { ctrlKey: true }), false)).toBeNull();
+    expect(isAppChord(chord("d", { ctrlKey: true }), false)).toBe(false);
+    expect(isAppChord(chord("D", { ctrlKey: true, shiftKey: true }), false)).toBe(true);
+    expect(isAppChord(chord("t", { metaKey: true }), true)).toBe(true);
   });
 });

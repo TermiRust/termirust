@@ -9,7 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { isAiShortcut, isFindShortcut, isMacPlatform } from "@/lib/shortcuts";
+import { isAiShortcut, isAppChord, isFindShortcut, isMacPlatform } from "@/lib/shortcuts";
 import { terminalTheme } from "@/lib/terminal-theme";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
@@ -104,6 +104,8 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
         setSearching(true);
         return false;
       }
+      // Let app chords bubble to the window without the shell also receiving them.
+      if (event.type === "keydown" && isAppChord(event, onMac)) return false;
       if (event.type === "keydown" && onAskAiRef.current && isAiShortcut(event, onMac)) {
         onAskAiRef.current(terminal.getSelection());
         return false;

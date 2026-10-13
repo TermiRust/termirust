@@ -24,6 +24,8 @@ interface HostSessionViewProps {
   onSizeChange?: (size: TerminalSize) => void;
   /** Opens an SFTP tab to the same host. */
   onOpenSftp?: (host: HostView) => void;
+  /** False for a pane that is not the tab's focused one; it then stays out of the input routing. */
+  focused?: boolean;
   /** Lets snippets type into this tab while it is connected. */
   tabId?: string;
 }
@@ -41,7 +43,7 @@ const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp, tabId }: HostSessionViewProps) {
+export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp, tabId, focused = true }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
@@ -70,7 +72,12 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
     if (connected) void useForwardsStore.getState().autoStart(host.id);
   }, [connected, host.id]);
 
-  useEffect(() => (connected && tabId ? registerTerminalInput(tabId, session.send) : undefined), [connected, tabId, session.send]);
+  useEffect(() => (connected && focused && tabId ? registerTerminalInput(tabId, session.send) : undefined), [connected, focused, tabId, session.send]);
+
+  // Clicking or moving focus to this pane puts the keyboard in its terminal.
+  useEffect(() => {
+    if (focused) terminalRef.current?.focus();
+  }, [focused]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

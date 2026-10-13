@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { closePane, neighbour, paneIds, paneRects, setRatio, singlePane, splitPane, type PaneNode } from "./pane-tree";
+import { closePane, neighbour, paneIds, paneRects, setRatio, singlePane, splitDividers, splitPane, type PaneNode } from "./pane-tree";
 
 // a | b, with b split into b (top) / c (bottom)
 const threePanes = (): PaneNode => splitPane(splitPane(singlePane("a"), "a", "row", "b", "s1"), "b", "column", "c", "s2");
@@ -45,5 +45,13 @@ describe("pane tree", () => {
     // a (left, full height) | b/c with b taking 70% of the height
     const tree = setRatio(threePanes(), "s2", 0.7);
     expect(neighbour(tree, "a", "right")).toBe("b");
+  });
+
+  it("lists dividers with the area each one splits", () => {
+    expect(splitDividers(singlePane("a"))).toEqual([]);
+    expect(splitDividers(threePanes())).toEqual([
+      { splitId: "s1", direction: "row", area: { x: 0, y: 0, w: 1, h: 1 }, ratio: 0.5 },
+      { splitId: "s2", direction: "column", area: { x: 0.5, y: 0, w: 0.5, h: 1 }, ratio: 0.5 },
+    ]);
   });
 });

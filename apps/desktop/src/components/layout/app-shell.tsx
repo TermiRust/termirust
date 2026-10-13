@@ -20,7 +20,9 @@ import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
 import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
-import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
+import { appShortcut, isMacPlatform, isToggleSidebarShortcut, paneShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
+import { paneIds } from "@/features/panes/pane-tree";
+import { PaneLayout } from "@/components/layout/pane-layout";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useAiStore } from "@/stores/ai-store";
 import { useSnippetsStore } from "@/stores/snippets-store";
@@ -47,7 +49,7 @@ export function AppShell() {
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
-  const [closing, setClosing] = useState<Tab | null>(null);
+  const [closing, setClosing] = useState<{ tab: Tab; paneId: string | null } | null>(null);
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
@@ -135,10 +137,23 @@ export function AppShell() {
 
   const requestClose = useCallback(
     (tab: Tab) => {
-      if (tab.status === "connected") setClosing(tab);
+      if (tab.status === "connected") setClosing({ tab, paneId: null });
       else closeTab(tab.id);
     },
     [closeTab],
+  );
+
+  /** ⌘W closes the focused pane of a split tab, or the tab when only one pane is left. */
+  const requestCloseFocused = useCallback(
+    (tab: Tab) => {
+      if (paneIds(tab.layout).length <= 1) {
+        requestClose(tab);
+        return;
+      }
+      if (tab.paneStatus[tab.focusedPaneId] === "connected") setClosing({ tab, paneId: tab.focusedPaneId });
+      else useTabsStore.getState().closePane(tab.id, tab.focusedPaneId);
+    },
+    [requestClose],
   );
 
   useEffect(() => {
@@ -155,6 +170,15 @@ export function AppShell() {
         else openNewHost();
         return;
       }
+      const pane = paneShortcut(event, onMac);
+      if (pane) {
+        event.preventDefault();
+        const { activeTabId: activeId, splitPane, focusNeighbour } = useTabsStore.getState();
+        if (!activeId) return;
+        if (pane.action === "split") splitPane(activeId, pane.direction);
+        else focusNeighbour(activeId, pane.direction);
+        return;
+      }
       const shortcut = tabShortcut(event, onMac);
       if (!shortcut) return;
       event.preventDefault();
@@ -166,12 +190,12 @@ export function AppShell() {
       } else {
         const { tabs: current, activeTabId: activeId } = useTabsStore.getState();
         const active = current.find((t) => t.id === activeId);
-        if (active) requestClose(active);
+        if (active) requestCloseFocused(active);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onMac, toggleSidebar, activateTabAt, requestClose, openLocalTab, setSection, setPaletteOpen, openNewHost]);
+  }, [onMac, toggleSidebar, activateTabAt, requestCloseFocused, openLocalTab, setSection, setPaletteOpen, openNewHost]);
 
   return (
     <div className="flex h-full">
@@ -237,10 +261,11 @@ export function AppShell() {
       )}
       {closing && (
         <ConfirmCloseDialog
-          title={closing.title}
+          title={closing.paneId ? `this pane of ${closing.tab.title}` : closing.tab.title}
           onCancel={() => setClosing(null)}
           onConfirm={() => {
-            closeTab(closing.id);
+            if (closing.paneId) useTabsStore.getState().closePane(closing.tab.id, closing.paneId);
+            else closeTab(closing.tab.id);
             setClosing(null);
           }}
         />
@@ -278,12 +303,25 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSf
       className={active ? "flex min-h-0 flex-1 flex-col" : undefined}
       style={warningBorder ? { boxShadow: `inset 0 0 0 2px ${warningBorder}` } : undefined}
     >
-      {tab.target.kind === "host" ? (
-        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} onOpenSftp={onOpenSftp} tabId={tab.id} />
+      {tab.target.kind === "host" || tab.target.kind === "local" ? (
+        <PaneLayout
+          layout={tab.layout}
+          focusedPaneId={tab.focusedPaneId}
+          broadcast={tab.broadcast}
+          onFocusPane={(paneId) => useTabsStore.getState().focusPane(tab.id, paneId)}
+          onResize={(splitId, ratio) => useTabsStore.getState().setSplitRatio(tab.id, splitId, ratio)}
+          renderPane={(paneId, focused, multiple) => {
+            const status = (s: TabStatus) => useTabsStore.getState().setPaneStatus(tab.id, paneId, s);
+            const size = focused ? reportSize : undefined;
+            return tab.target.kind === "host" ? (
+              <HostSessionView host={tab.target.host} onStatusChange={status} onSizeChange={size} onOpenSftp={onOpenSftp} tabId={tab.id} focused={focused} />
+            ) : (
+              <LocalSessionView onStatusChange={status} onSizeChange={size} tabId={tab.id} focused={focused} title={multiple ? "Local" : undefined} />
+            );
+          }}
+        />
       ) : tab.target.kind === "sftp" ? (
         <SftpView host={tab.target.host} onStatusChange={reportStatus} />
-      ) : tab.target.kind === "local" ? (
-        <LocalSessionView onStatusChange={reportStatus} onSizeChange={reportSize} tabId={tab.id} />
       ) : (
         <ConnectionLab onExit={() => onClose(tab.id)} autoRunBenchmarks={autoRunBenchmarks} />
       )}

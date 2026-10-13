@@ -20,11 +20,15 @@ const tabStatusOf: Record<LocalSessionState["phase"], TabStatus> = {
 interface LocalSessionViewProps {
   onStatusChange?: (status: TabStatus) => void;
   onSizeChange?: (size: TerminalSize) => void;
+  /** False for a pane that is not the tab's focused one; it then stays out of the input routing. */
+  focused?: boolean;
+  /** Shown above the terminal when the tab is split, so panes can be told apart. */
+  title?: string;
   /** Lets snippets type into this tab while the shell runs. */
   tabId?: string;
 }
 
-export function LocalSessionView({ onStatusChange, onSizeChange, tabId }: LocalSessionViewProps) {
+export function LocalSessionView({ onStatusChange, onSizeChange, tabId, focused = true, title }: LocalSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useLocalSession(getTerminal);
@@ -42,10 +46,16 @@ export function LocalSessionView({ onStatusChange, onSizeChange, tabId }: LocalS
   }, [state.phase, onStatusChange]);
 
   const running = state.phase === "running";
-  useEffect(() => (running && tabId ? registerTerminalInput(tabId, session.send) : undefined), [running, tabId, session.send]);
+  useEffect(() => (running && focused && tabId ? registerTerminalInput(tabId, session.send) : undefined), [running, focused, tabId, session.send]);
+
+  // Clicking or moving focus to this pane puts the keyboard in its terminal.
+  useEffect(() => {
+    if (focused) terminalRef.current?.focus();
+  }, [focused]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {title && <div className="flex h-6 shrink-0 items-center border-b border-border px-2 text-[11px] text-fg-muted">{title}</div>}
       {(state.phase === "exited" || state.phase === "error") && (
         <div role="status" className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-bg-sunk px-3 text-xs text-fg-muted">
           {state.phase === "error" ? (

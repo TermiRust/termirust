@@ -86,3 +86,27 @@ export function neighbour(node: PaneNode, from: string, direction: Direction): s
   }
   return best?.id ?? null;
 }
+
+export interface Divider {
+  splitId: string;
+  direction: "row" | "column";
+  /** The area the split divides; the divider sits at `ratio` across it. */
+  area: Rect;
+  ratio: number;
+}
+
+/** Every split's divider, for drawing drag handles over a flat list of panes. */
+export function splitDividers(node: PaneNode, area: Rect = { x: 0, y: 0, w: 1, h: 1 }): Divider[] {
+  if (node.kind === "pane") return [];
+  const [a, b]: [Rect, Rect] =
+    node.direction === "row"
+      ? [
+          { ...area, w: area.w * node.ratio },
+          { ...area, x: area.x + area.w * node.ratio, w: area.w * (1 - node.ratio) },
+        ]
+      : [
+          { ...area, h: area.h * node.ratio },
+          { ...area, y: area.y + area.h * node.ratio, h: area.h * (1 - node.ratio) },
+        ];
+  return [{ splitId: node.id, direction: node.direction, area, ratio: node.ratio }, ...splitDividers(node.first, a), ...splitDividers(node.second, b)];
+}

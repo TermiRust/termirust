@@ -77,3 +77,31 @@ export function isAiShortcut(event: KeyChord, onMac: boolean): boolean {
 export function aiShortcutLabel(onMac: boolean): string {
   return onMac ? "⌘I" : "Ctrl+Shift+I";
 }
+
+export type PaneShortcut = { action: "split"; direction: "row" | "column" } | { action: "focus"; direction: "left" | "right" | "up" | "down" } | null;
+
+const ARROWS: Record<string, "left" | "right" | "up" | "down"> = { ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down" };
+
+/** ⌘D / ⌘⇧D and ⌘⌥+arrows on macOS; Ctrl+Shift+D / Ctrl+Shift+E and Ctrl+Alt+arrows elsewhere (ADR-015). */
+export function paneShortcut(event: KeyChord, onMac: boolean): PaneShortcut {
+  const arrow = ARROWS[event.key];
+  if (arrow) {
+    const focus = onMac ? event.metaKey && event.altKey && !event.ctrlKey && !event.shiftKey : event.ctrlKey && event.altKey && !event.metaKey && !event.shiftKey;
+    return focus ? { action: "focus", direction: arrow } : null;
+  }
+  const key = event.key.toLowerCase();
+  if (event.altKey) return null;
+  if (onMac) {
+    if (!event.metaKey || event.ctrlKey || key !== "d") return null;
+    return { action: "split", direction: event.shiftKey ? "column" : "row" };
+  }
+  if (!event.ctrlKey || !event.shiftKey || event.metaKey) return null;
+  if (key === "d") return { action: "split", direction: "row" };
+  if (key === "e") return { action: "split", direction: "column" };
+  return null;
+}
+
+/** App chords the terminal must not also interpret (e.g. Ctrl+Shift+D would otherwise send EOF). */
+export function isAppChord(event: KeyChord, onMac: boolean): boolean {
+  return paneShortcut(event, onMac) !== null || tabShortcut(event, onMac) !== null || appShortcut(event, onMac) !== null || isToggleSidebarShortcut(event, onMac);
+}

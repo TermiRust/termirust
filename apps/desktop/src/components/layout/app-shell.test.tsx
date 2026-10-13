@@ -248,4 +248,32 @@ describe("AppShell warning border", () => {
     registerTerminalInput(tabs[1]!.id, send)();
     expect(send).toHaveBeenCalledWith("df -h\r");
   });
+
+  it("splits the active terminal, moves focus, and closes the focused pane before the tab", () => {
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    render(<AppShell />);
+    act(() => {
+      useTabsStore.getState().openLocalTab();
+    });
+    const onMac = /Mac/i.test(navigator.userAgent);
+    const press = (key: string, mods: Record<string, boolean>) =>
+      act(() => {
+        fireEvent.keyDown(window, { key, ...mods });
+      });
+
+    press("d", onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true });
+    expect(screen.getAllByText("local shell")).toHaveLength(2);
+    const tab = () => useTabsStore.getState().tabs[0]!;
+    const right = tab().focusedPaneId;
+
+    press("ArrowLeft", onMac ? { metaKey: true, altKey: true } : { ctrlKey: true, altKey: true });
+    expect(tab().focusedPaneId).not.toBe(right);
+
+    press("w", onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true });
+    expect(screen.getAllByText("local shell")).toHaveLength(1);
+    expect(useTabsStore.getState().tabs).toHaveLength(1);
+    press("w", onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true });
+    expect(useTabsStore.getState().tabs).toHaveLength(0);
+  });
 });
