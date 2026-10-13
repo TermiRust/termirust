@@ -72,6 +72,9 @@ pub enum CoreError {
 
     #[error("port forwarding: {0}")]
     PortForward(String),
+
+    #[error("AI: {0}")]
+    Ai(String),
 }
 
 impl From<russh::Error> for CoreError {

@@ -25,6 +25,8 @@ getrandom = "0.4"
 portable-pty = "0.9"
 russh-sftp = "3.0"
 regex = "1"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "json", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 russh = { version = "0.64", default-features = false, features = ["flate2", "ring", "rsa"] }
 
 [profile.release]

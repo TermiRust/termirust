@@ -1,4 +1,5 @@
 pub mod ai;
+mod cancel;
 mod error;
 pub mod forward;
 pub mod local_fs;
@@ -9,6 +10,7 @@ pub mod storage;
 pub mod terminal;
 pub mod vault;
 
+pub use cancel::CancelFlag;
 pub use error::{CoreError, Result};
 
 pub fn version() -> &'static str {
