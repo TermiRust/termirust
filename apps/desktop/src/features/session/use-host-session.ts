@@ -15,8 +15,8 @@ export type HostSessionState =
   | { phase: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean }
   | { phase: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean }
   | { phase: "needsUsername" }
-  | { phase: "hostKeyUnknown"; algorithm: string; fingerprint: string }
-  | { phase: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string }
+  | { phase: "hostKeyUnknown"; server: string; algorithm: string; fingerprint: string }
+  | { phase: "hostKeyChanged"; server: string; algorithm: string; fingerprint: string; previousFingerprint: string }
   | { phase: "connected"; sessionId: number }
   | { phase: "closed"; exitStatus: number | null }
   | { phase: "cancelled" }
@@ -108,11 +108,12 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
           });
           break;
         case "hostKeyUnknown":
-          setState({ phase: "hostKeyUnknown", algorithm: outcome.algorithm, fingerprint: outcome.fingerprint });
+          setState({ phase: "hostKeyUnknown", server: outcome.server, algorithm: outcome.algorithm, fingerprint: outcome.fingerprint });
           break;
         case "hostKeyChanged":
           setState({
             phase: "hostKeyChanged",
+            server: outcome.server,
             algorithm: outcome.algorithm,
             fingerprint: outcome.fingerprint,
             previousFingerprint: outcome.previousFingerprint,

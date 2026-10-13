@@ -60,6 +60,9 @@ pub enum CoreError {
 
     #[error("local terminal error: {0}")]
     LocalShell(String),
+
+    #[error("jump host: {0}")]
+    JumpHost(Box<CoreError>),
 }
 
 impl From<russh::Error> for CoreError {

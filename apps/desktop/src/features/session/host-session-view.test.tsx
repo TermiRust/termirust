@@ -110,20 +110,21 @@ describe("HostSessionView", () => {
 
   it("asks to verify a new server key", async () => {
     commands.sessionOpenHost
-      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" }))
+      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" }))
       .mockResolvedValueOnce(ok({ status: "opened", sessionId: 2 }));
     const user = userEvent.setup();
     render(<HostSessionView host={host} />);
 
     const dialog = await screen.findByRole("dialog", { name: "Verify new server" });
     expect(dialog).toHaveTextContent("SHA256:abc");
+    expect(dialog).toHaveTextContent("prod (10.0.0.1:22)");
     await user.click(within(dialog).getByRole("button", { name: "Trust & connect" }));
     expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({ confirmedFingerprint: "SHA256:abc" });
   });
 
   it("warns loudly about a changed key and makes Cancel the default", async () => {
     commands.sessionOpenHost.mockResolvedValue(
-      ok({ status: "hostKeyChanged", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
+      ok({ status: "hostKeyChanged", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
     );
     const user = userEvent.setup();
     render(<HostSessionView host={host} />);

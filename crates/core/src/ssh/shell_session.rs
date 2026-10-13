@@ -114,7 +114,78 @@ impl Handler for ClientHandler {
 /// An interactive shell on a remote host, backed by one SSH connection and PTY channel.
 pub struct ShellSession {
     connection: Handle<ClientHandler>,
+    /// Kept alive while the session tunnels through it.
+    jump: Option<Handle<ClientHandler>>,
     channel: ChannelWriteHalf<client::Msg>,
+}
+
+/// The intermediate server a session reaches its target through (OpenSSH `ProxyJump`).
+pub struct JumpHop<'a> {
+    pub login: &'a SshLogin,
+    pub verify_host_key: HostKeyVerifier,
+}
+
+/// Connects (directly or through an open jump connection) and authenticates.
+async fn establish(
+    login: &SshLogin,
+    verify_host_key: HostKeyVerifier,
+    connect_timeout: Duration,
+    through: Option<&Handle<ClientHandler>>,
+) -> Result<Handle<ClientHandler>> {
+    // Fail on a bad key or passphrase before touching the network.
+    let private_key = match &login.method {
+        LoginMethod::PrivateKey { pem, passphrase } => {
+            Some(load_private_key(pem, passphrase.as_deref())?)
+        }
+        _ => None,
+    };
+    let config = Arc::new(client::Config {
+        keepalive_interval: Some(Duration::from_secs(30)),
+        ..Default::default()
+    });
+    let handler = ClientHandler { verify_host_key };
+    let unreachable = |reason: String| CoreError::Unreachable {
+        host: login.host.clone(),
+        port: login.port,
+        reason,
+    };
+    let map_connect_error = |err: russh::Error| match err {
+        russh::Error::UnknownKey => CoreError::HostKeyRejected,
+        russh::Error::IO(io) => unreachable(io.to_string()),
+        other => CoreError::Ssh(other.to_string()),
+    };
+
+    let connecting = async {
+        match through {
+            None => client::connect(config, (login.host.as_str(), login.port), handler)
+                .await
+                .map_err(map_connect_error),
+            Some(jump) => {
+                let tunnel = jump
+                    .channel_open_direct_tcpip(
+                        login.host.clone(),
+                        u32::from(login.port),
+                        "127.0.0.1",
+                        0,
+                    )
+                    .await
+                    .map_err(|e| {
+                        unreachable(format!("the jump host could not open a tunnel: {e}"))
+                    })?;
+                client::connect_stream(config, tunnel.into_stream(), handler)
+                    .await
+                    .map_err(map_connect_error)
+            }
+        }
+    };
+    let mut connection = tokio::time::timeout(connect_timeout, connecting)
+        .await
+        .map_err(|_| CoreError::Timeout(connect_timeout))??;
+
+    if !authenticate(&mut connection, login, private_key).await? {
+        return Err(CoreError::AuthenticationFailed);
+    }
+    Ok(connection)
 }
 
 impl ShellSession {
@@ -133,44 +204,34 @@ impl ShellSession {
         .await
     }
 
-    /// Connects, authenticates and starts a login shell on a PTY.
-    /// Output and the final close arrive on the returned receiver.
     pub async fn open(
         login: &SshLogin,
         size: PtySize,
         verify_host_key: HostKeyVerifier,
         connect_timeout: Duration,
     ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
-        // Fail on a bad key or passphrase before touching the network.
-        let private_key = match &login.method {
-            LoginMethod::PrivateKey { pem, passphrase } => {
-                Some(load_private_key(pem, passphrase.as_deref())?)
-            }
-            _ => None,
+        Self::open_through(None, login, size, verify_host_key, connect_timeout).await
+    }
+
+    /// Connects (through `jump` when given), authenticates and starts a login shell on a PTY.
+    /// Failures on the jump hop are wrapped in [`CoreError::JumpHost`].
+    /// Output and the final close arrive on the returned receiver.
+    pub async fn open_through(
+        jump: Option<JumpHop<'_>>,
+        login: &SshLogin,
+        size: PtySize,
+        verify_host_key: HostKeyVerifier,
+        connect_timeout: Duration,
+    ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
+        let jump = match jump {
+            Some(hop) => Some(
+                establish(hop.login, hop.verify_host_key, connect_timeout, None)
+                    .await
+                    .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
+            ),
+            None => None,
         };
-        let config = Arc::new(client::Config {
-            keepalive_interval: Some(Duration::from_secs(30)),
-            ..Default::default()
-        });
-        let handler = ClientHandler { verify_host_key };
-
-        let connecting = client::connect(config, (login.host.as_str(), login.port), handler);
-        let mut connection = tokio::time::timeout(connect_timeout, connecting)
-            .await
-            .map_err(|_| CoreError::Timeout(connect_timeout))?
-            .map_err(|err| match err {
-                russh::Error::UnknownKey => CoreError::HostKeyRejected,
-                russh::Error::IO(io) => CoreError::Unreachable {
-                    host: login.host.clone(),
-                    port: login.port,
-                    reason: io.to_string(),
-                },
-                other => CoreError::Ssh(other.to_string()),
-            })?;
-
-        if !authenticate(&mut connection, login, private_key).await? {
-            return Err(CoreError::AuthenticationFailed);
-        }
+        let connection = establish(login, verify_host_key, connect_timeout, jump.as_ref()).await?;
 
         let channel = connection.channel_open_session().await?;
         channel
@@ -204,6 +265,7 @@ impl ShellSession {
         Ok((
             Self {
                 connection,
+                jump,
                 channel: writer,
             },
             events_rx,
@@ -230,6 +292,9 @@ impl ShellSession {
         self.connection
             .disconnect(Disconnect::ByApplication, "", "en")
             .await?;
+        if let Some(jump) = &self.jump {
+            let _ = jump.disconnect(Disconnect::ByApplication, "", "en").await;
+        }
         Ok(())
     }
 }

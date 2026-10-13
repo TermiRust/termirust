@@ -100,7 +100,9 @@ export type KeyView = {
 
 export type OpenHostOutcome = { status: "opened"; sessionId: number } | { status: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean } | { status: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean } | 
 /**  Key and agent logins still need a username when neither the host nor the key has one. */
-{ status: "needsUsername" } | { status: "hostKeyUnknown"; algorithm: string; fingerprint: string } | { status: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string };
+{ status: "needsUsername" } | 
+/**  `server` names the hop whose key is unknown: the target or its jump host. */
+{ status: "hostKeyUnknown"; server: string; algorithm: string; fingerprint: string } | { status: "hostKeyChanged"; server: string; algorithm: string; fingerprint: string; previousFingerprint: string };
 
 export type OpenHostRequest = {
 	hostId: string,

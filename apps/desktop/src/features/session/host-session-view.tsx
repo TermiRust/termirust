@@ -78,7 +78,7 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
       )}
       {(state.phase === "hostKeyUnknown" || state.phase === "hostKeyChanged") && (
         <HostKeyDialog
-          endpoint={endpoint}
+          endpoint={state.server}
           algorithm={state.algorithm}
           fingerprint={state.fingerprint}
           previousFingerprint={state.phase === "hostKeyChanged" ? state.previousFingerprint : undefined}

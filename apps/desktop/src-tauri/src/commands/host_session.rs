@@ -6,10 +6,11 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use termirust_core::CoreError;
 use termirust_core::ssh::{
-    HostKeyInfo, LoginMethod, PtySize, ShellSession, SshLogin, inspect_private_key,
+    HostKeyInfo, HostKeyVerifier, JumpHop, LoginMethod, PtySize, ShellSession, SshLogin,
+    inspect_private_key,
 };
 use termirust_core::vault::{
-    Host, HostAuth, HostKeyStatus, Identity, IdentityRecord, Secret, Vault,
+    Host, HostAuth, HostKeyStatus, Identity, IdentityRecord, KnownHostRecord, Secret, Vault,
 };
 use uuid::Uuid;
 
@@ -60,13 +61,16 @@ pub enum OpenHostOutcome {
     },
     /// Key and agent logins still need a username when neither the host nor the key has one.
     NeedsUsername,
+    /// `server` names the hop whose key is unknown: the target or its jump host.
     #[serde(rename_all = "camelCase")]
     HostKeyUnknown {
+        server: String,
         algorithm: String,
         fingerprint: String,
     },
     #[serde(rename_all = "camelCase")]
     HostKeyChanged {
+        server: String,
         algorithm: String,
         fingerprint: String,
         previous_fingerprint: String,
@@ -132,11 +136,6 @@ fn plan_login(
     identity: Option<&Identity>,
     prompted: Option<&PromptedLogin>,
 ) -> Result<LoginPlan, CoreError> {
-    if host.jump_host_id.is_some() {
-        return Err(CoreError::InvalidData(
-            "jump hosts are not supported yet".into(),
-        ));
-    }
     let typed = prompted.cloned().unwrap_or_default();
     let username = non_empty(typed.username.as_deref())
         .or_else(|| host.username.clone())
@@ -191,6 +190,119 @@ fn plan_login(
                 },
             })
         }
+    }
+}
+
+fn server_name(host: &Host) -> String {
+    format!("{} ({}:{})", host.label, host.hostname, host.port)
+}
+
+type OfferedKey = Arc<std::sync::Mutex<Option<(HostKeyInfo, HostKeyStatus, bool)>>>;
+
+/// Verifier for one hop: trusts the stored key or the one the user just confirmed, and records
+/// what was offered (and whether it was accepted) so the caller can ask or persist afterwards.
+fn hop_verifier(
+    known: Option<KnownHostRecord>,
+    confirmed: Option<String>,
+) -> (HostKeyVerifier, OfferedKey) {
+    let offered: OfferedKey = Arc::default();
+    let seen = offered.clone();
+    let verifier = Arc::new(move |key: &HostKeyInfo| {
+        let status = match &known {
+            None => HostKeyStatus::Unknown,
+            Some(k) if k.payload.fingerprint == key.fingerprint => HostKeyStatus::Trusted,
+            Some(k) => HostKeyStatus::Changed {
+                previous_fingerprint: k.payload.fingerprint.clone(),
+            },
+        };
+        let accept = host_key_decision(&status, key, confirmed.as_deref());
+        if let Ok(mut slot) = seen.lock() {
+            *slot = Some((key.clone(), status, accept));
+        }
+        accept
+    });
+    (verifier, offered)
+}
+
+fn key_outcome(server: String, offered: &OfferedKey) -> Option<OpenHostOutcome> {
+    let (key, status, _) = offered.lock().ok()?.clone()?;
+    Some(match status {
+        HostKeyStatus::Changed {
+            previous_fingerprint,
+        } => OpenHostOutcome::HostKeyChanged {
+            server,
+            algorithm: key.algorithm,
+            fingerprint: key.fingerprint,
+            previous_fingerprint,
+        },
+        _ => OpenHostOutcome::HostKeyUnknown {
+            server,
+            algorithm: key.algorithm,
+            fingerprint: key.fingerprint,
+        },
+    })
+}
+
+/// Remembers a hop's key once that hop has proven it holds it (it accepted our login).
+async fn trust_if_new(vault: &Vault, host: &Host, offered: &OfferedKey) -> Result<(), CoreError> {
+    let seen = offered.lock().ok().and_then(|s| s.clone());
+    if let Some((key, status, true)) = seen
+        && !matches!(status, HostKeyStatus::Trusted)
+    {
+        vault
+            .known_hosts()
+            .trust(&host.hostname, host.port, &key)
+            .await?;
+    }
+    Ok(())
+}
+
+struct ResolvedJump {
+    host: Host,
+    login: SshLogin,
+}
+
+/// The jump host logs in with what the vault holds; it cannot prompt mid-connection.
+async fn resolve_jump(vault: &Vault, host: &Host) -> Result<Option<ResolvedJump>, CoreError> {
+    let Some(jump_id) = host.jump_host_id else {
+        return Ok(None);
+    };
+    let jump = vault
+        .hosts()
+        .get(jump_id)
+        .await?
+        .ok_or_else(|| CoreError::InvalidData("the jump host no longer exists".into()))?
+        .payload;
+    if jump.jump_host_id.is_some() {
+        return Err(CoreError::InvalidData(format!(
+            "{} itself uses a jump host; multi-hop jumps are not supported yet",
+            jump.label
+        )));
+    }
+    let identity = match &jump.auth {
+        HostAuth::Identity { identity_id } => vault
+            .identities()
+            .get(*identity_id)
+            .await?
+            .map(|r| r.payload),
+        _ => None,
+    };
+    match plan_login(&jump, identity.as_ref(), None)? {
+        LoginPlan::Ready {
+            username, method, ..
+        } => Ok(Some(ResolvedJump {
+            login: SshLogin {
+                host: jump.hostname.clone(),
+                port: jump.port,
+                username,
+                method,
+            },
+            host: jump,
+        })),
+        _ => Err(CoreError::InvalidData(format!(
+            "the jump host {} needs a saved password, key passphrase or username — connect to it once and choose Remember in vault",
+            jump.label
+        ))),
     }
 }
 
@@ -258,24 +370,22 @@ pub async fn session_open_host(
     let uses_password = matches!(method, LoginMethod::Password(_));
     let key_label = identity.map(|i| i.label.clone()).unwrap_or_default();
 
-    let known = vault.known_hosts().find(&host.hostname, host.port).await?;
+    let jump = resolve_jump(vault, &host).await?;
     let confirmed = request.confirmed_fingerprint.clone();
-    let offered: Arc<std::sync::Mutex<Option<(HostKeyInfo, HostKeyStatus)>>> = Arc::default();
-    let seen = offered.clone();
-    let verifier = move |key: &HostKeyInfo| {
-        let status = match &known {
-            None => HostKeyStatus::Unknown,
-            Some(k) if k.payload.fingerprint == key.fingerprint => HostKeyStatus::Trusted,
-            Some(k) => HostKeyStatus::Changed {
-                previous_fingerprint: k.payload.fingerprint.clone(),
-            },
-        };
-        let accept = host_key_decision(&status, key, confirmed.as_deref());
-        if let Ok(mut slot) = seen.lock() {
-            *slot = Some((key.clone(), status));
-        }
-        accept
+    let (jump_verifier, jump_offered) = match &jump {
+        Some(j) => hop_verifier(
+            vault
+                .known_hosts()
+                .find(&j.host.hostname, j.host.port)
+                .await?,
+            confirmed.clone(),
+        ),
+        None => hop_verifier(None, None),
     };
+    let (verifier, offered) = hop_verifier(
+        vault.known_hosts().find(&host.hostname, host.port).await?,
+        confirmed,
+    );
 
     let login = SshLogin {
         host: host.hostname.clone(),
@@ -287,68 +397,64 @@ pub async fn session_open_host(
         cols: request.cols,
         rows: request.rows,
     };
-    let (shell, events) =
-        match ShellSession::open(&login, size, Arc::new(verifier), CONNECT_TIMEOUT).await {
-            Ok(opened) => opened,
-            Err(CoreError::HostKeyRejected) => {
-                let seen = offered.lock().ok().and_then(|s| s.clone());
-                return match seen {
-                    Some((
-                        key,
-                        HostKeyStatus::Changed {
-                            previous_fingerprint,
-                        },
-                    )) => Ok(OpenHostOutcome::HostKeyChanged {
-                        algorithm: key.algorithm,
-                        fingerprint: key.fingerprint,
-                        previous_fingerprint,
-                    }),
-                    Some((key, _)) => Ok(OpenHostOutcome::HostKeyUnknown {
-                        algorithm: key.algorithm,
-                        fingerprint: key.fingerprint,
-                    }),
-                    None => Err(CoreError::HostKeyRejected.into()),
-                };
-            }
-            Err(CoreError::AuthenticationFailed) if uses_password => {
-                return Ok(OpenHostOutcome::NeedsPassword {
-                    username_required: false,
-                    saved_password_rejected: secret == SecretSource::Vault,
-                });
-            }
-            Err(CoreError::WrongPassphrase) => {
-                return Ok(OpenHostOutcome::NeedsPassphrase {
-                    key_label,
-                    wrong_passphrase: true,
-                    username_required: false,
-                });
-            }
-            Err(CoreError::PassphraseRequired) => {
-                return Ok(OpenHostOutcome::NeedsPassphrase {
-                    key_label,
-                    wrong_passphrase: false,
-                    username_required: false,
-                });
-            }
-            Err(CoreError::AuthenticationFailed) => {
-                return Err(CoreError::InvalidData(format!(
-                    "{} did not accept the key for user {username}",
-                    host.hostname
-                ))
-                .into());
-            }
-            Err(err) => return Err(err.into()),
-        };
+    let hop = jump.as_ref().map(|j| JumpHop {
+        login: &j.login,
+        verify_host_key: jump_verifier,
+    });
+    let result = ShellSession::open_through(hop, &login, size, verifier, CONNECT_TIMEOUT).await;
 
-    // Persist only after the server proved it holds the key and accepted the login.
-    if let Some((key, status)) = offered.lock().ok().and_then(|s| s.clone())
-        && !matches!(status, HostKeyStatus::Trusted)
+    // The jump hop proved its key as soon as it let us through, even if the target then failed.
+    if let Some(j) = &jump
+        && !matches!(result, Err(CoreError::JumpHost(_)))
     {
-        vault
-            .known_hosts()
-            .trust(&host.hostname, host.port, &key)
-            .await?;
+        trust_if_new(vault, &j.host, &jump_offered).await?;
     }
+
+    let (shell, events) = match result {
+        Ok(opened) => opened,
+        Err(CoreError::JumpHost(inner)) if matches!(*inner, CoreError::HostKeyRejected) => {
+            let jump_host = jump
+                .as_ref()
+                .map(|j| server_name(&j.host))
+                .unwrap_or_default();
+            return key_outcome(jump_host, &jump_offered)
+                .ok_or_else(|| CoreError::HostKeyRejected.into());
+        }
+        Err(CoreError::HostKeyRejected) => {
+            return key_outcome(server_name(&host), &offered)
+                .ok_or_else(|| CoreError::HostKeyRejected.into());
+        }
+        Err(CoreError::AuthenticationFailed) if uses_password => {
+            return Ok(OpenHostOutcome::NeedsPassword {
+                username_required: false,
+                saved_password_rejected: secret == SecretSource::Vault,
+            });
+        }
+        Err(CoreError::WrongPassphrase) => {
+            return Ok(OpenHostOutcome::NeedsPassphrase {
+                key_label,
+                wrong_passphrase: true,
+                username_required: false,
+            });
+        }
+        Err(CoreError::PassphraseRequired) => {
+            return Ok(OpenHostOutcome::NeedsPassphrase {
+                key_label,
+                wrong_passphrase: false,
+                username_required: false,
+            });
+        }
+        Err(CoreError::AuthenticationFailed) => {
+            return Err(CoreError::InvalidData(format!(
+                "{} did not accept the key for user {username}",
+                host.hostname
+            ))
+            .into());
+        }
+        Err(err) => return Err(err.into()),
+    };
+
+    trust_if_new(vault, &host, &offered).await?;
     if let Some(prompted) = request.prompted.as_ref().filter(|p| p.remember) {
         remember_typed_secrets(
             vault,
@@ -605,17 +711,8 @@ mod tests {
 
     #[test]
     fn reports_unusable_configurations() {
-        let cases: [(Host, Option<&Identity>, &str); 2] = [
-            (key_host(Some("u")), None, "no longer exists"),
-            (
-                Host {
-                    jump_host_id: Some(Uuid::now_v7()),
-                    ..password_host(Some("pw"), Some("u"))
-                },
-                None,
-                "jump hosts",
-            ),
-        ];
+        let cases: [(Host, Option<&Identity>, &str); 1] =
+            [(key_host(Some("u")), None, "no longer exists")];
         for (host, identity, message) in cases {
             let err = plan_login(&host, identity, None).unwrap_err();
             assert!(
@@ -663,11 +760,12 @@ mod tests {
             ),
             (
                 OpenHostOutcome::HostKeyChanged {
+                    server: "bastion (1.2.3.4:22)".into(),
                     algorithm: "a".into(),
                     fingerprint: "n".into(),
                     previous_fingerprint: "o".into(),
                 },
-                serde_json::json!({"status":"hostKeyChanged","algorithm":"a","fingerprint":"n","previousFingerprint":"o"}),
+                serde_json::json!({"status":"hostKeyChanged","server":"bastion (1.2.3.4:22)","algorithm":"a","fingerprint":"n","previousFingerprint":"o"}),
             ),
         ];
         for (outcome, json) in cases {
@@ -680,6 +778,99 @@ mod tests {
         Vault::open_or_create(db, &MemoryKeyStore::default())
             .await
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn resolves_a_jump_host_from_its_saved_credentials() {
+        let vault = vault().await;
+        let bastion = vault
+            .hosts()
+            .create(&password_host(Some("jump-pw"), Some("admin")))
+            .await
+            .unwrap();
+        let target = Host {
+            jump_host_id: Some(bastion.meta.id),
+            ..password_host(Some("pw"), Some("u"))
+        };
+
+        let jump = resolve_jump(&vault, &target)
+            .await
+            .unwrap()
+            .expect("has a jump host");
+        assert_eq!(jump.login.username, "admin");
+        assert!(matches!(jump.login.method, LoginMethod::Password(ref p) if p == "jump-pw"));
+        assert!(
+            resolve_jump(&vault, &password_host(None, None))
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_jump_host_that_would_need_a_prompt_is_explained() {
+        let vault = vault().await;
+        let bastion = vault
+            .hosts()
+            .create(&Host {
+                label: "bastion".into(),
+                ..password_host(None, Some("admin"))
+            })
+            .await
+            .unwrap();
+        let target = Host {
+            jump_host_id: Some(bastion.meta.id),
+            ..password_host(Some("pw"), Some("u"))
+        };
+
+        let err = resolve_jump(&vault, &target).await.err().unwrap();
+        assert!(
+            matches!(err, CoreError::InvalidData(m) if m.contains("bastion") && m.contains("Remember"))
+        );
+    }
+
+    #[tokio::test]
+    async fn multi_hop_jumps_are_reported_as_not_supported() {
+        let vault = vault().await;
+        let first = vault
+            .hosts()
+            .create(&password_host(Some("pw"), Some("a")))
+            .await
+            .unwrap();
+        let second = vault
+            .hosts()
+            .create(&Host {
+                label: "middle".into(),
+                jump_host_id: Some(first.meta.id),
+                ..password_host(Some("pw"), Some("b"))
+            })
+            .await
+            .unwrap();
+        let target = Host {
+            jump_host_id: Some(second.meta.id),
+            ..password_host(Some("pw"), Some("c"))
+        };
+
+        let err = resolve_jump(&vault, &target).await.err().unwrap();
+        assert!(matches!(err, CoreError::InvalidData(m) if m.contains("multi-hop")));
+    }
+
+    #[test]
+    fn hop_verifier_records_what_was_offered_and_whether_it_was_accepted() {
+        let key = HostKeyInfo {
+            algorithm: "ssh-ed25519".into(),
+            fingerprint: "SHA256:k".into(),
+        };
+        let (verify, offered) = hop_verifier(None, Some("SHA256:k".into()));
+        assert!(verify(&key));
+        let (_, status, accepted) = offered.lock().unwrap().clone().unwrap();
+        assert_eq!(status, HostKeyStatus::Unknown);
+        assert!(accepted);
+
+        let outcome = key_outcome("bastion (1.2.3.4:22)".into(), &offered).unwrap();
+        assert!(
+            matches!(outcome, OpenHostOutcome::HostKeyUnknown { ref server, .. } if server == "bastion (1.2.3.4:22)")
+        );
     }
 
     #[tokio::test]

@@ -80,7 +80,7 @@ describe("useHostSession", () => {
   it("keeps the typed password when the next step is confirming the host key", async () => {
     commands.sessionOpenHost
       .mockResolvedValueOnce(ok({ status: "needsPassword", usernameRequired: false, savedPasswordRejected: false }))
-      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", algorithm: "ssh-ed25519", fingerprint: "SHA256:k" }))
+      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:k" }))
       .mockResolvedValueOnce(opened(6));
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.state.phase).toBe("needsPassword"));
@@ -109,12 +109,13 @@ describe("useHostSession", () => {
 
   it("surfaces a changed host key with both fingerprints", async () => {
     commands.sessionOpenHost.mockResolvedValue(
-      ok({ status: "hostKeyChanged", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
+      ok({ status: "hostKeyChanged", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
     );
     const { hook } = setup();
     await waitFor(() =>
       expect(hook.result.current.state).toEqual({
         phase: "hostKeyChanged",
+        server: "prod (10.0.0.1:22)",
         algorithm: "ssh-ed25519",
         fingerprint: "SHA256:new",
         previousFingerprint: "SHA256:old",

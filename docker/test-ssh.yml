@@ -19,8 +19,26 @@ services:
         ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEUQmwJbheLbLPM2hdVGFwm3Kv11WwrEHNqJHRvN2PDX termirust-test-encrypted
         ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCxWExklcN6v6sEtsVVt3QUHOic7lJ2hml/I2ynqEFTfgR1JLPxTyTl9cVZ4KeHyaHrr1OcH53VpM7fPLE27vucyXZn6SUpuEdUGeOf3uWvecQtY9+PLU5V5Efe7Jgk70YQKWucKrWGzjfIetYVnsKGXvqlK6N3JGGCBAfEhIC6uIBkGBaSSAhkMKZACQIV27p0ZoJ1rCY7iJW2cuvYD1Hnpd3nnNKtGMN4LhqK9CQzWu3BCwfdKN06mJXTa/hWbTW2c0TmZjt2qQL60rzLUvDWYL9l8CasjLmJJqc4OcPJo+sKppf8744368Y7EtMVYtTjeBMcBEb4vRjjB/xNOJMX termirust-test-rsa
         ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBDTWd0+1zkDXQUr1q3GQy6DSe1ON7wYro/A32ZYZ5krSUBwZkdC2iUOTSrsBG0uKViN3S613Hx0zATaqpVpY/yA= termirust-test-ecdsa
+    volumes:
+      - ./test-ssh-init:/custom-cont-init.d:ro
     ports:
       - "127.0.0.1:2222:2222"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2222"]
+      interval: 2s
+      retries: 30
+
+  # Reachable only from inside the compose network, i.e. through ssh-password as a jump host.
+  ssh-target:
+    image: linuxserver/openssh-server:10.3_p1-r1-ls239
+    hostname: ssh-target
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      PASSWORD_ACCESS: "true"
+      USER_NAME: target
+      USER_PASSWORD: target-test
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 2222"]
       interval: 2s

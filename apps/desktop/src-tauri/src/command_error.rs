@@ -43,6 +43,11 @@ impl CommandError {
 
 impl From<CoreError> for CommandError {
     fn from(err: CoreError) -> Self {
+        if let CoreError::JumpHost(inner) = err {
+            let mut error = CommandError::from(*inner);
+            error.message = format!("jump host: {}", error.message);
+            return error;
+        }
         let code = match &err {
             CoreError::Unreachable { .. } => CommandErrorCode::Unreachable,
             CoreError::Timeout(_) => CommandErrorCode::Timeout,
@@ -61,7 +66,9 @@ impl From<CoreError> for CommandError {
             CoreError::WrongPassphrase => CommandErrorCode::WrongPassphrase,
             CoreError::AgentUnavailable(_) => CommandErrorCode::AgentUnavailable,
             CoreError::LocalShell(_) => CommandErrorCode::LocalShell,
-            CoreError::NotImplemented(_) | CoreError::Crypto(_) => CommandErrorCode::Internal,
+            CoreError::NotImplemented(_) | CoreError::Crypto(_) | CoreError::JumpHost(_) => {
+                CommandErrorCode::Internal
+            }
         };
         Self {
             code,
@@ -129,6 +136,15 @@ mod tests {
         for (core, code) in cases {
             assert_eq!(CommandError::from(core).code, code);
         }
+    }
+
+    #[test]
+    fn jump_host_errors_keep_the_inner_code_and_say_which_hop_failed() {
+        let err = CommandError::from(CoreError::JumpHost(Box::new(
+            CoreError::AuthenticationFailed,
+        )));
+        assert_eq!(err.code, CommandErrorCode::AuthenticationFailed);
+        assert_eq!(err.message, "jump host: authentication failed");
     }
 
     #[test]
