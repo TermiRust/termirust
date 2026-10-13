@@ -13,6 +13,7 @@ const commands = {
   groupsCreate: vi.fn(),
   groupsUpdate: vi.fn(),
   groupsDelete: vi.fn(),
+  vaultRetryOpen: vi.fn(),
   keysList: vi.fn(),
   keysImport: vi.fn(),
   keysImportFile: vi.fn(),
@@ -231,12 +232,34 @@ describe("Sidebar", () => {
     expect(await screen.findByRole("button", { name: /Staging/, expanded: true })).toBeInTheDocument();
   });
 
-  it("shows a load error from the vault", async () => {
-    commands.hostsList.mockResolvedValue({ status: "error", error: { code: "keychain", message: "keychain locked" } });
+  it("says the vault is unlocking until the first load finishes", () => {
+    render(<Sidebar onOpenHost={vi.fn()} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Unlocking vault…");
+    expect(screen.queryByText("No hosts yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows a vault error and recovers with Try again", async () => {
+    commands.hostsList.mockResolvedValueOnce({ status: "error", error: { code: "keychain", message: "keychain access denied" } });
     commands.groupsList.mockResolvedValue(ok([]));
     await useHostsStore.getState().load();
     render(<Sidebar onOpenHost={vi.fn()} />);
-    expect(screen.getByRole("alert")).toHaveTextContent("keychain locked");
+    expect(screen.getByRole("alert")).toHaveTextContent("keychain access denied");
+
+    commands.vaultRetryOpen.mockResolvedValue(ok(null));
+    commands.hostsList.mockResolvedValue(ok([host("api")]));
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Connect to api" })).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the error when retrying fails again", async () => {
+    commands.hostsList.mockResolvedValue({ status: "error", error: { code: "keychain", message: "denied" } });
+    commands.groupsList.mockResolvedValue(ok([]));
+    await useHostsStore.getState().load();
+    render(<Sidebar onOpenHost={vi.fn()} />);
+    commands.vaultRetryOpen.mockResolvedValue({ status: "error", error: { code: "keychain", message: "still denied" } });
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("still denied");
   });
 
   it("saves and connects in one step", async () => {

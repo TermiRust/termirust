@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -20,7 +20,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
   const setSection = useLayoutStore((s) => s.setSection);
   const hostFilter = useLayoutStore((s) => s.hostFilter);
   const setHostFilter = useLayoutStore((s) => s.setHostFilter);
-  const { hosts, groups, loaded, error } = useHostsStore();
+  const { hosts, groups, loaded, error, retryVault } = useHostsStore();
   const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
@@ -125,10 +125,18 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-2">
-        {error && (
-          <p role="alert" className="px-1 text-sm text-accent">
-            {error}
+        {!loaded && (
+          <p role="status" className="flex items-center gap-2 px-1 text-sm text-fg-muted">
+            <Lock size={13} className="animate-pulse" /> Unlocking vault…
           </p>
+        )}
+        {error && (
+          <div role="alert" className="flex flex-col items-start gap-2 px-1 text-sm text-danger">
+            <p>{error}</p>
+            <Button size="sm" variant="outline" onClick={() => void retryVault()}>
+              Try again
+            </Button>
+          </div>
         )}
         {empty && <p className="px-1 text-sm text-fg-muted">No hosts yet.</p>}
         {noMatch && <p className="px-1 text-sm text-fg-muted">No host matches “{hostFilter}”.</p>}

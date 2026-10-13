@@ -10,6 +10,8 @@ interface HostsState {
   loaded: boolean;
   error: string | null;
   load: () => Promise<void>;
+  /** Re-opens a vault that failed to open (e.g. keychain access was denied), then reloads. */
+  retryVault: () => Promise<void>;
   createHost: (input: HostInput) => Promise<Outcome<HostView>>;
   updateHost: (id: string, input: HostInput) => Promise<Outcome<HostView>>;
   deleteHost: (id: string) => Promise<Outcome<null>>;
@@ -29,6 +31,13 @@ export const useHostsStore = create<HostsState>()((set, get) => ({
     if (hosts.status === "error") return set({ error: hosts.error.message, loaded: true });
     if (groups.status === "error") return set({ error: groups.error.message, loaded: true });
     set({ hosts: hosts.data, groups: groups.data, loaded: true, error: null });
+  },
+
+  retryVault: async () => {
+    set({ error: null, loaded: false });
+    const result = await commands.vaultRetryOpen();
+    if (result.status === "error") set({ error: result.error.message, loaded: true });
+    else await get().load();
   },
 
   createHost: async (input) => {

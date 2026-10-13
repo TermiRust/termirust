@@ -91,7 +91,7 @@ pub async fn ssh_config_preview(
     let parsed = read_ssh_config(&path, &home)?;
     Ok(SshConfigPreview {
         path: path.display().to_string(),
-        candidates: candidates(state.vault()?, &parsed).await?,
+        candidates: candidates(&state.vault().await?, &parsed).await?,
         unsupported: parsed.unsupported,
     })
 }
@@ -107,7 +107,8 @@ pub async fn ssh_config_import(
 ) -> Result<SshConfigImportResult, CommandError> {
     let home = home_dir(&app)?;
     let parsed = read_ssh_config(&config_path(path, &home), &home)?;
-    let summary = import_ssh_config_hosts(state.vault()?, &parsed.hosts, &aliases, &home).await?;
+    let summary =
+        import_ssh_config_hosts(&state.vault().await?, &parsed.hosts, &aliases, &home).await?;
     Ok(SshConfigImportResult {
         created_hosts: summary.created_hosts,
         imported_keys: summary.imported_keys,

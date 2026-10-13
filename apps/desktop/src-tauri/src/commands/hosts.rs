@@ -176,7 +176,7 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
 #[tauri::command]
 #[specta::specta]
 pub async fn hosts_list(state: State<'_, VaultState>) -> Result<Vec<HostView>, CommandError> {
-    let hosts = state.vault()?.hosts().list().await?;
+    let hosts = state.vault().await?.hosts().list().await?;
     Ok(hosts.iter().map(HostView::from).collect())
 }
 
@@ -187,7 +187,7 @@ pub async fn hosts_create(
     input: HostInput,
 ) -> Result<HostView, CommandError> {
     let host = host_from_input(input, None)?;
-    let record = state.vault()?.hosts().create(&host).await?;
+    let record = state.vault().await?.hosts().create(&host).await?;
     Ok(HostView::from(&record))
 }
 
@@ -199,7 +199,8 @@ pub async fn hosts_update(
     input: HostInput,
 ) -> Result<HostView, CommandError> {
     let id = parse_id(&id)?;
-    let hosts = state.vault()?.hosts();
+    let vault = state.vault().await?;
+    let hosts = vault.hosts();
     let previous = hosts.get(id).await?.ok_or_else(|| CoreError::NotFound {
         kind: "host",
         id: id.to_string(),
@@ -213,7 +214,8 @@ pub async fn hosts_update(
 #[specta::specta]
 pub async fn hosts_delete(state: State<'_, VaultState>, id: String) -> Result<(), CommandError> {
     state
-        .vault()?
+        .vault()
+        .await?
         .hosts()
         .delete(parse_id(&id)?)
         .await
@@ -223,7 +225,7 @@ pub async fn hosts_delete(state: State<'_, VaultState>, id: String) -> Result<()
 #[tauri::command]
 #[specta::specta]
 pub async fn groups_list(state: State<'_, VaultState>) -> Result<Vec<GroupView>, CommandError> {
-    let groups = state.vault()?.groups().list().await?;
+    let groups = state.vault().await?.groups().list().await?;
     Ok(groups.iter().map(GroupView::from).collect())
 }
 
@@ -238,7 +240,7 @@ pub async fn groups_create(
         parent_id: parse_optional_id(parent_id.as_ref())?,
         ..Group::new(name)
     };
-    let record = state.vault()?.groups().create(&group).await?;
+    let record = state.vault().await?.groups().create(&group).await?;
     Ok(GroupView::from(&record))
 }
 
@@ -252,7 +254,8 @@ pub async fn groups_update(
     warning_border: bool,
 ) -> Result<GroupView, CommandError> {
     let id = parse_id(&id)?;
-    let groups = state.vault()?.groups();
+    let vault = state.vault().await?;
+    let groups = vault.groups();
     let current = groups
         .get(id)
         .await?
@@ -275,7 +278,8 @@ pub async fn groups_update(
 #[specta::specta]
 pub async fn groups_delete(state: State<'_, VaultState>, id: String) -> Result<(), CommandError> {
     state
-        .vault()?
+        .vault()
+        .await?
         .groups()
         .delete(parse_id(&id)?)
         .await

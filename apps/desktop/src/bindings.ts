@@ -20,6 +20,8 @@ export const commands = {
 	/**  Lets the frontend print benchmark results to the dev console (used by the autorun mode). */
 	benchmarkReport: (summary: string) => __TAURI_INVOKE<void>("benchmark_report", { summary }),
 	vaultOverview: () => typedError<VaultOverview, CommandError>(__TAURI_INVOKE("vault_overview")),
+	/**  Re-opens the vault after a failure (e.g. the keychain prompt was denied) and waits for it. */
+	vaultRetryOpen: () => typedError<null, CommandError>(__TAURI_INVOKE("vault_retry_open")),
 	hostsList: () => typedError<HostView[], CommandError>(__TAURI_INVOKE("hosts_list")),
 	hostsCreate: (input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_create", { input })),
 	hostsUpdate: (id: string, input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_update", { id, input })),

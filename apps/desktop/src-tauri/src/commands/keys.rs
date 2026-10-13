@@ -73,7 +73,7 @@ fn key_identity(
 #[tauri::command]
 #[specta::specta]
 pub async fn keys_list(state: State<'_, VaultState>) -> Result<Vec<KeyView>, CommandError> {
-    let vault = state.vault()?;
+    let vault = state.vault().await?;
     let hosts = vault.hosts().list().await?;
     let identities = vault.identities().list().await?;
     Ok(identities
@@ -107,7 +107,8 @@ pub async fn keys_import(
         None
     };
     let record = state
-        .vault()?
+        .vault()
+        .await?
         .identities()
         .create(&key_identity(label, pem, &info, saved_passphrase))
         .await?;
@@ -150,7 +151,7 @@ pub async fn keys_generate(
     };
     let generated = generate_ed25519(&label)?;
     let identity = key_identity(label, generated.private_key.clone(), &generated.info, None);
-    let record = state.vault()?.identities().create(&identity).await?;
+    let record = state.vault().await?.identities().create(&identity).await?;
     key_view(&record, Vec::new())
         .ok_or_else(|| CoreError::InvalidData("generated key has no private part".into()).into())
 }
@@ -161,7 +162,8 @@ pub async fn keys_delete(state: State<'_, VaultState>, id: String) -> Result<(),
     let id =
         Uuid::parse_str(&id).map_err(|_| CoreError::InvalidData(format!("invalid id: {id}")))?;
     state
-        .vault()?
+        .vault()
+        .await?
         .identities()
         .delete(id)
         .await

@@ -6,6 +6,7 @@ mod session_registry;
 mod vault_state;
 
 use std::path::Path;
+use std::sync::Arc;
 
 use specta_typescript::Typescript;
 use tauri_specta::{Builder, collect_commands};
@@ -42,6 +43,7 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         benchmark::benchmark_acknowledge_output,
         benchmark::benchmark_report,
         vault::vault_overview,
+        vault::vault_retry_open,
         hosts::hosts_list,
         hosts::hosts_create,
         hosts::hosts_update,
@@ -95,11 +97,13 @@ pub fn run() {
             }
             tracing::info!(version = env!("CARGO_PKG_VERSION"), "Termirust starting");
             let data_dir = app.path().app_data_dir()?;
-            let vault = tauri::async_runtime::block_on(VaultState::open(
-                &data_dir,
-                &OsKeychain::new(KEYCHAIN_SERVICE),
+            app.manage(VaultState::new(
+                data_dir,
+                Arc::new(OsKeychain::new(KEYCHAIN_SERVICE)),
             ));
-            app.manage(vault);
+            // Opening may wait on an OS keychain prompt; the window must not wait with it.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move { handle.state::<VaultState>().open().await });
             Ok(())
         })
         .run(tauri::generate_context!())

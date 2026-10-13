@@ -82,7 +82,8 @@ pub async fn settings_terminal_get(
     state: State<'_, VaultState>,
 ) -> Result<TerminalSettings, CommandError> {
     let saved = state
-        .vault()?
+        .vault()
+        .await?
         .database()
         .settings()
         .get::<TerminalSettings>(TERMINAL_KEY)
@@ -98,7 +99,8 @@ pub async fn settings_terminal_set(
 ) -> Result<TerminalSettings, CommandError> {
     let settings = settings.sanitized();
     state
-        .vault()?
+        .vault()
+        .await?
         .database()
         .settings()
         .set(TERMINAL_KEY, &settings)

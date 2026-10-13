@@ -328,7 +328,7 @@ pub async fn session_open_host(
     on_output: Channel<RawChunk>,
     on_closed: Channel<SessionClosed>,
 ) -> Result<OpenHostOutcome, CommandError> {
-    let vault = vault_state.vault()?;
+    let vault = &vault_state.vault().await?;
     let host_id = Uuid::parse_str(&request.host_id)
         .map_err(|_| CoreError::InvalidData(format!("invalid host id: {}", request.host_id)))?;
     let host = vault

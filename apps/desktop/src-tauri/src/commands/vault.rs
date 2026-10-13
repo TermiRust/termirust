@@ -15,10 +15,18 @@ pub struct VaultOverview {
 #[tauri::command]
 #[specta::specta]
 pub async fn vault_overview(state: State<'_, VaultState>) -> Result<VaultOverview, CommandError> {
-    let vault = state.vault()?;
+    let vault = state.vault().await?;
     Ok(VaultOverview {
         hosts: vault.hosts().list().await?.len() as u32,
         groups: vault.groups().list().await?.len() as u32,
         identities: vault.identities().list().await?.len() as u32,
     })
+}
+
+/// Re-opens the vault after a failure (e.g. the keychain prompt was denied) and waits for it.
+#[tauri::command]
+#[specta::specta]
+pub async fn vault_retry_open(state: State<'_, VaultState>) -> Result<(), CommandError> {
+    state.open().await;
+    state.vault().await.map(|_| ())
 }
