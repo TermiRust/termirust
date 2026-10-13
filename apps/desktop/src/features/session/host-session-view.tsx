@@ -1,9 +1,10 @@
-import { ArrowLeft, PlugZap, RotateCw } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { PlugZap, RotateCw } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { TerminalView, type TerminalHandle } from "@/features/terminal/terminal-view";
+import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
 import { PasswordPrompt } from "./password-prompt";
@@ -11,22 +12,34 @@ import { useHostSession, type HostSessionState } from "./use-host-session";
 
 interface HostSessionViewProps {
   host: HostView;
-  onExit: () => void;
+  onStatusChange?: (status: TabStatus) => void;
 }
 
-export function HostSessionView({ host, onExit }: HostSessionViewProps) {
+const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
+  connecting: "connecting",
+  needsPassword: "connecting",
+  hostKeyUnknown: "connecting",
+  hostKeyChanged: "connecting",
+  connected: "connected",
+  closed: "disconnected",
+  cancelled: "disconnected",
+  error: "error",
+};
+
+export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
   const { state } = session;
   const endpoint = `${host.hostname}:${host.port}`;
 
+  useEffect(() => {
+    onStatusChange?.(tabStatusOf[state.phase]);
+  }, [state.phase, onStatusChange]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-2">
-        <Button size="icon" aria-label="Back" onClick={onExit}>
-          <ArrowLeft size={15} />
-        </Button>
+      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <span className="font-medium">{host.label}</span>
         <span className="font-mono text-xs text-fg-muted">
           {host.username ? `${host.username}@` : ""}

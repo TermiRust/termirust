@@ -50,7 +50,7 @@ describe("HostSessionView", () => {
       .mockResolvedValueOnce(ok({ status: "needsPassword", usernameRequired: true, savedPasswordRejected: false }))
       .mockResolvedValueOnce(ok({ status: "opened", sessionId: 1 }));
     const user = userEvent.setup();
-    render(<HostSessionView host={host} onExit={vi.fn()} />);
+    render(<HostSessionView host={host} />);
 
     const dialog = await screen.findByRole("dialog", { name: "Log in to prod-api" });
     expect(within(dialog).getByRole("checkbox", { name: /Remember in vault/ })).toBeChecked();
@@ -69,7 +69,7 @@ describe("HostSessionView", () => {
 
   it("explains when the saved password was rejected", async () => {
     commands.sessionOpenHost.mockResolvedValue(ok({ status: "needsPassword", usernameRequired: false, savedPasswordRejected: true }));
-    render(<HostSessionView host={host} onExit={vi.fn()} />);
+    render(<HostSessionView host={host} />);
     expect(await screen.findByText(/saved password was rejected/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Username" })).not.toBeInTheDocument();
   });
@@ -79,7 +79,7 @@ describe("HostSessionView", () => {
       .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" }))
       .mockResolvedValueOnce(ok({ status: "opened", sessionId: 2 }));
     const user = userEvent.setup();
-    render(<HostSessionView host={host} onExit={vi.fn()} />);
+    render(<HostSessionView host={host} />);
 
     const dialog = await screen.findByRole("dialog", { name: "Verify new server" });
     expect(dialog).toHaveTextContent("SHA256:abc");
@@ -92,7 +92,7 @@ describe("HostSessionView", () => {
       ok({ status: "hostKeyChanged", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
     );
     const user = userEvent.setup();
-    render(<HostSessionView host={host} onExit={vi.fn()} />);
+    render(<HostSessionView host={host} />);
 
     const dialog = await screen.findByRole("dialog", { name: "Host key has changed" });
     expect(dialog).toHaveTextContent("Previous: SHA256:old");
@@ -104,12 +104,19 @@ describe("HostSessionView", () => {
     expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
   });
 
-  it("goes back from the header", async () => {
+  it("reports its connection status for the tab", async () => {
     commands.sessionOpenHost.mockResolvedValue(ok({ status: "opened", sessionId: 3 }));
-    const onExit = vi.fn();
-    const user = userEvent.setup();
-    render(<HostSessionView host={host} onExit={onExit} />);
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    expect(onExit).toHaveBeenCalledOnce();
+    const onStatusChange = vi.fn();
+    render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
+    expect(onStatusChange).toHaveBeenCalledWith("connecting");
+    await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("connected"));
+  });
+
+  it("reports an error status when the backend refuses", async () => {
+    commands.sessionOpenHost.mockResolvedValue({ status: "error", error: { code: "invalid_data", message: "agent not supported" } });
+    const onStatusChange = vi.fn();
+    render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
+    await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("error"));
+    expect(screen.getByRole("status")).toHaveTextContent("agent not supported");
   });
 });

@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLayoutStore } from "@/stores/layout-store";
+import { useTabsStore } from "@/stores/tabs-store";
 
 vi.mock("@/bindings", () => ({
   commands: {
@@ -21,10 +22,12 @@ vi.mock("@/features/connection-lab/connection-lab", () => ({
 
 const { AppShell } = await import("./app-shell");
 const initialState = useLayoutStore.getState();
+const initialTabs = useTabsStore.getState();
 
 describe("AppShell", () => {
   beforeEach(() => {
     useLayoutStore.setState(initialState, true);
+    useTabsStore.setState(initialTabs, true);
   });
 
   it("shows the empty workspace with the backend version", async () => {
@@ -73,5 +76,42 @@ describe("AppShell", () => {
 
     await user.click(screen.getByRole("button", { name: "Leave lab" }));
     expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
+  });
+});
+
+describe("AppShell tabs", () => {
+  const initialTabs = useTabsStore.getState();
+  beforeEach(() => useTabsStore.setState(initialTabs, true));
+
+  it("asks before closing a connected tab with the keyboard shortcut", async () => {
+    const id = useTabsStore.getState().openLabTab();
+    useTabsStore.getState().setTabStatus(id, "connected");
+    render(<AppShell />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    fireEvent.keyDown(window, onMac ? { key: "w", metaKey: true } : { key: "w", ctrlKey: true, shiftKey: true });
+
+    const dialog = await screen.findByRole("dialog", { name: /Close Connection lab/ });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Close tab" }));
+    expect(useTabsStore.getState().tabs).toEqual([]);
+    expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
+  });
+
+  it("closes a tab that is not connected without asking", async () => {
+    useTabsStore.getState().openLabTab();
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole("button", { name: "Close Connection lab" }));
+    expect(useTabsStore.getState().tabs).toEqual([]);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("switches tabs by number shortcut", () => {
+    const first = useTabsStore.getState().openLabTab();
+    useTabsStore.getState().openLabTab();
+    render(<AppShell />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    act(() => {
+      fireEvent.keyDown(window, onMac ? { key: "1", metaKey: true } : { key: "1", altKey: true });
+    });
+    expect(useTabsStore.getState().activeTabId).toBe(first);
   });
 });
