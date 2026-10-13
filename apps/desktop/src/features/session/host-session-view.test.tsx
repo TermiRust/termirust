@@ -39,7 +39,7 @@ const host: HostView = {
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false,
+  keepaliveSecs: null, aiDisabled: false, os: null,
 color: null,
 };
 const ok = (data: unknown) => ({ status: "ok", data });

@@ -27,6 +27,7 @@ describe("hostFormValues", () => {
       keepaliveSecs: 60,
       color: null,
       aiDisabled: true,
+      os: null,
     };
     expect(hostFormValues(host)).toEqual({
       label: "db",
@@ -100,7 +101,7 @@ describe("hostInputFromForm", () => {
       jumpHostId: null,
       tags: [],
       notes: "",
-      keepaliveSecs: null, aiDisabled: false,
+      keepaliveSecs: null, aiDisabled: false, os: null,
     color: null,
     });
     expect([values.authMethod, values.keyId]).toEqual(["key", "k1"]);

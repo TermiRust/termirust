@@ -38,6 +38,9 @@ pub struct Host {
     /// Hide AI help in this host's tabs (e.g. a production database).
     #[serde(default)]
     pub ai_disabled: bool,
+    /// Detected on the first successful connection, e.g. "ubuntu"; drives the host's icon.
+    #[serde(default)]
+    pub os: Option<String>,
 }
 
 /// Colours a host or group may use for its tabs.
@@ -69,6 +72,7 @@ impl Host {
             keepalive_secs: None,
             color: None,
             ai_disabled: false,
+            os: None,
         }
     }
 

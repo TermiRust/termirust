@@ -24,6 +24,7 @@ const host = (id: string, groupId: string | null = null): HostView => ({
   keepaliveSecs: null,
   color: null,
   aiDisabled: false,
+  os: null,
 });
 const web: GroupView = { id: "g1", name: "Web", parentId: null, color: null, warningBorder: false, aiDisabled: false };
 const snippet = (command: string): SnippetView => ({ id: "s", name: "Restart", command, description: "", tags: [] });

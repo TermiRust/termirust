@@ -164,7 +164,7 @@ describe("AppShell warning border", () => {
   it("frames tabs of hosts whose group asks for it, in the group's colour", async () => {
     const { useHostsStore } = await import("@/stores/hosts-store");
     const prod = { id: "g1", name: "Production", parentId: null, color: null, warningBorder: true, aiDisabled: false };
-    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, color: null };
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, os: null, color: null };
     const laptop = { ...api, id: "h2", label: "laptop", groupId: null };
     useTabsStore.setState({ tabs: [], activeTabId: null });
     useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
@@ -188,7 +188,7 @@ describe("AppShell warning border", () => {
   it("opens an SFTP tab from the sidebar, framed like the host's terminal tabs", async () => {
     const { useHostsStore } = await import("@/stores/hosts-store");
     const prod = { id: "g1", name: "Production", parentId: null, color: null, warningBorder: true, aiDisabled: false };
-    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, color: null };
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, os: null, color: null };
     useTabsStore.setState({ tabs: [], activeTabId: null });
     useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
     useHostsStore.setState({ hosts: [], groups: [], loaded: false });
@@ -228,7 +228,7 @@ describe("AppShell warning border", () => {
   it("runs a snippet on several hosts: one tab each, sent once each connects", async () => {
     const { useHostsStore } = await import("@/stores/hosts-store");
     const { registerTerminalInput } = await import("@/stores/terminal-inputs");
-    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false };
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false, os: null };
     const db = { ...api, id: "h2", label: "db" };
     useTabsStore.setState({ tabs: [], activeTabId: null });
     useLayoutStore.setState({ section: "snippets", sidebarVisible: true, hostFilter: "" });
@@ -326,7 +326,7 @@ describe("AppShell warning border", () => {
     await user.click(screen.getByRole("button", { name: "Split pane" }));
     expect(screen.getAllByText("local shell")).toHaveLength(2);
 
-    const host = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false };
+    const host = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false, os: null };
     act(() => {
       useTabsStore.getState().openSftpTab(host, null);
     });

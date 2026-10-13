@@ -251,6 +251,7 @@ export type HostView = {
 	keepaliveSecs: number | null,
 	color: string | null,
 	aiDisabled: boolean,
+	os: string | null,
 };
 
 /**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */

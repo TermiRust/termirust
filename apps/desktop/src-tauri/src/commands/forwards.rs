@@ -753,5 +753,9 @@ mod tests {
                 .await
                 .is_err()
         );
+
+        // The shared connection flow learned the server's OS on this first connection.
+        let saved = vault.hosts().get(host_id).await.unwrap().unwrap().payload;
+        assert_eq!(saved.os.as_deref(), Some("alpine"));
     }
 }

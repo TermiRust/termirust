@@ -44,6 +44,7 @@ const host: HostView = {
   keepaliveSecs: null,
   color: null,
   aiDisabled: false,
+  os: null,
 };
 const ok = (data: unknown) => ({ status: "ok", data });
 const latestProps = (index: number) => [...terminals.values()][index]!;

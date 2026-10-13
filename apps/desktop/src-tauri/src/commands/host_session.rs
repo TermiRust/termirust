@@ -491,6 +491,20 @@ pub async fn connect_host(
     };
     tracing::info!(host_id = %request.host_id, "connected");
 
+    // First connection only: learn the OS for the host's icon, on a channel the user never sees.
+    if host.os.is_none()
+        && let Some(os) = connection.detect_os().await
+    {
+        let mut updated = vault
+            .hosts()
+            .get(host_id)
+            .await?
+            .map(|r| r.payload)
+            .unwrap_or_else(|| host.clone());
+        updated.os = Some(os);
+        vault.hosts().update(host_id, &updated).await?;
+    }
+
     if request.remember_host_key {
         trust_if_new(vault, &host, &offered).await?;
     }

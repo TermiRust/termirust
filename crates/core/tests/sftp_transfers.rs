@@ -264,3 +264,13 @@ async fn transfers_whole_directories_both_ways_with_overall_progress() {
     sftp.remove(&dir).await.unwrap();
     sftp.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn detects_the_test_servers_operating_system_without_a_terminal() {
+    let connection = SshConnection::open(None, &key_login(), Arc::new(|_| true), TIMEOUT)
+        .await
+        .unwrap();
+    // linuxserver/openssh-server is built on Alpine.
+    assert_eq!(connection.detect_os().await.as_deref(), Some("alpine"));
+    connection.disconnect().await.unwrap();
+}

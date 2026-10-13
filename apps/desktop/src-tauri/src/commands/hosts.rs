@@ -24,6 +24,7 @@ pub struct HostView {
     pub keepalive_secs: Option<u32>,
     pub color: Option<String>,
     pub ai_disabled: bool,
+    pub os: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -128,6 +129,7 @@ impl From<&HostRecord> for HostView {
             keepalive_secs: host.keepalive_secs,
             color: host.color.clone(),
             ai_disabled: host.ai_disabled,
+            os: host.os.clone(),
         }
     }
 }
@@ -176,6 +178,8 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
         keepalive_secs: input.keepalive_secs,
         color: input.color.filter(|c| !c.is_empty()),
         ai_disabled: input.ai_disabled,
+        // Detected, not typed: editing a host must not forget it.
+        os: previous.and_then(|h| h.os.clone()),
     })
 }
 
@@ -317,6 +321,20 @@ mod tests {
             color: None,
             ai_disabled: false,
         }
+    }
+
+    #[test]
+    fn editing_a_host_keeps_its_detected_os() {
+        let previous = Host {
+            os: Some("ubuntu".into()),
+            ..Host::new("10.0.0.1")
+        };
+        let edited = host_from_input(input(AuthInput::Agent), Some(&previous)).unwrap();
+        assert_eq!(edited.os.as_deref(), Some("ubuntu"));
+        assert_eq!(
+            host_from_input(input(AuthInput::Agent), None).unwrap().os,
+            None
+        );
     }
 
     #[test]

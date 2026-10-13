@@ -3,7 +3,9 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { OsIcon } from "@/components/ui/os-icon";
 import { useAiAllowed } from "@/features/ai/use-ai-allowed";
+import { useHostsStore } from "@/stores/hosts-store";
 import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
@@ -58,6 +60,8 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   const auto = useAutoReconnect(waitingToRetry, state.phase === "connected", session.reconnect);
   const dimmed = session.everConnected && state.phase !== "connected";
   const aiAllowed = useAiAllowed(host);
+  // The OS is learned on first connect; show it from the refreshed host list.
+  const latestHost = useHostsStore((s) => s.hosts.find((h) => h.id === host.id)) ?? host;
   const ai = useTerminalAi({
     allowed: aiAllowed,
     target: "remote",
@@ -75,6 +79,12 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   useEffect(() => {
     if (connected) void useForwardsStore.getState().autoStart(host.id);
   }, [connected, host.id]);
+
+  // The backend records the OS during the first connection; pick it up for the icon.
+  const knownOs = Boolean(latestHost.os);
+  useEffect(() => {
+    if (connected && !knownOs && useHostsStore.getState().loaded) void useHostsStore.getState().load();
+  }, [connected, knownOs]);
 
   useEffect(() => (connected && focused && tabId ? registerTerminalInput(tabId, session.send) : undefined), [connected, focused, tabId, session.send]);
   useEffect(() => (connected && tabId && paneId ? registerPaneInput(tabId, paneId, session.send) : undefined), [connected, tabId, paneId, session.send]);
@@ -94,6 +104,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
+        <OsIcon os={latestHost.os} size={14} />
         <span className="font-medium">{host.label}</span>
         <span className="font-mono text-xs text-fg-muted">
           {host.username ? `${host.username}@` : ""}

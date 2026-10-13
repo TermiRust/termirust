@@ -17,7 +17,7 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false,
+  keepaliveSecs: null, aiDisabled: false, os: null,
   color: null,
   ...overrides,
 });
