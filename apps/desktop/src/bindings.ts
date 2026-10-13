@@ -16,6 +16,7 @@ export const commands = {
 	benchmarkAcknowledgeOutput: (bytes: number) => __TAURI_INVOKE<void>("benchmark_acknowledge_output", { bytes }),
 	/**  Lets the frontend print benchmark results to the dev console (used by the autorun mode). */
 	benchmarkReport: (summary: string) => __TAURI_INVOKE<void>("benchmark_report", { summary }),
+	vaultOverview: () => typedError<VaultOverview, CommandError>(__TAURI_INVOKE("vault_overview")),
 };
 
 /* Types */
@@ -25,7 +26,7 @@ export type CommandError = {
 	message: string,
 };
 
-export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "internal";
+export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "internal";
 
 export type OpenSessionOutcome = { status: "opened"; sessionId: number } | 
 /**  The server's key is not trusted yet; ask the user, then retry with `trusted_fingerprint`. */
@@ -50,6 +51,12 @@ export type PasswordSessionRequest = {
 
 export type SessionClosed = {
 	exitStatus: number | null,
+};
+
+export type VaultOverview = {
+	hosts: number,
+	groups: number,
+	identities: number,
 };
 
 /* Tauri Specta runtime */

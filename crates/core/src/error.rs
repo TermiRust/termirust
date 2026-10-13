@@ -24,6 +24,30 @@ pub enum CoreError {
 
     #[error("ssh protocol error: {0}")]
     Ssh(String),
+
+    #[error("storage error: {0}")]
+    Storage(String),
+
+    #[error("crypto error: {0}")]
+    Crypto(String),
+
+    #[error("data could not be decrypted (wrong key or tampered data)")]
+    DecryptionFailed,
+
+    #[error("the vault key is missing from the OS keychain")]
+    VaultKeyMissing,
+
+    #[error("the vault key does not match this vault")]
+    WrongVaultKey,
+
+    #[error("OS keychain error: {0}")]
+    Keychain(String),
+
+    #[error("{kind} {id} not found")]
+    NotFound { kind: &'static str, id: String },
+
+    #[error("invalid data: {0}")]
+    InvalidData(String),
 }
 
 impl From<russh::Error> for CoreError {

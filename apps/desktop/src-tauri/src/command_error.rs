@@ -18,6 +18,13 @@ pub enum CommandErrorCode {
     SessionNotFound,
     SessionClosed,
     Ssh,
+    Storage,
+    VaultKeyMissing,
+    WrongVaultKey,
+    Keychain,
+    DecryptionFailed,
+    NotFound,
+    InvalidData,
     Internal,
 }
 
@@ -39,7 +46,14 @@ impl From<CoreError> for CommandError {
             CoreError::HostKeyRejected => CommandErrorCode::HostKeyRejected,
             CoreError::SessionClosed => CommandErrorCode::SessionClosed,
             CoreError::Ssh(_) => CommandErrorCode::Ssh,
-            CoreError::NotImplemented(_) => CommandErrorCode::Internal,
+            CoreError::Storage(_) => CommandErrorCode::Storage,
+            CoreError::VaultKeyMissing => CommandErrorCode::VaultKeyMissing,
+            CoreError::WrongVaultKey => CommandErrorCode::WrongVaultKey,
+            CoreError::Keychain(_) => CommandErrorCode::Keychain,
+            CoreError::DecryptionFailed => CommandErrorCode::DecryptionFailed,
+            CoreError::NotFound { .. } => CommandErrorCode::NotFound,
+            CoreError::InvalidData(_) => CommandErrorCode::InvalidData,
+            CoreError::NotImplemented(_) | CoreError::Crypto(_) => CommandErrorCode::Internal,
         };
         Self {
             code,
@@ -79,6 +93,29 @@ mod tests {
             ),
             (CoreError::SessionClosed, CommandErrorCode::SessionClosed),
             (CoreError::Ssh("x".into()), CommandErrorCode::Ssh),
+            (CoreError::Storage("x".into()), CommandErrorCode::Storage),
+            (
+                CoreError::VaultKeyMissing,
+                CommandErrorCode::VaultKeyMissing,
+            ),
+            (CoreError::WrongVaultKey, CommandErrorCode::WrongVaultKey),
+            (CoreError::Keychain("x".into()), CommandErrorCode::Keychain),
+            (
+                CoreError::DecryptionFailed,
+                CommandErrorCode::DecryptionFailed,
+            ),
+            (
+                CoreError::NotFound {
+                    kind: "host",
+                    id: "1".into(),
+                },
+                CommandErrorCode::NotFound,
+            ),
+            (
+                CoreError::InvalidData("x".into()),
+                CommandErrorCode::InvalidData,
+            ),
+            (CoreError::Crypto("x".into()), CommandErrorCode::Internal),
             (CoreError::NotImplemented("x"), CommandErrorCode::Internal),
         ];
         for (core, code) in cases {

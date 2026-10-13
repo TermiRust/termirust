@@ -2,13 +2,18 @@ mod command_error;
 mod commands;
 mod raw_chunk;
 mod session_registry;
+mod vault_state;
 
 use std::path::Path;
 
 use specta_typescript::Typescript;
 use tauri_specta::{Builder, collect_commands};
 
-use crate::commands::{benchmark, session};
+use tauri::Manager;
+use termirust_core::vault::OsKeychain;
+
+use crate::commands::{benchmark, session, vault};
+use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
 /// Committed TypeScript bindings consumed by the frontend.
 pub const BINDINGS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings.ts");
@@ -31,6 +36,7 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         benchmark::benchmark_output_json,
         benchmark::benchmark_acknowledge_output,
         benchmark::benchmark_report,
+        vault::vault_overview,
     ])
 }
 
@@ -57,6 +63,12 @@ pub fn run() {
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);
+            let data_dir = app.path().app_data_dir()?;
+            let vault = tauri::async_runtime::block_on(VaultState::open(
+                &data_dir,
+                &OsKeychain::new(KEYCHAIN_SERVICE),
+            ));
+            app.manage(vault);
             Ok(())
         })
         .run(tauri::generate_context!())

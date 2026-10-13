@@ -1,6 +1,8 @@
 mod error;
 pub mod ssh;
+pub mod storage;
 pub mod terminal;
+pub mod vault;
 
 pub use error::{CoreError, Result};
 
