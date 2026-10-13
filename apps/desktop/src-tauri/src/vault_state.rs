@@ -24,6 +24,12 @@ pub struct VaultState {
     key_store: Arc<dyn VaultKeyStore>,
 }
 
+/// No vault database yet: the user has not seen the onboarding, so nothing may touch the
+/// OS keychain (whose permission prompt would otherwise appear unexplained).
+pub fn is_first_launch(data_dir: &Path) -> bool {
+    !data_dir.join(DATABASE_FILE_NAME).exists()
+}
+
 pub async fn open_vault(
     data_dir: &Path,
     key_store: &dyn VaultKeyStore,
@@ -89,6 +95,18 @@ mod tests {
 
     use super::*;
     use crate::command_error::CommandErrorCode;
+
+    #[tokio::test]
+    async fn first_launch_is_detected_until_the_vault_has_been_created() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(is_first_launch(dir.path()));
+        let state = VaultState::new(
+            dir.path().to_path_buf(),
+            Arc::new(MemoryKeyStore::default()),
+        );
+        state.open().await;
+        assert!(!is_first_launch(dir.path()));
+    }
 
     #[tokio::test]
     async fn creates_the_database_inside_the_app_data_directory() {

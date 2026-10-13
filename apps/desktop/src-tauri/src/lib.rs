@@ -46,6 +46,8 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         benchmark::benchmark_report,
         vault::vault_overview,
         vault::vault_retry_open,
+        vault::onboarding_needed,
+        vault::onboarding_finish,
         hosts::hosts_list,
         hosts::hosts_create,
         hosts::hosts_update,
@@ -140,8 +142,13 @@ pub fn run() {
                 Arc::new(OsKeychain::new(KEYCHAIN_SERVICE)),
             ));
             // Opening may wait on an OS keychain prompt; the window must not wait with it.
-            let handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move { handle.state::<VaultState>().open().await });
+            // On first launch the onboarding opens it once the prompt has been explained.
+            if !vault_state::is_first_launch(&app.path().app_data_dir()?) {
+                let handle = app.handle().clone();
+                tauri::async_runtime::spawn(
+                    async move { handle.state::<VaultState>().open().await },
+                );
+            }
             Ok(())
         })
         .run(tauri::generate_context!())
