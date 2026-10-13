@@ -238,7 +238,7 @@ export function AppShell() {
       <div className="flex min-h-0 flex-1">
         {/* Kept mounted so it can slide; hidden from focus and screen readers while collapsed. */}
         <div
-          className={cn("shrink-0 overflow-hidden transition-[width] duration-200 ease-out", sidebarVisible ? "w-64" : "w-0")}
+          className={cn("flex shrink-0 overflow-hidden transition-[width] duration-200 ease-out", sidebarVisible ? "w-64" : "w-0")}
           inert={!sidebarVisible}
           aria-hidden={!sidebarVisible}
           data-testid="sidebar-slot"

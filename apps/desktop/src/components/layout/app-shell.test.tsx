@@ -56,6 +56,15 @@ describe("AppShell", () => {
     expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["local"]);
   });
 
+  // Regression: inside the sliding slot the sidebar stopped stretching and ended mid-window.
+  it("lets the sidebar fill the window height inside its sliding slot", () => {
+    render(<AppShell />);
+    const slot = screen.getByTestId("sidebar-slot");
+    expect(slot.className).toMatch(/(^|\s)flex(\s|$)/);
+    const sidebar = screen.getByRole("complementary", { name: "Hosts sidebar" });
+    expect(sidebar.className).not.toMatch(/\bh-(fit|auto|min)\b/);
+  });
+
   it("hides and shows the sidebar with the platform shortcut", () => {
     render(<AppShell />);
     expect(screen.getByRole("complementary", { name: "Hosts sidebar" })).toBeInTheDocument();
