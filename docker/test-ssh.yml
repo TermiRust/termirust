@@ -1,0 +1,21 @@
+# SSH servers for termirust-core integration tests:
+#   docker compose -f docker/test-ssh.yml up -d
+#   cargo test -p termirust-core --features integration
+name: termirust-test-ssh
+
+services:
+  ssh-password:
+    image: linuxserver/openssh-server:10.3_p1-r1-ls239
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Etc/UTC
+      PASSWORD_ACCESS: "true"
+      USER_NAME: termirust
+      USER_PASSWORD: termirust-test
+    ports:
+      - "127.0.0.1:2222:2222"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2222"]
+      interval: 2s
+      retries: 30

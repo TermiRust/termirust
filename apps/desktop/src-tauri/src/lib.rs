@@ -1,7 +1,14 @@
+mod command_error;
+mod commands;
+mod raw_chunk;
+mod session_registry;
+
 use std::path::Path;
 
 use specta_typescript::Typescript;
 use tauri_specta::{Builder, collect_commands};
+
+use crate::commands::{benchmark, session};
 
 /// Committed TypeScript bindings consumed by the frontend.
 pub const BINDINGS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/bindings.ts");
@@ -13,7 +20,18 @@ fn app_version() -> String {
 }
 
 pub fn command_registry() -> Builder<tauri::Wry> {
-    Builder::<tauri::Wry>::new().commands(collect_commands![app_version])
+    Builder::<tauri::Wry>::new().commands(collect_commands![
+        app_version,
+        session::session_open_with_password,
+        session::session_write,
+        session::session_acknowledge_output,
+        session::session_resize,
+        session::session_close,
+        benchmark::benchmark_output_raw,
+        benchmark::benchmark_output_json,
+        benchmark::benchmark_acknowledge_output,
+        benchmark::benchmark_report,
+    ])
 }
 
 pub fn export_bindings(
@@ -34,6 +52,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(session::Sessions::default())
+        .manage(benchmark::ActiveBenchmark::default())
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);

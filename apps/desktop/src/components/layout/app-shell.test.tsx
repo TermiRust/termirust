@@ -5,6 +5,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useLayoutStore } from "@/stores/layout-store";
 
 vi.mock("@/bindings", () => ({ commands: { appVersion: () => Promise.resolve("0.0.1") } }));
+vi.mock("@/features/connection-lab/connection-lab", () => ({
+  ConnectionLab: ({ onExit }: { onExit: () => void }) => (
+    <button type="button" onClick={onExit}>
+      Leave lab
+    </button>
+  ),
+}));
 
 const { AppShell } = await import("./app-shell");
 const initialState = useLayoutStore.getState();
@@ -50,5 +57,15 @@ describe("AppShell", () => {
     render(<AppShell />);
     await userEvent.type(screen.getByRole("searchbox", { name: "Filter hosts" }), "prod");
     expect(useLayoutStore.getState().hostFilter).toBe("prod");
+  });
+
+  it("switches between the empty workspace and the connection lab", async () => {
+    const user = userEvent.setup();
+    render(<AppShell />);
+    await user.click(screen.getByRole("button", { name: "Open connection lab" }));
+    expect(screen.queryByText(/No open sessions/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Leave lab" }));
+    expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
   });
 });

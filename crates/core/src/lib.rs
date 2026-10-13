@@ -1,4 +1,6 @@
 mod error;
+pub mod ssh;
+pub mod terminal;
 
 pub use error::{CoreError, Result};
 

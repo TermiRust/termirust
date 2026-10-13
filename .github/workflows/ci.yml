@@ -29,6 +29,10 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+      - name: Start SSH test servers
+        run: docker compose -f docker/test-ssh.yml up -d --wait
+      - name: Integration tests against real SSH servers
+        run: cargo test -p termirust-core --features integration
 
   frontend:
     name: Frontend (lint, typecheck, test)

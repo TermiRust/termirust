@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
+import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { isMacPlatform, isToggleSidebarShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useLayoutStore } from "@/stores/layout-store";
@@ -12,6 +13,8 @@ export function AppShell() {
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
+  const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
+  const [view, setView] = useState<"empty" | "lab">(autoRunBenchmarks ? "lab" : "empty");
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -29,7 +32,15 @@ export function AppShell() {
       {sidebarVisible && <Sidebar />}
       <main className="flex min-w-0 flex-1 flex-col">
         <TabBar />
-        <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} />
+        {view === "lab" ? (
+          <ConnectionLab onExit={() => setView("empty")} autoRunBenchmarks={autoRunBenchmarks} />
+        ) : (
+          <EmptyWorkspace
+            version={version}
+            sidebarShortcut={toggleSidebarLabel(onMac)}
+            onOpenConnectionLab={() => setView("lab")}
+          />
+        )}
       </main>
     </div>
   );
