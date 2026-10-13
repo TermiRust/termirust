@@ -2,14 +2,9 @@ import type { InputHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
+export const controlClass =
+  "h-8 w-full rounded-md border border-border-strong bg-bg-elev px-2.5 text-[13px] text-fg placeholder:text-fg-faint transition-shadow focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_var(--accent-ring)] focus-visible:outline-none aria-invalid:border-danger disabled:opacity-50";
+
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        "h-8 w-full rounded-md border border-border bg-bg-elev px-2.5 text-sm text-fg placeholder:text-fg-muted focus-visible:outline-2 focus-visible:outline-accent",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <input className={cn(controlClass, className)} {...props} />;
 }

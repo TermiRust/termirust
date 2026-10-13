@@ -3,8 +3,9 @@ import { useState, type FormEvent } from "react";
 import type { CommandError, HostInput, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Field, selectClass } from "@/components/ui/field";
+import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useHostsStore } from "@/stores/hosts-store";
 
 import { hostFormValues, hostInputFromForm, type HostFormErrors, type HostFormValues } from "./host-form";
@@ -96,29 +97,29 @@ function HostForm({ host, onClose, onSave, onDelete }: HostFormProps) {
           <Input {...text("username")} placeholder="root" />
         </Field>
         <Field label={fieldLabels.authMethod} className="col-span-3">
-          <select
+          <Select
             aria-label={fieldLabels.authMethod}
-            className={selectClass}
+           
             value={values.authMethod}
             onChange={(e) => set("authMethod", e.target.value as HostFormValues["authMethod"])}
           >
             <option value="password">Password</option>
             <option value="agent">SSH agent</option>
-          </select>
+          </Select>
         </Field>
 
         {values.authMethod === "password" && hasSavedPassword && (
           <Field label={fieldLabels.savedPasswordAction} className="col-span-6">
-            <select
+            <Select
               aria-label={fieldLabels.savedPasswordAction}
-              className={selectClass}
+             
               value={values.savedPasswordAction}
               onChange={(e) => set("savedPasswordAction", e.target.value as HostFormValues["savedPasswordAction"])}
             >
               <option value="keep">Keep the saved password</option>
               <option value="replace">Replace it</option>
               <option value="clear">Forget it (ask when connecting)</option>
-            </select>
+            </Select>
           </Field>
         )}
         {values.authMethod === "password" && (!hasSavedPassword || values.savedPasswordAction === "replace") && (
@@ -133,24 +134,24 @@ function HostForm({ host, onClose, onSave, onDelete }: HostFormProps) {
         )}
 
         <Field label={fieldLabels.groupId} className="col-span-3">
-          <select aria-label={fieldLabels.groupId} className={selectClass} value={values.groupId} onChange={(e) => set("groupId", e.target.value)}>
+          <Select aria-label={fieldLabels.groupId} value={values.groupId} onChange={(e) => set("groupId", e.target.value)}>
             <option value="">Ungrouped</option>
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.parentId ? `  ${g.name}` : g.name}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label={fieldLabels.jumpHostId} className="col-span-3">
-          <select aria-label={fieldLabels.jumpHostId} className={selectClass} value={values.jumpHostId} onChange={(e) => set("jumpHostId", e.target.value)}>
+          <Select aria-label={fieldLabels.jumpHostId} value={values.jumpHostId} onChange={(e) => set("jumpHostId", e.target.value)}>
             <option value="">None</option>
             {jumpCandidates.map((h) => (
               <option key={h.id} value={h.id}>
                 {h.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field label={fieldLabels.tags} className="col-span-4" hint="Comma separated">
           <Input {...text("tags")} placeholder="prod, api" />

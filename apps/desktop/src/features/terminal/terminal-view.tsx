@@ -8,6 +8,8 @@ import { Terminal } from "@xterm/xterm";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 
+import { termirustDark } from "@/lib/terminal-theme";
+
 export interface TerminalSize {
   cols: number;
   rows: number;
@@ -53,7 +55,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
       fontFamily: '"JetBrains Mono", Menlo, Consolas, monospace',
       fontSize: 13,
       scrollback: 10_000,
-      theme: { background: "#100e0b", foreground: "#ece8e1", cursor: "#fb923c" },
+      theme: termirustDark,
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
@@ -93,7 +95,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
 
   // FitAddon measures the mount element including its padding, so padding lives on the wrapper.
   return (
-    <div className="h-full w-full overflow-hidden bg-[#100e0b] p-2">
+    <div className="h-full w-full overflow-hidden bg-terminal p-2">
       <div ref={containerRef} className="h-full w-full" data-testid="terminal" />
     </div>
   );

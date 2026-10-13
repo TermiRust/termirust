@@ -1,48 +1,132 @@
 @import "tailwindcss";
 
+/* Tokens mirror docs/mockups/app-ui.html (ADR-014). */
 @theme {
+  --color-page: var(--page);
   --color-bg: var(--bg);
-  --color-bg-elev: var(--bg-elev);
-  --color-bg-sunk: var(--bg-sunk);
+  --color-bg-elev: var(--elev);
+  --color-bg-sunk: var(--sunk);
+  --color-bg-sunk-2: var(--sunk2);
   --color-fg: var(--fg);
-  --color-fg-muted: var(--fg-muted);
+  --color-fg-2: var(--fg2);
+  --color-fg-muted: var(--muted);
+  --color-fg-faint: var(--faint);
   --color-border: var(--border);
+  --color-border-strong: var(--border2);
+  --color-hover: var(--hover);
+  --color-active: var(--active);
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ring: var(--accent-ring);
   --color-ok: var(--ok);
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  --color-scrim: var(--scrim);
+  --color-terminal: #100e0b;
+  --shadow-panel: var(--shadow);
+  --shadow-dialog: var(--shadow-lg);
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 :root {
+  --page: #f2f0ec;
   --bg: #fbfaf8;
-  --bg-elev: #ffffff;
-  --bg-sunk: #f2f0ec;
+  --elev: #ffffff;
+  --sunk: #f2f0ec;
+  --sunk2: #ebe8e2;
   --fg: #1d1b18;
-  --fg-muted: #6b665e;
+  --fg2: #3d3933;
+  --muted: #6b665e;
+  --faint: #9a948a;
   --border: #e3dfd8;
+  --border2: #d3cdc3;
+  --hover: rgba(29, 27, 24, 0.05);
+  --active: rgba(29, 27, 24, 0.085);
   --accent: #c2410c;
   --accent-fg: #ffffff;
   --accent-soft: #fde7da;
+  --accent-ring: rgba(194, 65, 12, 0.28);
   --ok: #15803d;
+  --ok-soft: #dcfce7;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fdeeee;
+  --danger-border: #f1c4c4;
+  --scrim: rgba(29, 27, 24, 0.36);
+  --shadow: 0 1px 2px rgba(29, 27, 24, 0.05), 0 8px 24px -10px rgba(29, 27, 24, 0.16);
+  --shadow-lg: 0 24px 48px -12px rgba(29, 27, 24, 0.3), 0 2px 6px rgba(29, 27, 24, 0.08);
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    --page: #0d0b09;
     --bg: #15130f;
-    --bg-elev: #1d1a16;
-    --bg-sunk: #100e0b;
+    --elev: #1d1a16;
+    --sunk: #100e0b;
+    --sunk2: #24201b;
     --fg: #ece8e1;
-    --fg-muted: #a39d92;
+    --fg2: #d6d0c6;
+    --muted: #a39d92;
+    --faint: #756f65;
     --border: #2f2b25;
+    --border2: #3e3931;
+    --hover: rgba(236, 232, 225, 0.05);
+    --active: rgba(236, 232, 225, 0.09);
     --accent: #fb923c;
     --accent-fg: #1d1208;
     --accent-soft: #3a2415;
+    --accent-ring: rgba(251, 146, 60, 0.38);
     --ok: #7fd69c;
+    --ok-soft: #173222;
+    --warn: #fbbf24;
+    --warn-soft: #3a2c0e;
+    --danger: #f87171;
+    --danger-soft: #2e1513;
+    --danger-border: #6b2a25;
+    --scrim: rgba(0, 0, 0, 0.66);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.5);
+    --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.03);
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --page: #0d0b09;
+  --bg: #15130f;
+  --elev: #1d1a16;
+  --sunk: #100e0b;
+  --sunk2: #24201b;
+  --fg: #ece8e1;
+  --fg2: #d6d0c6;
+  --muted: #a39d92;
+  --faint: #756f65;
+  --border: #2f2b25;
+  --border2: #3e3931;
+  --hover: rgba(236, 232, 225, 0.05);
+  --active: rgba(236, 232, 225, 0.09);
+  --accent: #fb923c;
+  --accent-fg: #1d1208;
+  --accent-soft: #3a2415;
+  --accent-ring: rgba(251, 146, 60, 0.38);
+  --ok: #7fd69c;
+  --ok-soft: #173222;
+  --warn: #fbbf24;
+  --warn-soft: #3a2c0e;
+  --danger: #f87171;
+  --danger-soft: #2e1513;
+  --danger-border: #6b2a25;
+  --scrim: rgba(0, 0, 0, 0.66);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -10px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  color-scheme: dark;
 }
 
 html,
@@ -57,7 +141,19 @@ body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+input,
+textarea,
+select {
+  user-select: text;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }

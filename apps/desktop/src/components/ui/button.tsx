@@ -5,17 +5,18 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors outline-offset-1 disabled:pointer-events-none disabled:opacity-45",
   {
     variants: {
       variant: {
-        primary: "bg-accent text-accent-fg hover:opacity-90",
-        ghost: "text-fg hover:bg-bg-elev",
-        outline: "border border-border bg-transparent hover:bg-bg-elev",
+        primary: "bg-accent text-accent-fg hover:brightness-105 active:brightness-95",
+        outline: "border border-border-strong bg-bg-elev text-fg hover:bg-hover active:bg-active",
+        ghost: "text-fg-2 hover:bg-hover hover:text-fg active:bg-active",
+        danger: "border border-danger-border bg-danger-soft text-danger hover:brightness-105",
       },
       size: {
-        sm: "h-7 px-2.5",
-        md: "h-8 px-3",
+        sm: "h-7 px-2.5 text-xs",
+        md: "h-8 px-3 text-[13px]",
         icon: "h-7 w-7",
       },
     },
@@ -29,7 +30,13 @@ export interface ButtonProps
   asChild?: boolean;
 }
 
-export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+export function Button({ className, variant, size, asChild = false, type, ...props }: ButtonProps) {
   const Comp = asChild ? Slot : "button";
-  return <Comp className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+  return (
+    <Comp
+      className={cn(buttonVariants({ variant, size }), className)}
+      type={asChild ? undefined : (type ?? "button")}
+      {...props}
+    />
+  );
 }

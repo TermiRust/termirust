@@ -8,7 +8,7 @@ describe("Button", () => {
     render(<Button>Save</Button>);
     const button = screen.getByRole("button", { name: "Save" });
     expect(button.tagName).toBe("BUTTON");
-    expect(button.className).toContain("hover:bg-bg-elev");
+    expect(button.className).toContain("hover:bg-hover");
   });
 
   it("applies the requested variant", () => {
