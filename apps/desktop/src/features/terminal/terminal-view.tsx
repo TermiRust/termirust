@@ -47,7 +47,7 @@ function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
   terminal.options.cursorStyle = settings.cursorStyle;
   terminal.options.cursorBlink = settings.cursorBlink;
   terminal.options.scrollback = settings.scrollback;
-  terminal.options.theme = terminalTheme(settings.theme).colors;
+  terminal.options.theme = terminalTheme(settings.theme, settings.customThemes).colors;
 }
 
 export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize, onAskAi, forcePasteConfirmation = false }, ref) {
@@ -167,7 +167,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     if (fitRef.current && containerRef.current) fitIfVisible(fitRef.current, containerRef.current);
   }, [settings]);
 
-  const background = terminalTheme(settings.theme).colors.background;
+  const background = terminalTheme(settings.theme, settings.customThemes).colors.background;
 
   // FitAddon measures the mount element including its padding, so padding lives on the wrapper.
   return (

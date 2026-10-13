@@ -1,5 +1,7 @@
 import type { ITheme } from "@xterm/xterm";
 
+import type { CustomTheme } from "@/bindings";
+
 export interface TerminalTheme {
   id: string;
   name: string;
@@ -67,6 +69,19 @@ export const TERMINAL_THEMES: TerminalTheme[] = [
 
 const FALLBACK_THEME: TerminalTheme = { id: "termirust-dark", name: "Termirust Dark", colors: termirustDark };
 
-export function terminalTheme(id: string): TerminalTheme {
-  return TERMINAL_THEMES.find((t) => t.id === id) ?? FALLBACK_THEME;
+export function customToTheme(custom: CustomTheme): TerminalTheme {
+  return {
+    id: custom.id,
+    name: custom.name,
+    colors: { background: custom.background, foreground: custom.foreground, cursor: custom.cursor, cursorAccent: custom.background, selectionBackground: custom.selection, ...ansi(custom.ansi) },
+  };
+}
+
+/** Built-in themes followed by the user's imported ones. */
+export function allThemes(custom: CustomTheme[] = []): TerminalTheme[] {
+  return [...TERMINAL_THEMES, ...custom.map(customToTheme)];
+}
+
+export function terminalTheme(id: string, custom: CustomTheme[] = []): TerminalTheme {
+  return allThemes(custom).find((t) => t.id === id) ?? FALLBACK_THEME;
 }

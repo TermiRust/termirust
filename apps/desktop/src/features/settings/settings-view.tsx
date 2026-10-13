@@ -1,7 +1,7 @@
-import { FolderOpen, Minus, Plus, Settings as SettingsIcon } from "lucide-react";
+import { FolderOpen, Minus, Plus, Settings as SettingsIcon, Upload, X } from "lucide-react";
 
 import { commands } from "@/bindings";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,7 +9,8 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
-import { TERMINAL_THEMES, terminalTheme } from "@/lib/terminal-theme";
+import { allThemes, terminalTheme } from "@/lib/terminal-theme";
+import { mergeThemes, parseThemeFile } from "@/lib/theme-import";
 import { cn } from "@/lib/utils";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
@@ -82,31 +83,55 @@ export function SettingsView() {
                 ))}
               </Select>
             </Row>
-            <Row label="Theme">
+            <Row label="Theme" hint="Import iTerm2 .itermcolors or Windows Terminal .json schemes">
               <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {TERMINAL_THEMES.map((theme) => {
+                {allThemes(terminal.customThemes).map((theme) => {
                   const c = theme.colors;
                   const selected = theme.id === terminal.theme;
+                  const imported = theme.id.startsWith("custom-");
                   return (
-                    <button
-                      key={theme.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      aria-label={theme.name}
-                      onClick={() => update({ theme: theme.id })}
-                      className={cn("rounded-lg border p-2 text-left transition-colors", selected ? "border-accent ring-2 ring-accent-ring" : "border-border hover:border-border-strong")}
-                    >
-                      <div className="flex h-10 items-end gap-1 rounded p-1.5" style={{ background: c.background }}>
-                        {[c.red, c.green, c.yellow, c.blue, c.magenta, c.cyan].map((color, i) => (
-                          <span key={i} className="h-3 w-3 rounded-full" style={{ background: color }} />
-                        ))}
-                      </div>
-                      <p className="mt-1.5 text-xs">{theme.name}</p>
-                    </button>
+                    <div key={theme.id} className="relative">
+                      <button
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={theme.name}
+                        onClick={() => update({ theme: theme.id })}
+                        className={cn("w-full rounded-lg border p-2 text-left transition-colors", selected ? "border-accent ring-2 ring-accent-ring" : "border-border hover:border-border-strong")}
+                      >
+                        <div className="flex h-10 items-end gap-1 rounded p-1.5" style={{ background: c.background }}>
+                          {[c.red, c.green, c.yellow, c.blue, c.magenta, c.cyan].map((color, i) => (
+                            <span key={i} className="h-3 w-3 rounded-full" style={{ background: color }} />
+                          ))}
+                        </div>
+                        <p className="mt-1.5 truncate pr-4 text-xs">{theme.name}</p>
+                      </button>
+                      {imported && (
+                        <button
+                          type="button"
+                          aria-label={`Remove ${theme.name}`}
+                          onClick={() =>
+                            update({
+                              customThemes: terminal.customThemes.filter((t) => t.id !== theme.id),
+                              theme: selected ? "termirust-dark" : terminal.theme,
+                            })
+                          }
+                          className="absolute right-1.5 bottom-1.5 rounded p-0.5 text-fg-muted hover:bg-hover hover:text-fg"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
+              <ThemeImport
+                onImport={(themes) => {
+                  const customThemes = mergeThemes(terminal.customThemes, themes);
+                  const last = customThemes.find((t) => t.name === themes.at(-1)?.name);
+                  update({ customThemes, theme: last?.id ?? terminal.theme });
+                }}
+              />
             </Row>
             <Row label="Cursor">
               <div className="flex flex-wrap items-center gap-4">
@@ -160,7 +185,7 @@ export function SettingsView() {
 }
 
 function TerminalPreview({ settings }: { settings: ResolvedTerminalSettings }) {
-  const c = terminalTheme(settings.theme).colors;
+  const c = terminalTheme(settings.theme, settings.customThemes).colors;
   const cursorClass = settings.cursorStyle === "block" ? "inline-block w-[0.6em]" : settings.cursorStyle === "bar" ? "inline-block w-[2px]" : "inline-block w-[0.6em] h-[2px] align-bottom";
   return (
     <figure aria-label="Preview" className="sticky top-6 self-start">
@@ -187,5 +212,38 @@ function TerminalPreview({ settings }: { settings: ResolvedTerminalSettings }) {
         </div>
       </div>
     </figure>
+  );
+}
+
+function ThemeImport({ onImport }: { onImport: (themes: ReturnType<typeof parseThemeFile>) => void }) {
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-border-strong bg-bg-elev px-2.5 text-xs font-medium hover:bg-hover">
+        <Upload size={12} /> Import theme…
+        <input
+          type="file"
+          aria-label="Import theme file"
+          accept=".itermcolors,.json"
+          className="sr-only"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            try {
+              onImport(parseThemeFile(file.name, await file.text()));
+              setError(null);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        />
+      </label>
+      {error && (
+        <span role="alert" className="text-xs text-danger">
+          {error}
+        </span>
+      )}
+    </div>
   );
 }

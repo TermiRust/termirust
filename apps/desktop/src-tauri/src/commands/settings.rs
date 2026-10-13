@@ -14,6 +14,48 @@ pub const THEMES: &[&str] = &[
     "tokyo-night",
 ];
 
+/// Most imported themes a user can keep; enough for any real collection.
+const MAX_CUSTOM_THEMES: usize = 50;
+
+/// A colour scheme imported from iTerm2 or Windows Terminal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomTheme {
+    /// Always starts with "custom-" so it never shadows a built-in theme.
+    pub id: String,
+    pub name: String,
+    pub background: String,
+    pub foreground: String,
+    pub cursor: String,
+    pub selection: String,
+    /// The 16 ANSI colours: black, red, green, yellow, blue, magenta, cyan, white, then bright.
+    pub ansi: Vec<String>,
+}
+
+fn is_hex_colour(value: &str) -> bool {
+    let digits = value.strip_prefix('#').unwrap_or("");
+    matches!(digits.len(), 6 | 8) && digits.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+impl CustomTheme {
+    fn is_valid(&self) -> bool {
+        self.id.starts_with("custom-")
+            && self.id.len() <= 64
+            && !self.name.trim().is_empty()
+            && self.name.len() <= 80
+            && self.ansi.len() == 16
+            && [
+                &self.background,
+                &self.foreground,
+                &self.cursor,
+                &self.selection,
+            ]
+            .into_iter()
+            .chain(self.ansi.iter())
+            .all(|c| is_hex_colour(c))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum CursorStyle {
@@ -36,6 +78,7 @@ pub struct TerminalSettings {
     pub copy_on_select: bool,
     pub confirm_multiline_paste: bool,
     pub show_status_bar: bool,
+    pub custom_themes: Vec<CustomTheme>,
 }
 
 impl Default for TerminalSettings {
@@ -51,6 +94,7 @@ impl Default for TerminalSettings {
             copy_on_select: false,
             confirm_multiline_paste: true,
             show_status_bar: true,
+            custom_themes: Vec::new(),
         }
     }
 }
@@ -66,7 +110,13 @@ impl TerminalSettings {
             defaults.line_height
         };
         self.scrollback = self.scrollback.min(100_000);
-        if !THEMES.contains(&self.theme.as_str()) {
+        // Settings are stored outside the vault and rendered in the webview: keep only clean colours.
+        let mut seen = std::collections::HashSet::new();
+        self.custom_themes
+            .retain(|t| t.is_valid() && seen.insert(t.id.clone()));
+        self.custom_themes.truncate(MAX_CUSTOM_THEMES);
+        let custom = self.custom_themes.iter().any(|t| t.id == self.theme);
+        if !THEMES.contains(&self.theme.as_str()) && !custom {
             self.theme = defaults.theme;
         }
         if self.font_family.trim().is_empty() {
@@ -138,6 +188,47 @@ mod tests {
         assert_eq!((small.font_size, small.line_height), (8, 1.0));
     }
 
+    fn custom(id: &str) -> CustomTheme {
+        CustomTheme {
+            id: id.into(),
+            name: "Mine".into(),
+            background: "#101010".into(),
+            foreground: "#eeeeee".into(),
+            cursor: "#ff8800".into(),
+            selection: "#44444480".into(),
+            ansi: vec!["#000000".into(); 16],
+        }
+    }
+
+    #[test]
+    fn keeps_only_valid_custom_themes_and_allows_selecting_them() {
+        let mut bad_colour = custom("custom-b");
+        bad_colour.background = "red; background:url(x)".into();
+        let mut short = custom("custom-c");
+        short.ansi.pop();
+        let settings = TerminalSettings {
+            theme: "custom-a".into(),
+            custom_themes: vec![
+                custom("custom-a"),
+                custom("custom-a"),
+                bad_colour,
+                short,
+                custom("dracula"),
+            ],
+            ..TerminalSettings::default()
+        }
+        .sanitized();
+        assert_eq!(settings.custom_themes, vec![custom("custom-a")]);
+        assert_eq!(settings.theme, "custom-a");
+
+        let orphan = TerminalSettings {
+            theme: "custom-gone".into(),
+            ..TerminalSettings::default()
+        }
+        .sanitized();
+        assert_eq!(orphan.theme, "termirust-dark");
+    }
+
     #[test]
     fn partial_json_from_an_older_version_keeps_defaults_for_new_fields() {
         let parsed: TerminalSettings =
@@ -146,6 +237,7 @@ mod tests {
         assert_eq!(parsed.theme, "nord");
         assert!(parsed.confirm_multiline_paste);
         assert!(parsed.show_status_bar);
+        assert!(parsed.custom_themes.is_empty());
     }
 
     #[tokio::test]

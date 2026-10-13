@@ -86,4 +86,32 @@ describe("SettingsView", () => {
     await user.click(screen.getByRole("checkbox", { name: /Show status bar/ }));
     expect(await screen.findByRole("alert")).toHaveTextContent("disk full");
   });
+
+  it("imports a Windows Terminal scheme, selects it, and removes it again", async () => {
+    const user = userEvent.setup();
+    render(<SettingsView />);
+    const scheme = {
+      name: "Campbell",
+      background: "#0C0C0C",
+      foreground: "#CCCCCC",
+      black: "#0C0C0C", red: "#C50F1F", green: "#13A10E", yellow: "#C19C00", blue: "#0037DA", purple: "#881798", cyan: "#3A96DD", white: "#CCCCCC",
+      brightBlack: "#767676", brightRed: "#E74856", brightGreen: "#16C60C", brightYellow: "#F9F1A5", brightBlue: "#3B78FF", brightPurple: "#B4009E", brightCyan: "#61D6D6", brightWhite: "#F2F2F2",
+    };
+    const file = new File([JSON.stringify(scheme)], "campbell.json", { type: "application/json" });
+    await user.upload(screen.getByLabelText("Import theme file"), file);
+
+    expect(await screen.findByRole("radio", { name: "Campbell" })).toHaveAttribute("aria-checked", "true");
+    expect(saved()).toMatchObject({ theme: "custom-campbell", customThemes: [expect.objectContaining({ id: "custom-campbell" })] });
+
+    await user.click(screen.getByRole("button", { name: "Remove Campbell" }));
+    expect(screen.queryByRole("radio", { name: "Campbell" })).not.toBeInTheDocument();
+    expect(saved()).toMatchObject({ theme: "termirust-dark", customThemes: [] });
+  });
+
+  it("explains why a theme file could not be imported", async () => {
+    const user = userEvent.setup({ applyAccept: false });
+    render(<SettingsView />);
+    await user.upload(screen.getByLabelText("Import theme file"), new File(["{oops"], "broken.json"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("This is not valid JSON");
+  });
 });

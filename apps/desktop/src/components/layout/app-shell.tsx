@@ -20,6 +20,7 @@ import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
 import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
+import { allThemes } from "@/lib/terminal-theme";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, paneShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { paneIds } from "@/features/panes/pane-tree";
 import { PaneLayout } from "@/components/layout/pane-layout";
@@ -110,6 +111,19 @@ export function AppShell() {
       openSftpTab(host, resolveTabColor(host, groups.find((g) => g.id === host.groupId)));
     },
     [groups, openSftpTab, setSection],
+  );
+
+  const terminalSettings = useSettingsStore((s) => s.terminal);
+  const updateTerminal = useSettingsStore((s) => s.updateTerminal);
+  const themeCommands = useMemo<PaletteCommand[]>(
+    () =>
+      allThemes(terminalSettings.customThemes).map((theme) => ({
+        id: `theme:${theme.id}`,
+        label: `Theme: ${theme.name}${theme.id === terminalSettings.theme ? " (current)" : ""}`,
+        icon: paletteIcons.theme,
+        run: () => void updateTerminal({ theme: theme.id }),
+      })),
+    [terminalSettings.customThemes, terminalSettings.theme, updateTerminal],
   );
 
   const paletteCommands = useMemo<PaletteCommand[]>(
@@ -254,7 +268,7 @@ export function AppShell() {
         onOpenChange={setPaletteOpen}
         hosts={hosts}
         recentHostIds={recentHostIds}
-        commands={paletteCommands}
+        commands={[...paletteCommands, ...themeCommands]}
         onOpenHost={openHost}
         onOpenSftp={openSftp}
         snippets={snippets}

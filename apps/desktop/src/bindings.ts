@@ -153,6 +153,19 @@ export type CommandErrorCode = "unreachable" | "timeout" | "authentication_faile
 
 export type CursorStyle = "block" | "bar" | "underline";
 
+/**  A colour scheme imported from iTerm2 or Windows Terminal. */
+export type CustomTheme = {
+	/**  Always starts with "custom-" so it never shadows a built-in theme. */
+	id: string,
+	name: string,
+	background: string,
+	foreground: string,
+	cursor: string,
+	selection: string,
+	/**  The 16 ANSI colours: black, red, green, yellow, blue, magenta, cyan, white, then bright. */
+	ansi: string[],
+};
+
 /**  One row of a file panel, remote or local. */
 export type FileEntry = {
 	name: string,
@@ -382,6 +395,7 @@ export type TerminalSettings = {
 	copyOnSelect?: boolean,
 	confirmMultilinePaste?: boolean,
 	showStatusBar?: boolean,
+	customThemes?: CustomTheme[],
 };
 
 export type TransferDirection = "upload" | "download";

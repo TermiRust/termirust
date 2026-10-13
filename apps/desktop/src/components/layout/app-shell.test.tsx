@@ -282,4 +282,20 @@ describe("AppShell warning border", () => {
     press("w", onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true });
     expect(useTabsStore.getState().tabs).toHaveLength(0);
   });
+
+  it("switches the terminal theme from the palette", async () => {
+    const { useSettingsStore } = await import("@/stores/settings-store");
+    const update = vi.fn();
+    useSettingsStore.setState({ updateTerminal: update });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    render(<AppShell />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    act(() => {
+      fireEvent.keyDown(window, { key: "k", ...(onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true }) });
+    });
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("combobox"), "theme tokyo");
+    await user.keyboard("{Enter}");
+    expect(update).toHaveBeenCalledWith({ theme: "tokyo-night" });
+  });
 });

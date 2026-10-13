@@ -16,6 +16,7 @@ export const DEFAULT_TERMINAL_SETTINGS: ResolvedTerminalSettings = {
   copyOnSelect: false,
   confirmMultilinePaste: true,
   showStatusBar: true,
+  customThemes: [],
 };
 
 export function resolveTerminalSettings(raw: TerminalSettings): ResolvedTerminalSettings {
