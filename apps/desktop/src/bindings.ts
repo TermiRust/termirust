@@ -31,6 +31,9 @@ export const commands = {
 	keysImportFile: (label: string, path: string, passphrase: string | null, rememberPassphrase: boolean) => typedError<KeyView, CommandError>(__TAURI_INVOKE("keys_import_file", { label, path, passphrase, rememberPassphrase })),
 	keysGenerate: (label: string) => typedError<KeyView, CommandError>(__TAURI_INVOKE("keys_generate", { label })),
 	keysDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys_delete", { id })),
+	sshConfigPreview: (path: string | null) => typedError<SshConfigPreview, CommandError>(__TAURI_INVOKE("ssh_config_preview", { path })),
+	/**  Re-reads the config instead of trusting host details sent back by the UI. */
+	sshConfigImport: (path: string | null, aliases: string[]) => typedError<SshConfigImportResult, CommandError>(__TAURI_INVOKE("ssh_config_import", { path, aliases })),
 };
 
 /* Types */
@@ -141,6 +144,33 @@ export type PromptedLogin = {
 
 export type SessionClosed = {
 	exitStatus: number | null,
+};
+
+export type SkippedHost = {
+	alias: string,
+	reason: string,
+};
+
+export type SshConfigCandidate = {
+	alias: string,
+	hostname: string,
+	port: number,
+	user: string | null,
+	identityFiles: string[],
+	proxyJump: string | null,
+	alreadySaved: boolean,
+};
+
+export type SshConfigImportResult = {
+	createdHosts: string[],
+	importedKeys: string[],
+	skipped: SkippedHost[],
+};
+
+export type SshConfigPreview = {
+	path: string,
+	candidates: SshConfigCandidate[],
+	unsupported: string[],
 };
 
 export type VaultOverview = {

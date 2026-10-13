@@ -12,7 +12,7 @@ use tauri_specta::{Builder, collect_commands};
 use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
-use crate::commands::{benchmark, host_session, hosts, keys, session, vault};
+use crate::commands::{benchmark, host_session, hosts, keys, session, ssh_config, vault};
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
 /// Committed TypeScript bindings consumed by the frontend.
@@ -50,6 +50,8 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         keys::keys_import_file,
         keys::keys_generate,
         keys::keys_delete,
+        ssh_config::ssh_config_preview,
+        ssh_config::ssh_config_import,
     ])
 }
 

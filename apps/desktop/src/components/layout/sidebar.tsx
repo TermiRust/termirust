@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FolderPlus, KeyRound, Pencil, Plus, Server, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Pencil, Plus, Server, SquareTerminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { HostView } from "@/bindings";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
 import { HostFormDialog } from "@/features/hosts/host-form-dialog";
+import { ImportSshConfigDialog } from "@/features/hosts/import-ssh-config-dialog";
 import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
 import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -25,6 +26,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
   const { hosts, groups, loaded, error, createHost, updateHost, deleteHost } = useHostsStore();
   const [editing, setEditing] = useState<Editing>(null);
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [importingConfig, setImportingConfig] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const openHost = (host: HostView) => {
@@ -107,6 +109,9 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
           value={hostFilter}
           onChange={(e) => setHostFilter(e.target.value)}
         />
+        <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportingConfig(true)}>
+          <FileInput size={15} />
+        </Button>
         <Button size="icon" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}>
           <FolderPlus size={15} />
         </Button>
@@ -158,6 +163,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         onConnect={openHost}
       />
       <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
+      <ImportSshConfigDialog open={importingConfig} onOpenChange={setImportingConfig} />
     </aside>
   );
 }

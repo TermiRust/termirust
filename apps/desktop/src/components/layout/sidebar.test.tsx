@@ -14,6 +14,8 @@ const commands = {
   keysList: vi.fn(),
   keysImport: vi.fn(),
   keysImportFile: vi.fn(),
+  sshConfigPreview: vi.fn(),
+  sshConfigImport: vi.fn(),
 };
 vi.mock("@/bindings", () => ({ commands }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
