@@ -2,6 +2,7 @@ import { ArrowRight, Eye, HardDrive, KeyRound, Lock, ShieldCheck, Terminal } fro
 import { useState, type ReactNode } from "react";
 
 import { commands } from "@/bindings";
+import { WindowControls } from "@/components/layout/window-controls";
 import { Button } from "@/components/ui/button";
 
 import { keyStoreName } from "./key-store-name";
@@ -31,7 +32,9 @@ export function Onboarding({ onDone }: OnboardingProps) {
 
   return (
     <main aria-label="Welcome to Termirust" className="grid h-full place-items-center overflow-y-auto bg-bg-sunk p-6">
-      <div data-tauri-drag-region className="fixed inset-x-0 top-0 h-[38px]" />
+      <div data-tauri-drag-region className="fixed inset-x-0 top-0 flex h-[38px] justify-end">
+        {/Windows/i.test(navigator.userAgent) && <WindowControls />}
+      </div>
       <section className="motion-rise w-[min(560px,100%)] rounded-2xl border border-border bg-bg p-7 shadow-dialog">
         <div className="mb-5 flex items-center gap-3">
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent text-accent-fg">

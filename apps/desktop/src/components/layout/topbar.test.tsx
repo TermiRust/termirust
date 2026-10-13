@@ -2,7 +2,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { Topbar } from "./topbar";
+vi.mock("./window-controls", () => ({ WindowControls: () => <div>window controls</div> }));
+
+const { Topbar } = await import("./topbar");
 
 function setup(onMac: boolean, settingsActive = false) {
   const handlers = { onSearch: vi.fn(), onToggleSidebar: vi.fn(), onOpenSettings: vi.fn() };
@@ -34,5 +36,12 @@ describe("Topbar", () => {
     expect(screen.getByText("Ctrl+Shift+K")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("banner", { name: "Top bar" }).className).not.toMatch(/78px/);
+  });
+
+  it("draws window buttons only when asked (Windows, frameless)", () => {
+    const { rerender } = render(<Topbar onMac={false} paletteShortcut="Ctrl+Shift+K" sidebarShortcut="Ctrl+Shift+B" settingsActive={false} onSearch={vi.fn()} onToggleSidebar={vi.fn()} onOpenSettings={vi.fn()} />);
+    expect(screen.queryByText("window controls")).not.toBeInTheDocument();
+    rerender(<Topbar onMac={false} windowControls paletteShortcut="Ctrl+Shift+K" sidebarShortcut="Ctrl+Shift+B" settingsActive={false} onSearch={vi.fn()} onToggleSidebar={vi.fn()} onOpenSettings={vi.fn()} />);
+    expect(screen.getByText("window controls")).toBeInTheDocument();
   });
 });

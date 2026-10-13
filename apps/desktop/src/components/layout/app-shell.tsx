@@ -53,6 +53,7 @@ export function AppShell() {
   const showStatusBar = useSettingsStore((s) => s.terminal.showStatusBar);
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
+  const onWindows = useMemo(() => /Windows/i.test(navigator.userAgent), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
   const [closing, setClosing] = useState<{ tab: Tab; paneId: string | null } | null>(null);
 
@@ -228,6 +229,7 @@ export function AppShell() {
     <div className="flex h-full flex-col">
       <Topbar
         onMac={onMac}
+        windowControls={onWindows}
         paletteShortcut={shortcutLabel("palette", onMac)}
         sidebarShortcut={shortcutLabel("sidebar", onMac)}
         settingsActive={section === "settings"}

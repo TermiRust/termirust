@@ -1,10 +1,13 @@
 import { PanelLeft, Search, SlidersHorizontal } from "lucide-react";
 
 import { Kbd } from "@/components/ui/kbd";
+import { WindowControls } from "@/components/layout/window-controls";
 import { cn } from "@/lib/utils";
 
 interface TopbarProps {
   onMac: boolean;
+  /** Windows draws its own window buttons here (the native title bar is off). */
+  windowControls?: boolean;
   paletteShortcut: string;
   sidebarShortcut: string;
   settingsActive: boolean;
@@ -17,12 +20,12 @@ interface TopbarProps {
  * The window's top strip from the mockup. On macOS it sits in the title bar next to the
  * traffic lights (overlay title bar), so empty space drags the window.
  */
-export function Topbar({ onMac, paletteShortcut, sidebarShortcut, settingsActive, onSearch, onToggleSidebar, onOpenSettings }: TopbarProps) {
+export function Topbar({ onMac, windowControls = false, paletteShortcut, sidebarShortcut, settingsActive, onSearch, onToggleSidebar, onOpenSettings }: TopbarProps) {
   return (
     <header
       data-tauri-drag-region
       aria-label="Top bar"
-      className={cn("relative flex h-[38px] shrink-0 items-center gap-1 border-b border-border bg-bg-sunk pr-2 select-none", onMac ? "pl-[78px]" : "pl-2")}
+      className={cn("relative flex h-[38px] shrink-0 items-center gap-1 border-b border-border bg-bg-sunk select-none", onMac ? "pl-[78px]" : "pl-2", windowControls ? "pr-0" : "pr-2")}
     >
       <button
         type="button"
@@ -53,6 +56,7 @@ export function Topbar({ onMac, paletteShortcut, sidebarShortcut, settingsActive
       >
         <SlidersHorizontal size={15} />
       </button>
+      {windowControls && <WindowControls />}
     </header>
   );
 }
