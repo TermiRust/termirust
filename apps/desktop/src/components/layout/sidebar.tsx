@@ -1,8 +1,11 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareTerminal, Waypoints } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareTerminal, Waypoints } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
+import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
+import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts";
 import { Input } from "@/components/ui/input";
 import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
 import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
@@ -98,6 +101,7 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
             style={{ paddingLeft: 4 + depth * 14 }}
           >
             {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            <GroupSwatch group={node.group} />
             <span className="truncate">{node.group.name}</span>
             <span className="ml-auto font-normal">{countHosts(node)}</span>
           </button>
@@ -126,13 +130,17 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
   return (
     <aside aria-label="Hosts sidebar" className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-sunk">
       <div className="flex items-center gap-1 p-3">
-        <Input
-          type="search"
-          aria-label="Filter hosts"
-          placeholder="Filter hosts…"
-          value={hostFilter}
-          onChange={(e) => setHostFilter(e.target.value)}
-        />
+        <div className="relative min-w-0 flex-1">
+          <Search size={13} aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-muted" />
+          <Input
+            type="search"
+            aria-label="Filter hosts"
+            placeholder="Filter hosts…"
+            value={hostFilter}
+            onChange={(e) => setHostFilter(e.target.value)}
+            className="pl-7"
+          />
+        </div>
         <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportConfigOpen(true)}>
           <FileInput size={15} />
         </Button>
@@ -194,6 +202,9 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         </Button>
         <Button className="justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host
+          <span aria-hidden className="ml-auto">
+            <Kbd>{shortcutLabel("newHost", isMacPlatform())}</Kbd>
+          </span>
         </Button>
       </nav>
 
@@ -205,4 +216,10 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
       />
     </aside>
   );
+}
+
+/** The small coloured square before a group name, in the colour its hosts' tabs get. */
+function GroupSwatch({ group }: { group: GroupView }) {
+  const color = resolveTabColor({ color: null }, group);
+  return <span aria-hidden className="mx-0.5 h-1.5 w-1.5 shrink-0 rounded-[2px]" style={{ background: color ? tabColorVar[color] : "var(--color-fg-faint)" }} />;
 }

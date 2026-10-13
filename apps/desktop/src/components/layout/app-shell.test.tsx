@@ -329,4 +329,18 @@ describe("AppShell warning border", () => {
     });
     expect(screen.getByRole("button", { name: "Split pane" })).toBeDisabled();
   });
+
+  it("gives every icon-only button an accessible name", () => {
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    render(<AppShell />);
+    act(() => {
+      useTabsStore.getState().openLocalTab();
+      useTabsStore.getState().splitPane(useTabsStore.getState().tabs[0]!.id, "row");
+    });
+    const unnamed = screen
+      .getAllByRole("button", { hidden: true })
+      .filter((b) => !b.textContent?.trim() && !b.getAttribute("aria-label") && !b.getAttribute("aria-labelledby"));
+    expect(unnamed.map((b) => b.outerHTML.slice(0, 120))).toEqual([]);
+  });
 });

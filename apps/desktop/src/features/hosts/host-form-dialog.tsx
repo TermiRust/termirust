@@ -1,4 +1,4 @@
-import { ChevronRight, KeyRound, Plus, Server } from "lucide-react";
+import { ChevronRight, KeyRound, Lock, Plus, Server, UserRound } from "lucide-react";
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import type { CommandError, HostInput, HostView } from "@/bindings";
@@ -145,9 +145,9 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
             value={values.authMethod}
             onChange={(v) => set("authMethod", v)}
             options={[
-              { value: "password", label: "Password" },
-              { value: "key", label: "Key" },
-              { value: "agent", label: "Agent" },
+              { value: "password", label: <span className="flex items-center gap-1.5"><Lock size={12} />Password</span> },
+              { value: "key", label: <span className="flex items-center gap-1.5"><KeyRound size={12} />Key</span> },
+              { value: "agent", label: <span className="flex items-center gap-1.5"><UserRound size={12} />Agent</span> },
             ]}
           />
         </div>

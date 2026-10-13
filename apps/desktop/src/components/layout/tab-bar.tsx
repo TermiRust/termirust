@@ -3,6 +3,7 @@ import { useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { tabColorVar } from "@/features/tabs/tab-color";
+import { isMacPlatform } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { StatusDot } from "@/components/ui/status-dot";
 import { dotForStatus } from "@/features/hosts/host-status";
@@ -29,6 +30,10 @@ interface TabBarProps {
   onNewLocalTab: () => void;
   splitShortcut?: string;
 }
+
+const onMac = isMacPlatform();
+/** "⌘1"… on macOS, "Alt+1"… elsewhere (ADR-015). */
+const tabIndexLabel = (index: number) => `${onMac ? "⌘" : "Alt+"}${index + 1}`;
 
 export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarProps) {
   const { tabs, activeTabId, activateTab, renameTab, moveTab } = useTabsStore();
@@ -125,6 +130,7 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
                     <StatusDot state={dotForStatus(tab.status)} className="h-[7px] w-[7px] shadow-none" />
                   )}
                   <span className="truncate">{tab.title}</span>
+                  {index < 9 && <span className="ml-auto shrink-0 pl-1 font-mono text-[10.5px] text-fg-faint">{tabIndexLabel(index)}</span>}
                 </button>
               )}
               <button
