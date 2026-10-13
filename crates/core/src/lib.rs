@@ -1,4 +1,5 @@
 mod error;
+pub mod forward;
 pub mod local_fs;
 pub mod pty;
 pub mod sftp;

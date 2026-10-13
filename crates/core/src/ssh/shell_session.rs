@@ -99,6 +99,7 @@ pub enum ShellEvent {
 
 pub(crate) struct ClientHandler {
     verify_host_key: HostKeyVerifier,
+    remote_forwards: crate::forward::RemoteForwardRouter,
 }
 
 impl Handler for ClientHandler {
@@ -112,6 +113,24 @@ impl Handler for ClientHandler {
             server_public_key,
         )))
     }
+
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: russh::Channel<client::Msg>,
+        _connected_address: &str,
+        connected_port: u32,
+        originator_address: &str,
+        originator_port: u32,
+        reply: client::ChannelOpenHandle,
+        _session: &mut client::Session,
+    ) -> std::result::Result<(), Self::Error> {
+        // Dropping `reply` rejects connections for ports nobody asked to forward.
+        if let Some(route) = self.remote_forwards.route(connected_port) {
+            reply.accept().await;
+            route.deliver(channel, format!("{originator_address}:{originator_port}"));
+        }
+        Ok(())
+    }
 }
 
 /// An interactive shell on a remote host, backed by one SSH connection and PTY channel.
@@ -119,6 +138,7 @@ impl Handler for ClientHandler {
 /// forwards are opened on top of it.
 pub struct SshConnection {
     handle: Handle<ClientHandler>,
+    remote_forwards: crate::forward::RemoteForwardRouter,
     /// Kept alive while the connection tunnels through it.
     jump: Option<Handle<ClientHandler>>,
 }
@@ -134,18 +154,40 @@ impl SshConnection {
     ) -> Result<Self> {
         let jump = match jump {
             Some(hop) => Some(
-                establish(hop.login, hop.verify_host_key, connect_timeout, None)
-                    .await
-                    .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
+                establish(
+                    hop.login,
+                    hop.verify_host_key,
+                    connect_timeout,
+                    None,
+                    Default::default(),
+                )
+                .await
+                .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
             ),
             None => None,
         };
-        let handle = establish(login, verify_host_key, connect_timeout, jump.as_ref()).await?;
-        Ok(Self { handle, jump })
+        let remote_forwards = crate::forward::RemoteForwardRouter::default();
+        let handle = establish(
+            login,
+            verify_host_key,
+            connect_timeout,
+            jump.as_ref(),
+            remote_forwards.clone(),
+        )
+        .await?;
+        Ok(Self {
+            handle,
+            remote_forwards,
+            jump,
+        })
     }
 
     pub(crate) fn handle(&self) -> &Handle<ClientHandler> {
         &self.handle
+    }
+
+    pub(crate) fn remote_forwards(&self) -> &crate::forward::RemoteForwardRouter {
+        &self.remote_forwards
     }
 
     pub async fn disconnect(&self) -> Result<()> {
@@ -184,6 +226,7 @@ async fn establish(
     verify_host_key: HostKeyVerifier,
     connect_timeout: Duration,
     through: Option<&Handle<ClientHandler>>,
+    remote_forwards: crate::forward::RemoteForwardRouter,
 ) -> Result<Handle<ClientHandler>> {
     // Fail on a bad key or passphrase before touching the network.
     let private_key = match &login.method {
@@ -198,7 +241,10 @@ async fn establish(
         keepalive_max: 3,
         ..Default::default()
     });
-    let handler = ClientHandler { verify_host_key };
+    let handler = ClientHandler {
+        verify_host_key,
+        remote_forwards,
+    };
     let unreachable = |reason: String| CoreError::Unreachable {
         host: login.host.clone(),
         port: login.port,

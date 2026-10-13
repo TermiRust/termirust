@@ -69,6 +69,9 @@ pub enum CoreError {
 
     #[error("cancelled")]
     Cancelled,
+
+    #[error("port forwarding: {0}")]
+    PortForward(String),
 }
 
 impl From<russh::Error> for CoreError {

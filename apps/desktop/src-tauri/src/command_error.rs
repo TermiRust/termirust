@@ -31,6 +31,7 @@ pub enum CommandErrorCode {
     LocalShell,
     Sftp,
     Cancelled,
+    PortForward,
     Internal,
 }
 
@@ -70,6 +71,7 @@ impl From<CoreError> for CommandError {
             CoreError::LocalShell(_) => CommandErrorCode::LocalShell,
             CoreError::Sftp(_) => CommandErrorCode::Sftp,
             CoreError::Cancelled => CommandErrorCode::Cancelled,
+            CoreError::PortForward(_) => CommandErrorCode::PortForward,
             CoreError::NotImplemented(_) | CoreError::Crypto(_) | CoreError::JumpHost(_) => {
                 CommandErrorCode::Internal
             }
