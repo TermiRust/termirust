@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { commands, type HostView } from "@/bindings";
+import { commands, type HostView, type SnippetView } from "@/bindings";
 import { AppDialogs } from "@/components/layout/app-dialogs";
 import { ConfirmCloseDialog } from "@/components/layout/confirm-close-dialog";
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
@@ -11,6 +11,7 @@ import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { ForwardsView } from "@/features/forwards/forwards-view";
 import { KeychainView } from "@/features/keychain/keychain-view";
 import { SettingsView } from "@/features/settings/settings-view";
+import { SnippetRunDialog } from "@/features/snippets/snippet-run-dialog";
 import { SnippetsView } from "@/features/snippets/snippets-view";
 import { CommandPalette, type PaletteCommand } from "@/features/palette/command-palette";
 import { paletteIcons } from "@/features/palette/palette-icons";
@@ -21,6 +22,8 @@ import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useAiStore } from "@/stores/ai-store";
+import { useSnippetsStore } from "@/stores/snippets-store";
+import { sendToTerminal } from "@/stores/terminal-inputs";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -47,11 +50,31 @@ export function AppShell() {
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadAi = useAiStore((s) => s.load);
+  const loadSnippets = useSnippetsStore((s) => s.load);
+  const snippets = useSnippetsStore((s) => s.snippets);
   useEffect(() => {
     void loadHosts();
     void loadSettings();
     void loadAi();
-  }, [loadHosts, loadSettings, loadAi]);
+    void loadSnippets();
+  }, [loadHosts, loadSettings, loadAi, loadSnippets]);
+
+  const [snippetRun, setSnippetRun] = useState<{ snippet: SnippetView; tab: Tab } | null>(null);
+  const activeTab = tabs.find((t) => t.id === activeTabId);
+  const terminalReady = activeTab !== undefined && activeTab.status === "connected" && (activeTab.target.kind === "host" || activeTab.target.kind === "local");
+  const runSnippet = useCallback(
+    (snippet: SnippetView) => {
+      const { tabs: current, activeTabId: activeId } = useTabsStore.getState();
+      const tab = current.find((t) => t.id === activeId);
+      if (!tab || tab.status !== "connected" || (tab.target.kind !== "host" && tab.target.kind !== "local")) {
+        setSection("snippets");
+        return;
+      }
+      setSection("hosts");
+      setSnippetRun({ snippet, tab });
+    },
+    [setSection],
+  );
 
   useEffect(() => {
     if (autoRunBenchmarks && useTabsStore.getState().tabs.length === 0) openLabTab();
@@ -143,7 +166,7 @@ export function AppShell() {
       {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
-        {section === "snippets" && <SnippetsView />}
+        {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} />}
         {section === "forwards" && <ForwardsView />}
         {section === "settings" && <SettingsView />}
         {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
@@ -188,7 +211,17 @@ export function AppShell() {
         commands={paletteCommands}
         onOpenHost={openHost}
         onOpenSftp={openSftp}
+        snippets={snippets}
+        onRunSnippet={runSnippet}
       />
+      {snippetRun && (
+        <SnippetRunDialog
+          snippet={snippetRun.snippet}
+          targetLabel={snippetRun.tab.title}
+          onSend={(keys) => sendToTerminal(snippetRun.tab.id, keys)}
+          onClose={() => setSnippetRun(null)}
+        />
+      )}
       {closing && (
         <ConfirmCloseDialog
           title={closing.title}
@@ -233,11 +266,11 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSf
       style={warningBorder ? { boxShadow: `inset 0 0 0 2px ${warningBorder}` } : undefined}
     >
       {tab.target.kind === "host" ? (
-        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} onOpenSftp={onOpenSftp} />
+        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} onOpenSftp={onOpenSftp} tabId={tab.id} />
       ) : tab.target.kind === "sftp" ? (
         <SftpView host={tab.target.host} onStatusChange={reportStatus} />
       ) : tab.target.kind === "local" ? (
-        <LocalSessionView onStatusChange={reportStatus} onSizeChange={reportSize} />
+        <LocalSessionView onStatusChange={reportStatus} onSizeChange={reportSize} tabId={tab.id} />
       ) : (
         <ConnectionLab onExit={() => onClose(tab.id)} autoRunBenchmarks={autoRunBenchmarks} />
       )}

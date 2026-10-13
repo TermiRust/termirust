@@ -8,6 +8,7 @@ import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import { useForwardsStore } from "@/stores/forwards-store";
+import { registerTerminalInput } from "@/stores/terminal-inputs";
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
@@ -23,6 +24,8 @@ interface HostSessionViewProps {
   onSizeChange?: (size: TerminalSize) => void;
   /** Opens an SFTP tab to the same host. */
   onOpenSftp?: (host: HostView) => void;
+  /** Lets snippets type into this tab while it is connected. */
+  tabId?: string;
 }
 
 const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
@@ -38,7 +41,7 @@ const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp }: HostSessionViewProps) {
+export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp, tabId }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
@@ -66,6 +69,8 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   useEffect(() => {
     if (connected) void useForwardsStore.getState().autoStart(host.id);
   }, [connected, host.id]);
+
+  useEffect(() => (connected && tabId ? registerTerminalInput(tabId, session.send) : undefined), [connected, tabId, session.send]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

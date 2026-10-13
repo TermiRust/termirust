@@ -11,6 +11,8 @@ vi.mock("@/bindings", () => ({
     hostsList: () => Promise.resolve({ status: "ok", data: [] }),
     groupsList: () => Promise.resolve({ status: "ok", data: [] }),
     settingsTerminalGet: () => Promise.resolve({ status: "ok", data: {} }),
+    snippetsList: () => Promise.resolve({ status: "ok", data: [{ id: "s1", name: "Disk usage", command: "df -h", description: "", tags: [] }] }),
+    commandDanger: () => Promise.resolve(null),
     aiSettingsGet: () => Promise.resolve({ status: "ok", data: { enabled: false, kind: "anthropic", baseUrl: "", model: "", hasApiKey: false } }),
     sshConfigPreview: () =>
       Promise.resolve({
@@ -195,5 +197,28 @@ describe("AppShell warning border", () => {
     expect(screen.getByRole("tab", { name: /api · SFTP/ })).toBeInTheDocument();
     expect(screen.getByText("sftp browser")).toBeInTheDocument();
     expect(screen.getAllByRole("tabpanel", { hidden: true }).at(-1)).toHaveAttribute("data-warning-border", "true");
+  });
+
+  it("runs a snippet from the palette in the active connected terminal", async () => {
+    const { registerTerminalInput } = await import("@/stores/terminal-inputs");
+    const { useSnippetsStore } = await import("@/stores/snippets-store");
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null }], activeTabId: "t1" });
+    const send = vi.fn();
+    const unregister = registerTerminalInput("t1", send);
+    render(<AppShell />);
+    await vi.waitFor(() => expect(useSnippetsStore.getState().snippets).toHaveLength(1));
+
+    const onMac = /Mac/i.test(navigator.userAgent);
+    act(() => {
+      fireEvent.keyDown(window, { key: "k", ...(onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true }) });
+    });
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("combobox"), "disk");
+    await user.keyboard("{Enter}");
+    const dialog = await screen.findByRole("dialog", { name: "Run Disk usage" });
+    await user.click(within(dialog).getByRole("button", { name: "Run" }));
+    expect(send).toHaveBeenCalledWith("df -h\r");
+    unregister();
   });
 });

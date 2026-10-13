@@ -85,6 +85,19 @@ describe("CommandPalette", () => {
     expect(onOpenHost).not.toHaveBeenCalled();
   });
 
+  it("finds snippets by name and runs the chosen one", async () => {
+    const onRunSnippet = vi.fn();
+    const snippet = { id: "s1", name: "Restart nginx", command: "sudo systemctl restart nginx\nsystemctl status nginx", description: "", tags: [] };
+    render(<CommandPalette open onOpenChange={vi.fn()} hosts={[]} recentHostIds={[]} commands={[]} onOpenHost={vi.fn()} snippets={[snippet]} onRunSnippet={onRunSnippet} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("combobox"), "restart ng");
+    expect(screen.getByText("Snippets")).toBeInTheDocument();
+    expect(options()[0]).toHaveTextContent("sudo systemctl restart nginx");
+    expect(options()[0]).not.toHaveTextContent("Connect");
+    await user.keyboard("{Enter}");
+    expect(onRunSnippet).toHaveBeenCalledWith(snippet);
+  });
+
   it("wraps around with ArrowUp from the top", async () => {
     const { user } = setup();
     await user.keyboard("{ArrowUp}");

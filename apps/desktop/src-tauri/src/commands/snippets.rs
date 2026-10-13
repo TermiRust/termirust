@@ -107,12 +107,28 @@ pub async fn snippets_delete(state: State<'_, VaultState>, id: String) -> Result
         .await?)
 }
 
+/// Why a command deserves a second look before running, using the same rules as AI suggestions.
+#[tauri::command]
+#[specta::specta]
+pub fn command_danger(command: String) -> Option<String> {
+    termirust_core::ai::danger::danger(&command).map(str::to_owned)
+}
+
 #[cfg(test)]
 mod tests {
     use termirust_core::storage::Database;
     use termirust_core::vault::{MemoryKeyStore, Vault};
 
     use super::*;
+
+    #[test]
+    fn flags_dangerous_commands_for_the_run_dialog() {
+        assert_eq!(
+            command_danger("rm -rf /srv/app".into()).as_deref(),
+            Some("deletes files recursively without asking")
+        );
+        assert_eq!(command_danger("ls".into()), None);
+    }
 
     #[tokio::test]
     async fn round_trips_through_the_view() {

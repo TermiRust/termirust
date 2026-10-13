@@ -95,6 +95,7 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         snippets::snippets_create,
         snippets::snippets_update,
         snippets::snippets_delete,
+        snippets::command_danger,
     ])
 }
 

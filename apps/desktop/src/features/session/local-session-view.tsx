@@ -6,6 +6,7 @@ import { useAiAllowed } from "@/features/ai/use-ai-allowed";
 import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import type { TabStatus } from "@/stores/tabs-store";
+import { registerTerminalInput } from "@/stores/terminal-inputs";
 
 import { useLocalSession, type LocalSessionState } from "./use-local-session";
 
@@ -19,9 +20,11 @@ const tabStatusOf: Record<LocalSessionState["phase"], TabStatus> = {
 interface LocalSessionViewProps {
   onStatusChange?: (status: TabStatus) => void;
   onSizeChange?: (size: TerminalSize) => void;
+  /** Lets snippets type into this tab while the shell runs. */
+  tabId?: string;
 }
 
-export function LocalSessionView({ onStatusChange, onSizeChange }: LocalSessionViewProps) {
+export function LocalSessionView({ onStatusChange, onSizeChange, tabId }: LocalSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useLocalSession(getTerminal);
@@ -37,6 +40,9 @@ export function LocalSessionView({ onStatusChange, onSizeChange }: LocalSessionV
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
   }, [state.phase, onStatusChange]);
+
+  const running = state.phase === "running";
+  useEffect(() => (running && tabId ? registerTerminalInput(tabId, session.send) : undefined), [running, tabId, session.send]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

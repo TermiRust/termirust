@@ -85,6 +85,8 @@ export const commands = {
 	snippetsCreate: (input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_create", { input })),
 	snippetsUpdate: (id: string, input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_update", { id, input })),
 	snippetsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("snippets_delete", { id })),
+	/**  Why a command deserves a second look before running, using the same rules as AI suggestions. */
+	commandDanger: (command: string) => __TAURI_INVOKE<string | null>("command_danger", { command }),
 };
 
 /* Types */

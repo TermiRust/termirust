@@ -1,8 +1,8 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Search, Server } from "lucide-react";
+import { Search, Server, SquareCode } from "lucide-react";
 import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import type { HostView } from "@/bindings";
+import type { HostView, SnippetView } from "@/bindings";
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,7 @@ export interface PaletteCommand {
 
 interface Item {
   key: string;
-  section: "Recent" | "Hosts" | "Commands";
+  section: "Recent" | "Hosts" | "Snippets" | "Commands";
   label: string;
   detail?: string;
   icon: ReactNode;
@@ -37,6 +37,8 @@ interface CommandPaletteProps {
   commands: PaletteCommand[];
   onOpenHost: (host: HostView) => void;
   onOpenSftp?: (host: HostView) => void;
+  snippets?: SnippetView[];
+  onRunSnippet?: (snippet: SnippetView) => void;
 }
 
 const address = (h: HostView) => `${h.username ? `${h.username}@` : ""}${h.hostname}${h.port === 22 ? "" : `:${h.port}`}`;
@@ -69,7 +71,7 @@ export function CommandPalette({ open, onOpenChange, ...props }: CommandPaletteP
   );
 }
 
-function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, onOpenSftp, close }: Omit<CommandPaletteProps, "open" | "onOpenChange"> & { close: () => void }) {
+function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, onOpenSftp, snippets = [], onRunSnippet, close }: Omit<CommandPaletteProps, "open" | "onOpenChange"> & { close: () => void }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
@@ -116,8 +118,22 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, onOpenSftp, c
       .filter(({ item }) => !matchedHosts.some((m) => m.key === `Hosts:${item.id}`))
       .map(({ item }) => hostItem("Hosts", item));
     const matchedCommands = rankByFuzzy(commands, query, (c) => c.label).map(({ item, match }) => ({ item, indices: match.indices }));
-    return [...matchedHosts, ...byAddress, ...commandItems(matchedCommands)].slice(0, 30);
-  }, [query, hosts, recentHostIds, commands, onOpenHost, onOpenSftp, close]);
+    const matchedSnippets: Item[] = onRunSnippet
+      ? rankByFuzzy(snippets, query, (s) => s.name).map(({ item, match }) => ({
+          key: `snippet:${item.id}`,
+          section: "Snippets",
+          label: item.name,
+          detail: item.command.split("\n")[0],
+          icon: <SquareCode size={14} />,
+          indices: match.indices,
+          run: () => {
+            close();
+            onRunSnippet(item);
+          },
+        }))
+      : [];
+    return [...matchedHosts, ...byAddress, ...matchedSnippets, ...commandItems(matchedCommands)].slice(0, 30);
+  }, [query, hosts, recentHostIds, commands, onOpenHost, onOpenSftp, snippets, onRunSnippet, close]);
 
   const current = Math.min(active, Math.max(items.length - 1, 0));
 
@@ -178,7 +194,7 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, onOpenSftp, c
                 {item.detail && <span className="truncate font-mono text-xs text-fg-muted">{item.detail}</span>}
                 <span className="ml-auto flex items-center gap-2">
                   {item.shortcut && <Kbd>{item.shortcut}</Kbd>}
-                  {item.section !== "Commands" && index === current && (
+                  {(item.section === "Recent" || item.section === "Hosts") && index === current && (
                     <span className="text-xs text-fg-muted">Connect ↵{item.runAlt ? " · SFTP ⇧↵" : ""}</span>
                   )}
                 </span>
