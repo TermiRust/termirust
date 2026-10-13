@@ -1,8 +1,12 @@
+mod settings;
+
 use std::path::Path;
 use std::str::FromStr;
 
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteSynchronous};
+
+pub use settings::Settings;
 
 use crate::{CoreError, Result};
 

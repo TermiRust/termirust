@@ -61,3 +61,9 @@ export function shortcutLabel(action: "palette" | "newHost" | "newLocal" | "side
   const other = { palette: "Ctrl+Shift+K", newHost: "Ctrl+Shift+N", newLocal: "Ctrl+Shift+T", sidebar: "Ctrl+Shift+B" };
   return (onMac ? mac : other)[action];
 }
+
+/** ⌘F on macOS; Ctrl+Shift+F elsewhere so Ctrl+F (forward a char) still reaches the shell. */
+export function isFindShortcut(event: KeyChord, onMac: boolean): boolean {
+  if (event.key.toLowerCase() !== "f" || event.altKey) return false;
+  return onMac ? event.metaKey && !event.ctrlKey && !event.shiftKey : event.ctrlKey && event.shiftKey && !event.metaKey;
+}

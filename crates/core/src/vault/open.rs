@@ -70,6 +70,11 @@ impl Vault {
     pub fn vault_id(&self) -> &str {
         &self.vault_id
     }
+
+    /// The underlying database, for device-local data such as settings.
+    pub fn database(&self) -> &Database {
+        &self.db
+    }
 }
 
 fn verify_key_check(key: &VaultKey, key_check: &[u8]) -> Result<()> {

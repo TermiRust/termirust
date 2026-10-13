@@ -13,7 +13,7 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    benchmark, host_session, hosts, keys, local_session, session, ssh_config, vault,
+    benchmark, host_session, hosts, keys, local_session, session, settings, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -55,6 +55,8 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         keys::keys_delete,
         ssh_config::ssh_config_preview,
         ssh_config::ssh_config_import,
+        settings::settings_terminal_get,
+        settings::settings_terminal_set,
     ])
 }
 

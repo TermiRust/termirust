@@ -36,6 +36,8 @@ export const commands = {
 	sshConfigPreview: (path: string | null) => typedError<SshConfigPreview, CommandError>(__TAURI_INVOKE("ssh_config_preview", { path })),
 	/**  Re-reads the config instead of trusting host details sent back by the UI. */
 	sshConfigImport: (path: string | null, aliases: string[]) => typedError<SshConfigImportResult, CommandError>(__TAURI_INVOKE("ssh_config_import", { path, aliases })),
+	settingsTerminalGet: () => typedError<TerminalSettings, CommandError>(__TAURI_INVOKE("settings_terminal_get")),
+	settingsTerminalSet: (settings: TerminalSettings) => typedError<TerminalSettings, CommandError>(__TAURI_INVOKE("settings_terminal_set", { settings })),
 };
 
 /* Types */
@@ -50,6 +52,8 @@ export type CommandError = {
 };
 
 export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "local_shell" | "internal";
+
+export type CursorStyle = "block" | "bar" | "underline";
 
 export type GroupView = {
 	id: string,
@@ -175,6 +179,20 @@ export type SshConfigPreview = {
 	path: string,
 	candidates: SshConfigCandidate[],
 	unsupported: string[],
+};
+
+/**  Terminal preferences; missing or out-of-range values fall back to defaults. */
+export type TerminalSettings = {
+	fontFamily?: string,
+	fontSize?: number,
+	lineHeight?: number | null,
+	theme?: string,
+	cursorStyle?: CursorStyle,
+	cursorBlink?: boolean,
+	scrollback?: number,
+	copyOnSelect?: boolean,
+	confirmMultilinePaste?: boolean,
+	showStatusBar?: boolean,
 };
 
 export type VaultOverview = {

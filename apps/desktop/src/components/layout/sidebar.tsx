@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Pencil, Plus, Server, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { HostView } from "@/bindings";
@@ -144,6 +144,13 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         </Button>
         <Button className="justify-start" disabled title="Coming in M2">
           <SquareTerminal size={15} /> Snippets
+        </Button>
+        <Button
+          className={cn("justify-start", section === "settings" && "bg-active text-fg")}
+          aria-current={section === "settings" ? "page" : undefined}
+          onClick={() => setSection("settings")}
+        >
+          <Settings size={15} /> Settings
         </Button>
         <Button className="justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host

@@ -4,5 +4,6 @@ pub mod hosts;
 pub mod keys;
 pub mod local_session;
 pub mod session;
+pub mod settings;
 pub mod ssh_config;
 pub mod vault;

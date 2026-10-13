@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { KeychainView } from "@/features/keychain/keychain-view";
+import { SettingsView } from "@/features/settings/settings-view";
 import { CommandPalette, type PaletteCommand } from "@/features/palette/command-palette";
 import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
@@ -16,6 +17,7 @@ import { groupTabColor } from "@/features/tabs/tab-color";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useDialogsStore } from "@/stores/dialogs-store";
+import { useSettingsStore } from "@/stores/settings-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 import { loadRecentHostIds, rememberRecentHost } from "@/stores/recent-hosts";
@@ -37,9 +39,11 @@ export function AppShell() {
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
   const [closing, setClosing] = useState<Tab | null>(null);
 
+  const loadSettings = useSettingsStore((s) => s.load);
   useEffect(() => {
     void loadHosts();
-  }, [loadHosts]);
+    void loadSettings();
+  }, [loadHosts, loadSettings]);
 
   useEffect(() => {
     if (autoRunBenchmarks && useTabsStore.getState().tabs.length === 0) openLabTab();
@@ -69,6 +73,7 @@ export function AppShell() {
       },
       { id: "import-config", label: "Import from SSH config", icon: paletteIcons.importConfig, run: () => setImportConfigOpen(true) },
       { id: "keychain", label: "Open Keychain", icon: paletteIcons.keychain, run: () => setSection("keychain") },
+      { id: "settings", label: "Open Settings", icon: paletteIcons.settings, run: () => setSection("settings") },
       { id: "sidebar", label: "Toggle sidebar", icon: paletteIcons.sidebar, shortcut: shortcutLabel("sidebar", onMac), run: toggleSidebar },
     ],
     [onMac, openNewHost, openLocalTab, setImportConfigOpen, setSection, toggleSidebar],
@@ -119,6 +124,7 @@ export function AppShell() {
       {sidebarVisible && <Sidebar onOpenHost={openHost} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
+        {section === "settings" && <SettingsView />}
         {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
         {section === "hosts" && tabs.length === 0 && (
           <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} onOpenConnectionLab={openLabTab} />

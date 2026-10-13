@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
+import { appShortcut, isFindShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
 
 const chord = (overrides: Partial<KeyChord>): KeyChord => ({
   key: "b",
@@ -81,5 +81,18 @@ describe("appShortcut", () => {
   it("labels shortcuts per platform", () => {
     expect(shortcutLabel("palette", true)).toBe("⌘K");
     expect(shortcutLabel("newLocal", false)).toBe("Ctrl+Shift+T");
+  });
+});
+
+describe("isFindShortcut", () => {
+  it.each([
+    [chord({ key: "f", metaKey: true }), true, true],
+    [chord({ key: "f", ctrlKey: true }), true, false],
+    [chord({ key: "F", ctrlKey: true, shiftKey: true }), false, true],
+    [chord({ key: "f", ctrlKey: true }), false, false],
+    [chord({ key: "f", metaKey: true, altKey: true }), true, false],
+    [chord({ key: "g", metaKey: true }), true, false],
+  ])("%j on mac=%s → %s", (event, onMac, expected) => {
+    expect(isFindShortcut(event, onMac)).toBe(expected);
   });
 });

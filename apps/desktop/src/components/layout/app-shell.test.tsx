@@ -10,6 +10,7 @@ vi.mock("@/bindings", () => ({
     appVersion: () => Promise.resolve("0.0.1"),
     hostsList: () => Promise.resolve({ status: "ok", data: [] }),
     groupsList: () => Promise.resolve({ status: "ok", data: [] }),
+    settingsTerminalGet: () => Promise.resolve({ status: "ok", data: {} }),
   },
 }));
 vi.mock("@/features/session/local-session-view", () => ({ LocalSessionView: () => <div>local shell</div> }));
