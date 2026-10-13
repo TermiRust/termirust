@@ -80,6 +80,7 @@ vi.stubGlobal(
 );
 
 const { TerminalView } = await import("./terminal-view");
+const { fitIfVisible } = await import("./fit-if-visible");
 const initialSettings = useSettingsStore.getState();
 
 function pasteInto(element: HTMLElement, text: string) {
@@ -90,6 +91,29 @@ function pasteInto(element: HTMLElement, text: string) {
   });
   return event;
 }
+
+describe("fitIfVisible", () => {
+  const sized = (width: number, height: number) => {
+    const el = document.createElement("div");
+    Object.defineProperty(el, "offsetWidth", { value: width });
+    Object.defineProperty(el, "offsetHeight", { value: height });
+    return el;
+  };
+
+  // Regression: a hidden tab was resized to ~11 columns, leaving prompt fragments on screen.
+  it("never resizes a terminal whose tab is hidden", () => {
+    const fit = { fit: vi.fn() };
+    fitIfVisible(fit, sized(0, 0));
+    fitIfVisible(fit, sized(800, 0));
+    expect(fit.fit).not.toHaveBeenCalled();
+  });
+
+  it("resizes once the tab is visible again", () => {
+    const fit = { fit: vi.fn() };
+    fitIfVisible(fit, sized(800, 600));
+    expect(fit.fit).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("TerminalView", () => {
   beforeEach(() => {

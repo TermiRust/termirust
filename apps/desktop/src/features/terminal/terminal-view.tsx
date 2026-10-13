@@ -13,6 +13,7 @@ import { isAiShortcut, isAppChord, isFindShortcut, isMacPlatform } from "@/lib/s
 import { terminalTheme } from "@/lib/terminal-theme";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
+import { fitIfVisible } from "./fit-if-visible";
 import { needsPasteConfirmation } from "./paste-guard";
 import { PasteConfirmDialog } from "./paste-confirm-dialog";
 import { TerminalSearchBar } from "./terminal-search-bar";
@@ -137,10 +138,10 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     let frame = 0;
     const observer = new ResizeObserver(() => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => fit.fit());
+      frame = requestAnimationFrame(() => fitIfVisible(fit, container));
     });
     observer.observe(container);
-    fit.fit();
+    fitIfVisible(fit, container);
     terminalRef.current = terminal;
     fitRef.current = fit;
     searchRef.current = search;
@@ -163,7 +164,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     const terminal = terminalRef.current;
     if (!terminal) return;
     applySettings(terminal, settings);
-    fitRef.current?.fit();
+    if (fitRef.current && containerRef.current) fitIfVisible(fitRef.current, containerRef.current);
   }, [settings]);
 
   const background = terminalTheme(settings.theme).colors.background;
