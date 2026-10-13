@@ -63,6 +63,12 @@ pub enum CoreError {
 
     #[error("jump host: {0}")]
     JumpHost(Box<CoreError>),
+
+    #[error("file transfer error: {0}")]
+    Sftp(String),
+
+    #[error("cancelled")]
+    Cancelled,
 }
 
 impl From<russh::Error> for CoreError {

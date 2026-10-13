@@ -29,6 +29,8 @@ pub enum CommandErrorCode {
     WrongPassphrase,
     AgentUnavailable,
     LocalShell,
+    Sftp,
+    Cancelled,
     Internal,
 }
 
@@ -66,6 +68,8 @@ impl From<CoreError> for CommandError {
             CoreError::WrongPassphrase => CommandErrorCode::WrongPassphrase,
             CoreError::AgentUnavailable(_) => CommandErrorCode::AgentUnavailable,
             CoreError::LocalShell(_) => CommandErrorCode::LocalShell,
+            CoreError::Sftp(_) => CommandErrorCode::Sftp,
+            CoreError::Cancelled => CommandErrorCode::Cancelled,
             CoreError::NotImplemented(_) | CoreError::Crypto(_) | CoreError::JumpHost(_) => {
                 CommandErrorCode::Internal
             }

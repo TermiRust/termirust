@@ -20,6 +20,7 @@ zeroize.workspace = true
 uuid.workspace = true
 getrandom.workspace = true
 portable-pty.workspace = true
+russh-sftp.workspace = true
 
 [features]
 # Tests that need the Docker SSH servers from docker/test-ssh.yml.

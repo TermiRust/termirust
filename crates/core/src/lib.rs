@@ -1,5 +1,6 @@
 mod error;
 pub mod pty;
+pub mod sftp;
 pub mod ssh;
 pub mod storage;
 pub mod terminal;
