@@ -5371,6 +5371,7 @@ dependencies = [
  "tempfile",
  "termirust-core",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

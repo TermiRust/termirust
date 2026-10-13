@@ -1,19 +1,97 @@
-import { KeyRound, Plus, Server, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FolderPlus, KeyRound, Pencil, Plus, Server, SquareTerminal } from "lucide-react";
+import { useMemo, useState } from "react";
 
+import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
+import { HostFormDialog } from "@/features/hosts/host-form-dialog";
+import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
+import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 
-export function Sidebar() {
+interface SidebarProps {
+  onOpenHost: (host: HostView) => void;
+}
+
+type Editing = { mode: "new" } | { mode: "edit"; host: HostView } | null;
+
+export function Sidebar({ onOpenHost }: SidebarProps) {
   const hostFilter = useLayoutStore((s) => s.hostFilter);
   const setHostFilter = useLayoutStore((s) => s.setHostFilter);
+  const { hosts, groups, loaded, error, createHost, updateHost, deleteHost } = useHostsStore();
+  const [editing, setEditing] = useState<Editing>(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const tree = useMemo(() => buildHostTree(hosts, groups, hostFilter), [hosts, groups, hostFilter]);
+  const filtering = hostFilter.trim().length > 0;
+
+  const toggle = (id: string) =>
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const row = (host: HostView, depth: number) => (
+    <li key={host.id}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`Connect to ${host.label}`}
+        title={`${host.username ? `${host.username}@` : ""}${host.hostname}:${host.port} — double-click to connect`}
+        onDoubleClick={() => onOpenHost(host)}
+        onKeyDown={(e) => e.key === "Enter" && onOpenHost(host)}
+        className="group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent"
+        style={{ paddingLeft: 8 + depth * 14 }}
+      >
+        <Server size={13} className="shrink-0 text-fg-muted" />
+        <span className="truncate">{host.label}</span>
+        <button
+          type="button"
+          aria-label={`Edit ${host.label}`}
+          onClick={() => setEditing({ mode: "edit", host })}
+          className="ml-auto hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block"
+        >
+          <Pencil size={12} />
+        </button>
+      </div>
+    </li>
+  );
+
+  const groupNode = (node: GroupNode, depth: number) => {
+    const open = filtering || !collapsed.has(node.group.id);
+    return (
+      <li key={node.group.id}>
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => toggle(node.group.id)}
+          className="flex h-7 w-full items-center gap-1 rounded-md pr-2 text-left text-xs font-semibold tracking-wide text-fg-muted uppercase hover:bg-bg-elev"
+          style={{ paddingLeft: 4 + depth * 14 }}
+        >
+          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          <span className="truncate">{node.group.name}</span>
+          <span className="ml-auto font-normal">{countHosts(node)}</span>
+        </button>
+        {open && (
+          <ul>
+            {node.children.map((c) => groupNode(c, depth + 1))}
+            {node.hosts.map((h) => row(h, depth + 1))}
+          </ul>
+        )}
+      </li>
+    );
+  };
+
+  const empty = loaded && hosts.length === 0;
+  const noMatch = loaded && hosts.length > 0 && filtering && tree.groups.length === 0 && tree.ungrouped.length === 0;
 
   return (
-    <aside
-      aria-label="Hosts sidebar"
-      className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-sunk"
-    >
-      <div className="p-3">
+    <aside aria-label="Hosts sidebar" className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-sunk">
+      <div className="flex items-center gap-1 p-3">
         <Input
           type="search"
           aria-label="Filter hosts"
@@ -21,10 +99,23 @@ export function Sidebar() {
           value={hostFilter}
           onChange={(e) => setHostFilter(e.target.value)}
         />
+        <Button size="icon" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}>
+          <FolderPlus size={15} />
+        </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 text-sm text-fg-muted">
-        <p>No hosts yet.</p>
+      <div className="flex-1 overflow-y-auto px-2 pb-2">
+        {error && (
+          <p role="alert" className="px-1 text-sm text-accent">
+            {error}
+          </p>
+        )}
+        {empty && <p className="px-1 text-sm text-fg-muted">No hosts yet.</p>}
+        {noMatch && <p className="px-1 text-sm text-fg-muted">No host matches “{hostFilter}”.</p>}
+        <ul aria-label="Hosts">
+          {tree.groups.map((g) => groupNode(g, 0))}
+          {tree.ungrouped.map((h) => row(h, 0))}
+        </ul>
       </div>
 
       <nav aria-label="Sections" className="flex flex-col gap-0.5 border-t border-border p-2">
@@ -37,10 +128,19 @@ export function Sidebar() {
         <Button className="justify-start" disabled title="Coming in M2">
           <SquareTerminal size={15} /> Snippets
         </Button>
-        <Button className="justify-start" variant="outline" disabled title="Coming soon">
+        <Button className="justify-start" variant="outline" onClick={() => setEditing({ mode: "new" })}>
           <Plus size={15} /> New host
         </Button>
       </nav>
+
+      <HostFormDialog
+        open={editing !== null}
+        host={editing?.mode === "edit" ? editing.host : undefined}
+        onOpenChange={(open) => !open && setEditing(null)}
+        onSave={(input) => (editing?.mode === "edit" ? updateHost(editing.host.id, input) : createHost(input))}
+        onDelete={editing?.mode === "edit" ? () => deleteHost(editing.host.id) : undefined}
+      />
+      <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
     </aside>
   );
 }

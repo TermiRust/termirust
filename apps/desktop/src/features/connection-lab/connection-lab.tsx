@@ -1,7 +1,7 @@
 import { ArrowLeft, Gauge, Plug, PlugZap, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { commands } from "@/bindings";
+import { commands, type HostView } from "@/bindings";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,17 +16,23 @@ const BENCHMARK_BYTES = 100 * 1024 * 1024;
 
 interface ConnectionLabProps {
   onExit: () => void;
+  /** Prefills the form from a saved host. */
+  host?: HostView;
   /** Runs every benchmark once on mount and reports results to the Rust console. */
   autoRunBenchmarks?: boolean;
 }
 
 const AUTORUN_SEQUENCE = ["raw", "json", "raw", "json"] as const;
 
-export function ConnectionLab({ onExit, autoRunBenchmarks = false }: ConnectionLabProps) {
+export function ConnectionLab({ onExit, host, autoRunBenchmarks = false }: ConnectionLabProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useSshSession(getTerminal);
-  const [values, setValues] = useState<ConnectFormValues>({ host: "127.0.0.1", port: "2222", username: "", password: "" });
+  const [values, setValues] = useState<ConnectFormValues>(() =>
+    host
+      ? { host: host.hostname, port: String(host.port), username: host.username ?? "", password: "" }
+      : { host: "127.0.0.1", port: "2222", username: "", password: "" },
+  );
   const [errors, setErrors] = useState<ConnectFormErrors>({});
   const [results, setResults] = useState<string[]>([]);
   const [benchmarking, setBenchmarking] = useState(false);

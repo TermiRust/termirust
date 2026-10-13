@@ -17,9 +17,20 @@ export const commands = {
 	/**  Lets the frontend print benchmark results to the dev console (used by the autorun mode). */
 	benchmarkReport: (summary: string) => __TAURI_INVOKE<void>("benchmark_report", { summary }),
 	vaultOverview: () => typedError<VaultOverview, CommandError>(__TAURI_INVOKE("vault_overview")),
+	hostsList: () => typedError<HostView[], CommandError>(__TAURI_INVOKE("hosts_list")),
+	hostsCreate: (input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_create", { input })),
+	hostsUpdate: (id: string, input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_update", { id, input })),
+	hostsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("hosts_delete", { id })),
+	groupsList: () => typedError<GroupView[], CommandError>(__TAURI_INVOKE("groups_list")),
+	groupsCreate: (name: string, parentId: string | null) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_create", { name, parentId })),
+	groupsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("groups_delete", { id })),
 };
 
 /* Types */
+export type AuthInput = { method: "password"; password: PasswordChange } | { method: "identity"; identityId: string } | { method: "agent" };
+
+export type AuthView = { method: "password"; hasSavedPassword: boolean } | { method: "identity"; identityId: string } | { method: "agent" };
+
 /**  Error shape returned to the frontend; `code` is stable so the UI can localise it. */
 export type CommandError = {
 	code: CommandErrorCode,
@@ -27,6 +38,40 @@ export type CommandError = {
 };
 
 export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "internal";
+
+export type GroupView = {
+	id: string,
+	name: string,
+	parentId: string | null,
+};
+
+export type HostInput = {
+	label: string,
+	hostname: string,
+	port: number,
+	username: string | null,
+	auth: AuthInput,
+	groupId: string | null,
+	jumpHostId: string | null,
+	tags: string[],
+	notes: string,
+	keepaliveSecs: number | null,
+};
+
+/**  What the UI may know about a host. Saved passwords never leave Rust. */
+export type HostView = {
+	id: string,
+	label: string,
+	hostname: string,
+	port: number,
+	username: string | null,
+	auth: AuthView,
+	groupId: string | null,
+	jumpHostId: string | null,
+	tags: string[],
+	notes: string,
+	keepaliveSecs: number | null,
+};
 
 export type OpenSessionOutcome = { status: "opened"; sessionId: number } | 
 /**  The server's key is not trusted yet; ask the user, then retry with `trusted_fingerprint`. */
@@ -37,6 +82,9 @@ export type OutputBenchmark = {
 	messages: number,
 	rustElapsedMs: number | null,
 };
+
+/**  Editing a host must not require re-typing a saved password the UI never sees. */
+export type PasswordChange = { kind: "keep" } | { kind: "clear" } | { kind: "set"; value: string };
 
 export type PasswordSessionRequest = {
 	host: string,

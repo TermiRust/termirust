@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+
+import type { HostView } from "@/bindings";
+
+import { hostFormValues, hostInputFromForm, type HostFormValues } from "./host-form";
+
+const blank = hostFormValues();
+const filled: HostFormValues = { ...blank, label: " Prod ", hostname: " 10.0.0.1 ", username: " deploy ", tags: "prod, , eu" };
+
+describe("hostFormValues", () => {
+  it("defaults a new host to port 22 and password auth", () => {
+    expect(blank).toMatchObject({ port: "22", authMethod: "password", savedPasswordAction: "keep", keepaliveSecs: "" });
+  });
+
+  it("prefills from an existing host without any password", () => {
+    const host: HostView = {
+      id: "1",
+      label: "db",
+      hostname: "db.internal",
+      port: 2222,
+      username: "pg",
+      auth: { method: "agent" },
+      groupId: "g",
+      jumpHostId: null,
+      tags: ["a", "b"],
+      notes: "n",
+      keepaliveSecs: 60,
+    };
+    expect(hostFormValues(host)).toEqual({
+      label: "db",
+      hostname: "db.internal",
+      port: "2222",
+      username: "pg",
+      authMethod: "agent",
+      password: "",
+      savedPasswordAction: "keep",
+      groupId: "g",
+      jumpHostId: "",
+      tags: "a, b",
+      notes: "n",
+      keepaliveSecs: "60",
+    });
+  });
+});
+
+describe("hostInputFromForm", () => {
+  it("trims fields, splits tags and turns empty strings into null", () => {
+    const result = hostInputFromForm(filled);
+    expect(result).toEqual({
+      ok: true,
+      input: {
+        label: "Prod",
+        hostname: "10.0.0.1",
+        port: 22,
+        username: "deploy",
+        auth: { method: "password", password: { kind: "clear" } },
+        groupId: null,
+        jumpHostId: null,
+        tags: ["prod", "eu"],
+        notes: "",
+        keepaliveSecs: null,
+      },
+    });
+  });
+
+  it("saves a typed password for a new host", () => {
+    const result = hostInputFromForm({ ...filled, password: "pw" });
+    expect(result.ok && result.input.auth).toEqual({ method: "password", password: { kind: "set", value: "pw" } });
+  });
+
+  it("keeps, replaces or clears a password the host already stores", () => {
+    const auth = (v: Partial<HostFormValues>) => {
+      const r = hostInputFromForm({ ...filled, ...v }, true);
+      return r.ok ? r.input.auth : r.errors;
+    };
+    expect(auth({ savedPasswordAction: "keep", password: "ignored" })).toEqual({ method: "password", password: { kind: "keep" } });
+    expect(auth({ savedPasswordAction: "clear" })).toEqual({ method: "password", password: { kind: "clear" } });
+    expect(auth({ savedPasswordAction: "replace", password: "new" })).toEqual({
+      method: "password",
+      password: { kind: "set", value: "new" },
+    });
+    expect(auth({ savedPasswordAction: "replace", password: "" })).toEqual({ password: "Enter the new password" });
+  });
+
+  it("uses agent auth without any password", () => {
+    const result = hostInputFromForm({ ...filled, authMethod: "agent", password: "pw" });
+    expect(result.ok && result.input.auth).toEqual({ method: "agent" });
+  });
+
+  it.each([
+    [{ hostname: "  " }, { hostname: "Host is required" }],
+    [{ hostname: "my host" }, { hostname: "Host must not contain spaces" }],
+    [{ port: "70000" }, { port: "Port must be 1–65535" }],
+    [{ keepaliveSecs: "-1" }, { keepaliveSecs: "Keepalive must be 0–3600 seconds" }],
+    [{ keepaliveSecs: "1.5" }, { keepaliveSecs: "Keepalive must be 0–3600 seconds" }],
+  ])("rejects %j", (patch, errors) => {
+    expect(hostInputFromForm({ ...filled, ...patch })).toEqual({ ok: false, errors });
+  });
+
+  it("accepts an explicit keepalive and an empty port as 22", () => {
+    const result = hostInputFromForm({ ...filled, port: "", keepaliveSecs: "45" });
+    expect(result.ok && [result.input.port, result.input.keepaliveSecs]).toEqual([22, 45]);
+  });
+});

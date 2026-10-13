@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 
+import type { HostView } from "@/bindings";
+
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { isMacPlatform, isToggleSidebarShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
+import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 
 export function AppShell() {
@@ -15,6 +18,17 @@ export function AppShell() {
   const onMac = useMemo(() => isMacPlatform(), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
   const [view, setView] = useState<"empty" | "lab">(autoRunBenchmarks ? "lab" : "empty");
+  const [labHost, setLabHost] = useState<HostView | null>(null);
+  const loadHosts = useHostsStore((s) => s.load);
+
+  useEffect(() => {
+    void loadHosts();
+  }, [loadHosts]);
+
+  const openHost = (host: HostView) => {
+    setLabHost(host);
+    setView("lab");
+  };
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -29,11 +43,19 @@ export function AppShell() {
 
   return (
     <div className="flex h-full">
-      {sidebarVisible && <Sidebar />}
+      {sidebarVisible && <Sidebar onOpenHost={openHost} />}
       <main className="flex min-w-0 flex-1 flex-col">
         <TabBar />
         {view === "lab" ? (
-          <ConnectionLab onExit={() => setView("empty")} autoRunBenchmarks={autoRunBenchmarks} />
+          <ConnectionLab
+            key={labHost?.id ?? "manual"}
+            host={labHost ?? undefined}
+            onExit={() => {
+              setView("empty");
+              setLabHost(null);
+            }}
+            autoRunBenchmarks={autoRunBenchmarks}
+          />
         ) : (
           <EmptyWorkspace
             version={version}

@@ -4,7 +4,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useLayoutStore } from "@/stores/layout-store";
 
-vi.mock("@/bindings", () => ({ commands: { appVersion: () => Promise.resolve("0.0.1") } }));
+vi.mock("@/bindings", () => ({
+  commands: {
+    appVersion: () => Promise.resolve("0.0.1"),
+    hostsList: () => Promise.resolve({ status: "ok", data: [] }),
+    groupsList: () => Promise.resolve({ status: "ok", data: [] }),
+  },
+}));
 vi.mock("@/features/connection-lab/connection-lab", () => ({
   ConnectionLab: ({ onExit }: { onExit: () => void }) => (
     <button type="button" onClick={onExit}>
