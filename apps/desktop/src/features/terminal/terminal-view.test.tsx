@@ -137,6 +137,21 @@ describe("TerminalView", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("always asks before multi-line pastes while broadcasting, even with the guard off", () => {
+    act(() => useSettingsStore.setState({ terminal: { ...DEFAULT_TERMINAL_SETTINGS, confirmMultilinePaste: false } }));
+    render(<TerminalView forcePasteConfirmation />);
+    expect(pasteInto(screen.getByTestId("terminal"), "a\nb").defaultPrevented).toBe(true);
+    expect(screen.getByRole("dialog", { name: "Paste 2 lines?" })).toBeInTheDocument();
+  });
+
+  it("keeps app chords from the shell but lets Ctrl+D through", () => {
+    render(<TerminalView />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    const split = new KeyboardEvent("keydown", onMac ? { key: "d", metaKey: true } : { key: "D", ctrlKey: true, shiftKey: true });
+    expect(terminals[0]!.keyHandler!(split)).toBe(false);
+    expect(terminals[0]!.keyHandler!(new KeyboardEvent("keydown", { key: "d", ctrlKey: true }))).toBe(true);
+  });
+
   it("opens the search bar on the find shortcut instead of sending it to the shell", async () => {
     render(<TerminalView />);
     const onMac = /Mac/i.test(navigator.userAgent);

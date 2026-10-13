@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { canSendToTerminal, forgetPendingInput, registerTerminalInput, sendToTerminal, sendWhenReady } from "./terminal-inputs";
+import { broadcastToTab, canSendToTerminal, forgetPendingInput, registerPaneInput, registerTerminalInput, sendToTerminal, sendWhenReady } from "./terminal-inputs";
 
 describe("terminal inputs", () => {
   it("routes text to the registered tab until it unregisters", () => {
@@ -46,5 +46,22 @@ describe("terminal inputs", () => {
     const send = vi.fn();
     registerTerminalInput("t5", send);
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("broadcasts to every registered pane of one tab only", () => {
+    const a = vi.fn();
+    const b = vi.fn();
+    const other = vi.fn();
+    const stopA = registerPaneInput("tb", "pa", a);
+    registerPaneInput("tb", "pb", b);
+    registerPaneInput("tc", "px", other);
+    expect(broadcastToTab("tb", "ls\r")).toBe(2);
+    expect(a).toHaveBeenCalledWith("ls\r");
+    expect(b).toHaveBeenCalledWith("ls\r");
+    expect(other).not.toHaveBeenCalled();
+
+    stopA();
+    expect(broadcastToTab("tb", "x")).toBe(1);
+    expect(broadcastToTab("none", "x")).toBe(0);
   });
 });

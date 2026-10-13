@@ -35,6 +35,8 @@ interface TerminalViewProps {
   onResize?: (size: TerminalSize) => void;
   /** ⌘I / Ctrl+Shift+I, with whatever text is selected (often empty). */
   onAskAi?: (selection: string) => void;
+  /** Always confirm multi-line pastes, whatever the setting (e.g. while broadcasting). */
+  forcePasteConfirmation?: boolean;
 }
 
 function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
@@ -47,7 +49,7 @@ function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
   terminal.options.theme = terminalTheme(settings.theme).colors;
 }
 
-export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize, onAskAi }, ref) {
+export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize, onAskAi, forcePasteConfirmation = false }, ref) {
   const settings = useSettingsStore((s) => s.terminal);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -57,6 +59,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
   const onDataRef = useRef(onData);
   const onResizeRef = useRef(onResize);
   const onAskAiRef = useRef(onAskAi);
+  const forcePasteRef = useRef(forcePasteConfirmation);
   const [searching, setSearching] = useState(false);
   const [pendingPaste, setPendingPaste] = useState<string | null>(null);
 
@@ -65,6 +68,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     onDataRef.current = onData;
     onResizeRef.current = onResize;
     onAskAiRef.current = onAskAi;
+    forcePasteRef.current = forcePasteConfirmation;
   });
 
   useImperativeHandle(ref, () => ({
@@ -115,7 +119,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
 
     const onPaste = (event: ClipboardEvent) => {
       const text = event.clipboardData?.getData("text/plain") ?? "";
-      if (needsPasteConfirmation(text, settingsRef.current.confirmMultilinePaste)) {
+      if (needsPasteConfirmation(text, settingsRef.current.confirmMultilinePaste || forcePasteRef.current)) {
         event.preventDefault();
         event.stopImmediatePropagation();
         setPendingPaste(text);

@@ -24,6 +24,7 @@ import { appShortcut, isMacPlatform, isToggleSidebarShortcut, paneShortcut, shor
 import { paneIds } from "@/features/panes/pane-tree";
 import { PaneLayout } from "@/components/layout/pane-layout";
 import { useAppVersion } from "@/lib/use-app-version";
+import { cn } from "@/lib/utils";
 import { useAiStore } from "@/stores/ai-store";
 import { useSnippetsStore } from "@/stores/snippets-store";
 import { sendToTerminal, sendWhenReady } from "@/stores/terminal-inputs";
@@ -130,6 +131,15 @@ export function AppShell() {
       { id: "forwards", label: "Open Port forwarding", icon: paletteIcons.forwards, run: () => setSection("forwards") },
       { id: "settings", label: "Open Settings", icon: paletteIcons.settings, run: () => setSection("settings") },
       { id: "logs", label: "Open log folder", icon: paletteIcons.logs, run: () => void commands.logsOpenFolder() },
+      {
+        id: "broadcast",
+        label: "Toggle broadcast input (split tab)",
+        icon: paletteIcons.broadcast,
+        run: () => {
+          const { activeTabId: activeId, toggleBroadcast } = useTabsStore.getState();
+          if (activeId) toggleBroadcast(activeId);
+        },
+      },
       { id: "sidebar", label: "Toggle sidebar", icon: paletteIcons.sidebar, shortcut: shortcutLabel("sidebar", onMac), run: toggleSidebar },
     ],
     [onMac, openNewHost, openLocalTab, setImportConfigOpen, setSection, toggleSidebar],
@@ -303,6 +313,24 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSf
       className={active ? "flex min-h-0 flex-1 flex-col" : undefined}
       style={warningBorder ? { boxShadow: `inset 0 0 0 2px ${warningBorder}` } : undefined}
     >
+      {(tab.target.kind === "host" || tab.target.kind === "local") && paneIds(tab.layout).length > 1 && (
+        <div className="flex h-7 shrink-0 items-center gap-2 border-b border-border bg-bg-sunk px-2 text-[11px] text-fg-muted">
+          <span>{paneIds(tab.layout).length} panes</span>
+          <button
+            type="button"
+            aria-pressed={tab.broadcast}
+            onClick={() => useTabsStore.getState().toggleBroadcast(tab.id)}
+            className={cn("rounded border px-1.5 py-0.5", tab.broadcast ? "border-accent bg-accent text-accent-fg" : "border-border hover:bg-hover")}
+          >
+            Broadcast input
+          </button>
+          {tab.broadcast && (
+            <span role="status" className="font-semibold text-accent">
+              Broadcast — what you type goes to all {paneIds(tab.layout).length} panes
+            </span>
+          )}
+        </div>
+      )}
       {tab.target.kind === "host" || tab.target.kind === "local" ? (
         <PaneLayout
           layout={tab.layout}
@@ -314,9 +342,26 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSf
             const status = (s: TabStatus) => useTabsStore.getState().setPaneStatus(tab.id, paneId, s);
             const size = focused ? reportSize : undefined;
             return tab.target.kind === "host" ? (
-              <HostSessionView host={tab.target.host} onStatusChange={status} onSizeChange={size} onOpenSftp={onOpenSftp} tabId={tab.id} focused={focused} />
+              <HostSessionView
+                host={tab.target.host}
+                onStatusChange={status}
+                onSizeChange={size}
+                onOpenSftp={onOpenSftp}
+                tabId={tab.id}
+                paneId={paneId}
+                broadcast={tab.broadcast}
+                focused={focused}
+              />
             ) : (
-              <LocalSessionView onStatusChange={status} onSizeChange={size} tabId={tab.id} focused={focused} title={multiple ? "Local" : undefined} />
+              <LocalSessionView
+                onStatusChange={status}
+                onSizeChange={size}
+                tabId={tab.id}
+                paneId={paneId}
+                broadcast={tab.broadcast}
+                focused={focused}
+                title={multiple ? "Local" : undefined}
+              />
             );
           }}
         />

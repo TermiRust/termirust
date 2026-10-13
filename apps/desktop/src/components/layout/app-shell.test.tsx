@@ -267,6 +267,12 @@ describe("AppShell warning border", () => {
     const tab = () => useTabsStore.getState().tabs[0]!;
     const right = tab().focusedPaneId;
 
+    fireEvent.click(screen.getByRole("button", { name: "Broadcast input" }));
+    expect(screen.getByRole("button", { name: "Broadcast input" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("what you type goes to all 2 panes");
+    fireEvent.click(screen.getByRole("button", { name: "Broadcast input" }));
+    expect(tab().broadcast).toBe(false);
+
     press("ArrowLeft", onMac ? { metaKey: true, altKey: true } : { ctrlKey: true, altKey: true });
     expect(tab().focusedPaneId).not.toBe(right);
 

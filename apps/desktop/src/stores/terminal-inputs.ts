@@ -39,3 +39,26 @@ export function sendWhenReady(tabId: string, text: string): void {
 export function forgetPendingInput(tabId: string): void {
   pending.delete(tabId);
 }
+
+/** Every pane of a tab that can take input, for broadcasting keystrokes. */
+const panes = new Map<string, Map<string, Send>>();
+
+export function registerPaneInput(tabId: string, paneId: string, send: Send): () => void {
+  const tab = panes.get(tabId) ?? new Map<string, Send>();
+  tab.set(paneId, send);
+  panes.set(tabId, tab);
+  return () => {
+    const current = panes.get(tabId);
+    if (current?.get(paneId) !== send) return;
+    current.delete(paneId);
+    if (current.size === 0) panes.delete(tabId);
+  };
+}
+
+/** Sends to every connected pane of the tab; returns how many received it. */
+export function broadcastToTab(tabId: string, text: string): number {
+  const tab = panes.get(tabId);
+  if (!tab) return 0;
+  for (const send of tab.values()) send(text);
+  return tab.size;
+}

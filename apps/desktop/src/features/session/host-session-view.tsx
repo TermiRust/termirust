@@ -8,7 +8,7 @@ import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import { useForwardsStore } from "@/stores/forwards-store";
-import { registerTerminalInput } from "@/stores/terminal-inputs";
+import { broadcastToTab, registerPaneInput, registerTerminalInput } from "@/stores/terminal-inputs";
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
@@ -26,6 +26,10 @@ interface HostSessionViewProps {
   onOpenSftp?: (host: HostView) => void;
   /** False for a pane that is not the tab's focused one; it then stays out of the input routing. */
   focused?: boolean;
+  /** This pane's id inside the tab, so broadcast input can reach it. */
+  paneId?: string;
+  /** Keystrokes typed here go to every pane of the tab. */
+  broadcast?: boolean;
   /** Lets snippets type into this tab while it is connected. */
   tabId?: string;
 }
@@ -43,7 +47,7 @@ const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp, tabId, focused = true }: HostSessionViewProps) {
+export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp, tabId, paneId, broadcast = false, focused = true }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
@@ -73,6 +77,14 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   }, [connected, host.id]);
 
   useEffect(() => (connected && focused && tabId ? registerTerminalInput(tabId, session.send) : undefined), [connected, focused, tabId, session.send]);
+  useEffect(() => (connected && tabId && paneId ? registerPaneInput(tabId, paneId, session.send) : undefined), [connected, tabId, paneId, session.send]);
+  const sendTyped = useCallback(
+    (data: string) => {
+      if (broadcast && tabId && broadcastToTab(tabId, data) > 0) return;
+      session.send(data);
+    },
+    [broadcast, tabId, session],
+  );
 
   // Clicking or moving focus to this pane puts the keyboard in its terminal.
   useEffect(() => {
@@ -111,7 +123,8 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
         <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selection() ?? "")}>
           <TerminalView
             ref={terminalRef}
-            onData={session.send}
+            onData={sendTyped}
+            forcePasteConfirmation={broadcast}
             onAskAi={ai.onAskAi}
             onResize={(size) => {
               session.resize(size);

@@ -6,7 +6,7 @@ import { useAiAllowed } from "@/features/ai/use-ai-allowed";
 import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import type { TabStatus } from "@/stores/tabs-store";
-import { registerTerminalInput } from "@/stores/terminal-inputs";
+import { broadcastToTab, registerPaneInput, registerTerminalInput } from "@/stores/terminal-inputs";
 
 import { useLocalSession, type LocalSessionState } from "./use-local-session";
 
@@ -24,11 +24,15 @@ interface LocalSessionViewProps {
   focused?: boolean;
   /** Shown above the terminal when the tab is split, so panes can be told apart. */
   title?: string;
+  /** This pane's id inside the tab, so broadcast input can reach it. */
+  paneId?: string;
+  /** Keystrokes typed here go to every pane of the tab. */
+  broadcast?: boolean;
   /** Lets snippets type into this tab while the shell runs. */
   tabId?: string;
 }
 
-export function LocalSessionView({ onStatusChange, onSizeChange, tabId, focused = true, title }: LocalSessionViewProps) {
+export function LocalSessionView({ onStatusChange, onSizeChange, tabId, paneId, broadcast = false, focused = true, title }: LocalSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useLocalSession(getTerminal);
@@ -47,6 +51,14 @@ export function LocalSessionView({ onStatusChange, onSizeChange, tabId, focused 
 
   const running = state.phase === "running";
   useEffect(() => (running && focused && tabId ? registerTerminalInput(tabId, session.send) : undefined), [running, focused, tabId, session.send]);
+  useEffect(() => (running && tabId && paneId ? registerPaneInput(tabId, paneId, session.send) : undefined), [running, tabId, paneId, session.send]);
+  const sendTyped = useCallback(
+    (data: string) => {
+      if (broadcast && tabId && broadcastToTab(tabId, data) > 0) return;
+      session.send(data);
+    },
+    [broadcast, tabId, session],
+  );
 
   // Clicking or moving focus to this pane puts the keyboard in its terminal.
   useEffect(() => {
@@ -72,7 +84,8 @@ export function LocalSessionView({ onStatusChange, onSizeChange, tabId, focused 
         <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selection() ?? "")}>
           <TerminalView
             ref={terminalRef}
-            onData={session.send}
+            onData={sendTyped}
+            forcePasteConfirmation={broadcast}
             onAskAi={ai.onAskAi}
             onResize={(size) => {
               session.resize(size);
