@@ -1,5 +1,5 @@
-import { ArrowUp, File, Folder, FolderPlus, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ArrowUp, ChevronDown, ChevronUp, File, Folder, FolderPlus, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
 
 import type { FileEntry } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { formatBytes, formatModified, formatPermissions } from "./format";
 import { nextSelection, stepSelection } from "./selection";
+import { DEFAULT_SORT, sortEntries, toggleSort, type SortKey, type SortOrder } from "./sort";
 
 export interface FilePanelProps {
   side: "local" | "remote";
@@ -33,8 +34,10 @@ export interface FilePanelProps {
 }
 
 export function FilePanel(props: FilePanelProps) {
-  const { side, title, path, entries, loading, error, selected, dropTarget, isMac } = props;
+  const { side, title, path, loading, error, selected, dropTarget, isMac } = props;
   const [anchor, setAnchor] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT);
+  const entries = useMemo(() => sortEntries(props.entries, sort), [props.entries, sort]);
   const paths = entries.map((e) => e.path);
   const selectedEntries = entries.filter((e) => selected.includes(e.path));
 
@@ -115,9 +118,9 @@ export function FilePanel(props: FilePanelProps) {
       </div>
 
       <div className="grid shrink-0 grid-cols-[1fr_80px_150px] gap-2 border-b border-border px-3 py-1 text-[11px] text-fg-muted">
-        <span>Name</span>
-        <span className="text-right">Size</span>
-        <span>Modified</span>
+        <SortHeader label="Name" column="name" sort={sort} onSort={setSort} />
+        <SortHeader label="Size" column="size" sort={sort} onSort={setSort} className="justify-end" />
+        <SortHeader label="Modified" column="modified" sort={sort} onSort={setSort} />
       </div>
 
       {error ? (
@@ -172,6 +175,22 @@ export function FilePanel(props: FilePanelProps) {
         {selectedEntries.length > 0 ? `${selectedEntries.length} of ${entries.length} selected` : `${entries.length} items`}
       </div>
     </section>
+  );
+}
+
+function SortHeader({ label, column, sort, onSort, className }: { label: string; column: SortKey; sort: SortOrder; onSort: (sort: SortOrder) => void; className?: string }) {
+  const active = sort.key === column;
+  return (
+    <button
+      type="button"
+      aria-label={`Sort by ${label.toLowerCase()}`}
+      aria-pressed={active}
+      onClick={() => onSort(toggleSort(sort, column))}
+      className={cn("flex items-center gap-0.5 text-left hover:text-fg", active && "text-fg-2", className)}
+    >
+      {label}
+      {active && (sort.ascending ? <ChevronUp size={11} /> : <ChevronDown size={11} />)}
+    </button>
   );
 }
 

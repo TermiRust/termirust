@@ -178,6 +178,7 @@ export function AppShell() {
         recentHostIds={recentHostIds}
         commands={paletteCommands}
         onOpenHost={openHost}
+        onOpenSftp={openSftp}
       />
       {closing && (
         <ConfirmCloseDialog

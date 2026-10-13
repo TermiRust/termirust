@@ -1,6 +1,6 @@
 import type { TransferEvent } from "@/bindings";
 
-import { formatBytes } from "./format";
+import { formatBytes, formatDuration } from "./format";
 
 export function progressOf(event: TransferEvent): number {
   if (event.state === "completed") return 1;
@@ -8,13 +8,14 @@ export function progressOf(event: TransferEvent): number {
   return 0;
 }
 
-export function statusText(event: TransferEvent): string {
+export function statusText(event: TransferEvent, rate: number | null = null): string {
   switch (event.state) {
     case "queued":
       return "Waiting…";
     case "running": {
       const files = event.filesTotal > 1 ? ` · ${event.filesDone}/${event.filesTotal} files` : "";
-      return `${formatBytes(event.done)} / ${formatBytes(event.total)}${files}`;
+      const speed = rate !== null && rate > 0 ? ` · ${formatBytes(Math.round(rate))}/s · ${formatDuration((event.total - event.done) / rate)} left` : "";
+      return `${formatBytes(event.done)} / ${formatBytes(event.total)}${speed}${files}`;
     }
     case "completed":
       return `Done · ${formatBytes(event.bytes)}`;

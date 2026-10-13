@@ -25,6 +25,8 @@ interface Item {
   shortcut?: string;
   indices: number[];
   run: () => void;
+  /** Shift+Enter on a host: open SFTP instead of a terminal. */
+  runAlt?: () => void;
 }
 
 interface CommandPaletteProps {
@@ -34,6 +36,7 @@ interface CommandPaletteProps {
   recentHostIds: string[];
   commands: PaletteCommand[];
   onOpenHost: (host: HostView) => void;
+  onOpenSftp?: (host: HostView) => void;
 }
 
 const address = (h: HostView) => `${h.username ? `${h.username}@` : ""}${h.hostname}${h.port === 22 ? "" : `:${h.port}`}`;
@@ -66,7 +69,7 @@ export function CommandPalette({ open, onOpenChange, ...props }: CommandPaletteP
   );
 }
 
-function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, close }: Omit<CommandPaletteProps, "open" | "onOpenChange"> & { close: () => void }) {
+function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, onOpenSftp, close }: Omit<CommandPaletteProps, "open" | "onOpenChange"> & { close: () => void }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
 
@@ -83,6 +86,12 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, close }: Omit
       icon: <Server size={14} />,
       indices,
       run: openHost(h),
+      runAlt: onOpenSftp
+        ? () => {
+            close();
+            onOpenSftp(h);
+          }
+        : undefined,
     });
     const commandItems = (list: { item: PaletteCommand; indices: number[] }[]): Item[] =>
       list.map(({ item, indices }) => ({
@@ -108,7 +117,7 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, close }: Omit
       .map(({ item }) => hostItem("Hosts", item));
     const matchedCommands = rankByFuzzy(commands, query, (c) => c.label).map(({ item, match }) => ({ item, indices: match.indices }));
     return [...matchedHosts, ...byAddress, ...commandItems(matchedCommands)].slice(0, 30);
-  }, [query, hosts, recentHostIds, commands, onOpenHost, close]);
+  }, [query, hosts, recentHostIds, commands, onOpenHost, onOpenSftp, close]);
 
   const current = Math.min(active, Math.max(items.length - 1, 0));
 
@@ -119,7 +128,9 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, close }: Omit
       setActive((current + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length);
     } else if (event.key === "Enter") {
       event.preventDefault();
-      items[current]?.run();
+      const item = items[current];
+      if (event.shiftKey && item?.runAlt) item.runAlt();
+      else item?.run();
     }
   };
 
@@ -167,7 +178,9 @@ function PaletteBody({ hosts, recentHostIds, commands, onOpenHost, close }: Omit
                 {item.detail && <span className="truncate font-mono text-xs text-fg-muted">{item.detail}</span>}
                 <span className="ml-auto flex items-center gap-2">
                   {item.shortcut && <Kbd>{item.shortcut}</Kbd>}
-                  {item.section !== "Commands" && index === current && <span className="text-xs text-fg-muted">Connect ↵</span>}
+                  {item.section !== "Commands" && index === current && (
+                    <span className="text-xs text-fg-muted">Connect ↵{item.runAlt ? " · SFTP ⇧↵" : ""}</span>
+                  )}
                 </span>
               </div>
             </li>

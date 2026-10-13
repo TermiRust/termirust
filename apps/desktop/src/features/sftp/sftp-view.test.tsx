@@ -161,6 +161,17 @@ describe("SftpView", () => {
     expect(await within(list("Local")).findByRole("option", { name: /site/ })).toBeInTheDocument();
   });
 
+  it("sorts by a column, keeping folders on top", async () => {
+    const user = userEvent.setup();
+    await renderConnected();
+    const order = () => within(list("Local")).getAllByRole("option").map((o) => o.getAttribute("title"));
+    expect(order()).toEqual(["Projects", "notes.txt", "report.pdf"]);
+
+    await user.click(within(panel("Local")).getByRole("button", { name: "Sort by name" }));
+    expect(order()).toEqual(["Projects", "report.pdf", "notes.txt"]);
+    expect(within(panel("Local")).getByRole("button", { name: "Sort by name" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("reports a folder that cannot be listed", async () => {
     commands.sftpList.mockImplementation((_id: number, path: string) =>
       Promise.resolve(path === "/root" ? { status: "error", error: { code: "sftp", message: "permission denied" } } : ok(remoteTree[path] ?? [])),

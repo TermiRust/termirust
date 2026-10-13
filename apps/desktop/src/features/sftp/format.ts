@@ -23,3 +23,11 @@ export function formatPermissions(mode: number | null): string {
   const flags = "rwxrwxrwx";
   return [...flags].map((flag, i) => (mode & (1 << (8 - i)) ? flag : "-")).join("");
 }
+
+/** Remaining time as "45s", "3m 05s" or "1h 02m". */
+export function formatDuration(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+}

@@ -7,7 +7,7 @@ vi.mock("@tauri-apps/api/core", async () => ({ Channel: (await import("@/test/ta
 const commands = { sftpTransferStart: vi.fn(), sftpTransferCancel: vi.fn() };
 vi.mock("@/bindings", () => ({ commands }));
 
-const { useTransfersStore } = await import("./transfers-store");
+const { measureRate, useTransfersStore } = await import("./transfers-store");
 
 const request: TransferRequest = { sftpId: 1, direction: "upload", localPath: "/tmp/a", remotePath: "/srv/a" };
 const ok = (data: unknown) => ({ status: "ok", data });
@@ -30,6 +30,31 @@ describe("transfers store", () => {
     expect(item(key)?.event).toMatchObject({ state: "running", done: 5 });
     lastChannel().emit({ state: "completed", bytes: 10 });
     expect(item(key)?.event).toEqual({ state: "completed", bytes: 10 });
+  });
+
+  it("measures a smoothed speed from readings at least half a second apart", () => {
+    let item = { rate: null as number | null, sample: null as { at: number; done: number } | null };
+    item = measureRate(item, 0, 0);
+    expect(item).toEqual({ rate: null, sample: { at: 0, done: 0 } });
+    expect(measureRate(item, 100, 100)).toBe(item);
+    item = measureRate(item, 1000, 1000);
+    expect(item.rate).toBe(1000);
+    item = measureRate(item, 4000, 2000);
+    expect(item.rate).toBeCloseTo(1000 * 0.7 + 3000 * 0.3);
+    expect(measureRate(item, 10, 2600).sample).toEqual({ at: 2600, done: 10 });
+  });
+
+  it("tracks speed while running and drops it when finished", async () => {
+    const now = vi.spyOn(Date, "now");
+    const key = await useTransfersStore.getState().start(request, "a");
+    now.mockReturnValue(1000);
+    lastChannel().emit({ state: "running", done: 0, total: 10_000, filesDone: 0, filesTotal: 1, current: "" });
+    now.mockReturnValue(2000);
+    lastChannel().emit({ state: "running", done: 4000, total: 10_000, filesDone: 0, filesTotal: 1, current: "" });
+    expect(item(key)?.rate).toBe(4000);
+    lastChannel().emit({ state: "completed", bytes: 10_000 });
+    expect(item(key)?.rate).toBeNull();
+    now.mockRestore();
   });
 
   it("marks a transfer failed when it cannot be queued", async () => {

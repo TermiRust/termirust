@@ -15,6 +15,9 @@ describe("transfer status", () => {
     expect(statusText({ state: "queued" })).toBe("Waiting…");
     expect(statusText({ state: "running", done: 1024, total: 2048, filesDone: 1, filesTotal: 3, current: "" })).toBe("1.0 KB / 2.0 KB · 1/3 files");
     expect(statusText({ state: "running", done: 1, total: 2, filesDone: 0, filesTotal: 1, current: "" })).toBe("1 B / 2 B");
+    expect(statusText({ state: "running", done: 1024 ** 2, total: 11 * 1024 ** 2, filesDone: 0, filesTotal: 1, current: "" }, 1024 ** 2)).toBe(
+      "1.0 MB / 11.0 MB · 1.0 MB/s · 10s left",
+    );
     expect(statusText({ state: "completed", bytes: 2048 })).toBe("Done · 2.0 KB");
     expect(statusText({ state: "failed", message: "denied" })).toBe("denied");
     expect(statusText({ state: "cancelled" })).toBe("Cancelled");

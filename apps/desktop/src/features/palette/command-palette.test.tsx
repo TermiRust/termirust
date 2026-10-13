@@ -25,14 +25,15 @@ const hosts = [host("1", "prod-api"), host("2", "prod-db", { port: 2222 }), host
 
 function setup(recentHostIds: string[] = []) {
   const onOpenHost = vi.fn();
+  const onOpenSftp = vi.fn();
   const onOpenChange = vi.fn();
   const newHost = vi.fn();
   const commands: PaletteCommand[] = [
     { id: "new-host", label: "New host", icon: null, shortcut: "⌘N", run: newHost },
     { id: "keychain", label: "Open Keychain", icon: null, run: vi.fn() },
   ];
-  render(<CommandPalette open onOpenChange={onOpenChange} hosts={hosts} recentHostIds={recentHostIds} commands={commands} onOpenHost={onOpenHost} />);
-  return { onOpenHost, onOpenChange, newHost, user: userEvent.setup() };
+  render(<CommandPalette open onOpenChange={onOpenChange} hosts={hosts} recentHostIds={recentHostIds} commands={commands} onOpenHost={onOpenHost} onOpenSftp={onOpenSftp} />);
+  return { onOpenHost, onOpenSftp, onOpenChange, newHost, user: userEvent.setup() };
 }
 
 const options = () => within(screen.getByRole("listbox", { name: "Results" })).queryAllByRole("option");
@@ -73,6 +74,15 @@ describe("CommandPalette", () => {
     await user.keyboard("{Enter}");
     expect(onOpenHost).toHaveBeenCalledExactlyOnceWith(expected);
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("opens SFTP to the highlighted host with Shift+Enter", async () => {
+    const { onOpenHost, onOpenSftp, user } = setup();
+    await user.type(screen.getByRole("combobox"), "staging");
+    expect(options()[0]).toHaveTextContent("SFTP ⇧↵");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(onOpenSftp).toHaveBeenCalledExactlyOnceWith(hosts[2]);
+    expect(onOpenHost).not.toHaveBeenCalled();
   });
 
   it("wraps around with ArrowUp from the top", async () => {

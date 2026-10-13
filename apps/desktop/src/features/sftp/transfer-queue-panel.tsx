@@ -56,8 +56,8 @@ function TransferRow({ item, onCancel, onRetry, onDismiss }: { item: TransferIte
           style={{ width: `${fraction * 100}%` }}
         />
       </div>
-      <span className={cn("w-56 shrink-0 truncate text-right text-[11px] tabular-nums", event.state === "failed" ? "text-danger" : "text-fg-muted")} title={statusText(event)}>
-        {statusText(event)}
+      <span className={cn("w-72 shrink-0 truncate text-right text-[11px] tabular-nums", event.state === "failed" ? "text-danger" : "text-fg-muted")} title={statusText(event, item.rate)}>
+        {statusText(event, item.rate)}
       </span>
       {!finished && (
         <button type="button" aria-label={`Cancel ${item.name}`} onClick={onCancel} className="rounded p-0.5 text-fg-muted hover:bg-active hover:text-fg">
