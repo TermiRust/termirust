@@ -10,6 +10,7 @@ import { TabBar } from "@/components/layout/tab-bar";
 import { Topbar } from "@/components/layout/topbar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { ForwardsView } from "@/features/forwards/forwards-view";
+import { HostsView } from "@/features/hosts/hosts-view";
 import { KeychainView } from "@/features/keychain/keychain-view";
 import { SettingsView } from "@/features/settings/settings-view";
 import { MultiHostRunDialog } from "@/features/snippets/multi-host-run-dialog";
@@ -244,6 +245,7 @@ export function AppShell() {
           <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />
         </div>
         <main className="flex min-w-0 flex-1 flex-col">
+          {section === "library" && <HostsView onOpenHost={openHost} onOpenSftp={openSftp} />}
           {section === "keychain" && <KeychainView />}
           {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}
           {section === "forwards" && <ForwardsView />}

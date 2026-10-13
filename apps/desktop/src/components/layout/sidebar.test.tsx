@@ -114,6 +114,20 @@ describe("Sidebar", () => {
     expect(onOpenHost).not.toHaveBeenCalled();
   });
 
+  it("separates the host library from the open terminals, counting tabs", async () => {
+    const { useTabsStore } = await import("@/stores/tabs-store");
+    const { user } = await renderWith([host("api")]);
+    await user.click(screen.getByRole("button", { name: "Hosts" }));
+    expect(useLayoutStore.getState().section).toBe("library");
+    act(() => {
+      useTabsStore.getState().openLocalTab();
+    });
+    expect(screen.getByRole("button", { name: /Terminals/ })).toHaveTextContent("1");
+    await user.click(screen.getByRole("button", { name: /Terminals/ }));
+    expect(useLayoutStore.getState().section).toBe("hosts");
+    act(() => useTabsStore.setState({ tabs: [], activeTabId: null }));
+  });
+
   it("opens the Port forwarding screen from the section list", async () => {
     const { user } = await renderWith([host("api")]);
     await user.click(screen.getByRole("button", { name: "Port forwarding" }));

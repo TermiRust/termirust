@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Search, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareTerminal, Waypoints } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareCode, SquareTerminal, Waypoints } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -173,11 +173,19 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
 
       <nav aria-label="Sections" className="flex flex-col gap-0.5 border-t border-border p-2">
         <Button
+          className={cn("justify-start", section === "library" && "bg-active text-fg")}
+          aria-current={section === "library" ? "page" : undefined}
+          onClick={() => setSection("library")}
+        >
+          <Server size={15} /> Hosts
+        </Button>
+        <Button
           className={cn("justify-start", section === "hosts" && "bg-active text-fg")}
           aria-current={section === "hosts" ? "page" : undefined}
           onClick={() => setSection("hosts")}
         >
-          <Server size={15} /> Hosts
+          <SquareTerminal size={15} /> Terminals
+          {tabs.length > 0 && <span className="ml-auto rounded bg-bg-sunk-2 px-1.5 font-mono text-[11px] text-fg-muted">{tabs.length}</span>}
         </Button>
         <Button
           className={cn("justify-start", section === "keychain" && "bg-active text-fg")}
@@ -198,7 +206,7 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
           aria-current={section === "snippets" ? "page" : undefined}
           onClick={() => setSection("snippets")}
         >
-          <SquareTerminal size={15} /> Snippets
+          <SquareCode size={15} /> Snippets
         </Button>
         <Button className="justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host
