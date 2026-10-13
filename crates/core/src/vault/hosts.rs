@@ -149,7 +149,8 @@ impl HostRepository<'_> {
     }
 
     pub async fn delete(&self, id: Uuid) -> Result<()> {
-        self.vault.delete_item(ItemKind::Host, id).await
+        self.vault.delete_item(ItemKind::Host, id).await?;
+        self.vault.port_forwards().delete_for_host(id).await
     }
 
     pub async fn get(&self, id: Uuid) -> Result<Option<HostRecord>> {

@@ -60,6 +60,19 @@ export const commands = {
 	localRename: (from: string, to: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_rename", { from, to })),
 	/**  Removes a file, or a directory with everything in it, without following symlinks. */
 	localRemove: (path: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_remove", { path })),
+	forwardsList: () => typedError<ForwardRuleView[], CommandError>(__TAURI_INVOKE("forwards_list")),
+	forwardsCreate: (input: ForwardRuleInput) => typedError<ForwardRuleView, CommandError>(__TAURI_INVOKE("forwards_create", { input })),
+	/**  Saving a running rule stops it, so the next start uses the new addresses. */
+	forwardsUpdate: (id: string, input: ForwardRuleInput) => typedError<ForwardRuleView, CommandError>(__TAURI_INVOKE("forwards_update", { id, input })),
+	forwardsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("forwards_delete", { id })),
+	forwardsStart: (request: StartForwardRequest) => typedError<StartForwardOutcome, CommandError>(__TAURI_INVOKE("forwards_start", { request })),
+	forwardsStop: (ruleId: string) => typedError<null, CommandError>(__TAURI_INVOKE("forwards_stop", { ruleId })),
+	forwardsStatus: () => typedError<ForwardStatus[], CommandError>(__TAURI_INVOKE("forwards_status")),
+	/**
+	 *  Starts the host's auto-start rules once its terminal tab connected. A rule that would need
+	 *  a typed secret fails with a hint instead of interrupting the terminal with a prompt.
+	 */
+	forwardsAutoStart: (hostId: string) => typedError<ForwardStatus[], CommandError>(__TAURI_INVOKE("forwards_auto_start", { hostId })),
 };
 
 /* Types */
@@ -89,6 +102,32 @@ export type FileEntry = {
 };
 
 export type FileKind = "directory" | "file" | "symlink" | "other";
+
+export type ForwardRuleInput = {
+	label: string,
+	hostId: string,
+	spec: ForwardSpecDto,
+	autoStart: boolean,
+};
+
+export type ForwardRuleView = {
+	id: string,
+	label: string,
+	hostId: string,
+	spec: ForwardSpecDto,
+	autoStart: boolean,
+	/**  The equivalent OpenSSH flag, e.g. "-L 127.0.0.1:5432:db:5432". */
+	summary: string,
+};
+
+export type ForwardSpecDto = { kind: "local"; bindHost: string; bindPort: number; targetHost: string; targetPort: number } | { kind: "remote"; remoteHost: string; remotePort: number; localHost: string; localPort: number } | { kind: "dynamic"; bindHost: string; bindPort: number };
+
+export type ForwardState = { state: "stopped" } | { state: "starting" } | { state: "running"; listeningOn: string; active: number; total: number } | { state: "failed"; message: string };
+
+export type ForwardStatus = {
+	ruleId: string,
+	state: ForwardState,
+};
 
 export type GroupView = {
 	id: string,
@@ -231,6 +270,17 @@ export type SshConfigPreview = {
 	path: string,
 	candidates: SshConfigCandidate[],
 	unsupported: string[],
+};
+
+export type StartForwardOutcome = 
+/**  `state` is Running, or Failed with the reason (busy port, unreachable host…). */
+{ status: "started"; state: ForwardState } | { status: "needsInput"; prompt: OpenHostOutcome };
+
+export type StartForwardRequest = {
+	ruleId: string,
+	prompted: PromptedLogin | null,
+	confirmedFingerprint: string | null,
+	rememberHostKey: boolean,
 };
 
 /**  Terminal preferences; missing or out-of-range values fall back to defaults. */

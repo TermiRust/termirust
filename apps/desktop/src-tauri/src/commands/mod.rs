@@ -1,4 +1,5 @@
 pub mod benchmark;
+pub mod forwards;
 pub mod host_session;
 pub mod hosts;
 pub mod keys;

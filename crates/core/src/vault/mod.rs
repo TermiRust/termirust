@@ -6,6 +6,7 @@ mod items;
 mod key_store;
 mod known_hosts;
 mod open;
+mod port_forwards;
 mod secret;
 mod ssh_config_import;
 
@@ -16,6 +17,9 @@ pub use items::{ItemKind, ItemMeta, StoredItem};
 pub use key_store::{MemoryKeyStore, OsKeychain, VaultKeyStore};
 pub use known_hosts::{HostKeyStatus, KnownHost, KnownHostRecord, KnownHostRepository};
 pub use open::{VAULT_FORMAT_VERSION, Vault};
+pub use port_forwards::{
+    ForwardSpec, LOOPBACK, PortForwardRecord, PortForwardRepository, PortForwardRule,
+};
 pub use secret::Secret;
 pub use ssh_config_import::{SshConfigImportSummary, import_ssh_config_hosts, is_already_saved};
 

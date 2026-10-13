@@ -16,8 +16,8 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    benchmark, host_session, hosts, keys, local_files, local_session, logs, session, settings,
-    sftp, ssh_config, vault,
+    benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, session,
+    settings, sftp, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -77,6 +77,14 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         local_files::local_create_dir,
         local_files::local_rename,
         local_files::local_remove,
+        forwards::forwards_list,
+        forwards::forwards_create,
+        forwards::forwards_update,
+        forwards::forwards_delete,
+        forwards::forwards_start,
+        forwards::forwards_stop,
+        forwards::forwards_status,
+        forwards::forwards_auto_start,
     ])
 }
 
@@ -103,6 +111,7 @@ pub fn run() {
         .manage(benchmark::ActiveBenchmark::default())
         .manage(sftp::SftpSessions::default())
         .manage(transfer_queue::TransferQueue::default())
+        .manage(forwards::RunningForwards::default())
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);

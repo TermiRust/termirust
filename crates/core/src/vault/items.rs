@@ -16,6 +16,7 @@ pub enum ItemKind {
     Group,
     Identity,
     KnownHost,
+    PortForward,
 }
 
 impl ItemKind {
@@ -25,6 +26,7 @@ impl ItemKind {
             ItemKind::Group => "group",
             ItemKind::Identity => "identity",
             ItemKind::KnownHost => "known_host",
+            ItemKind::PortForward => "port_forward",
         }
     }
 }

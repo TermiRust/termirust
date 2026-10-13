@@ -186,6 +186,11 @@ impl SshConnection {
         &self.handle
     }
 
+    /// True once the server or the network ended the connection.
+    pub fn is_closed(&self) -> bool {
+        self.handle.is_closed()
+    }
+
     pub(crate) fn remote_forwards(&self) -> &crate::forward::RemoteForwardRouter {
         &self.remote_forwards
     }

@@ -88,7 +88,7 @@ pub struct GroupView {
     pub warning_border: bool,
 }
 
-fn parse_id(value: &str) -> Result<Uuid, CommandError> {
+pub(crate) fn parse_id(value: &str) -> Result<Uuid, CommandError> {
     Uuid::parse_str(value)
         .map_err(|_| CoreError::InvalidData(format!("invalid id: {value}")).into())
 }
