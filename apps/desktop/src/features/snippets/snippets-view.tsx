@@ -13,9 +13,11 @@ import { parseVariables } from "./variables";
 interface SnippetsViewProps {
   /** Runs or inserts a snippet in the active terminal tab; absent when no tab can take it. */
   onUse?: (snippet: SnippetView) => void;
+  /** Runs a snippet on several saved hosts, one tab each. */
+  onRunOnHosts?: (snippet: SnippetView) => void;
 }
 
-export function SnippetsView({ onUse }: SnippetsViewProps) {
+export function SnippetsView({ onUse, onRunOnHosts }: SnippetsViewProps) {
   const { snippets, loaded, error, load, remove } = useSnippetsStore();
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<SnippetView | "new" | null>(null);
@@ -73,6 +75,11 @@ export function SnippetsView({ onUse }: SnippetsViewProps) {
                     {onUse && (
                       <Button size="sm" variant="outline" onClick={() => onUse(snippet)} aria-label={`Use ${snippet.name}`}>
                         Use
+                      </Button>
+                    )}
+                    {onRunOnHosts && (
+                      <Button size="sm" variant="outline" onClick={() => onRunOnHosts(snippet)} aria-label={`Run ${snippet.name} on several hosts`}>
+                        Run on hosts…
                       </Button>
                     )}
                     <Button size="icon" aria-label={`Edit ${snippet.name}`} onClick={() => setEditing(snippet)}>

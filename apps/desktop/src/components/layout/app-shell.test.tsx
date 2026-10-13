@@ -221,4 +221,31 @@ describe("AppShell warning border", () => {
     expect(send).toHaveBeenCalledWith("df -h\r");
     unregister();
   });
+
+  it("runs a snippet on several hosts: one tab each, sent once each connects", async () => {
+    const { useHostsStore } = await import("@/stores/hosts-store");
+    const { registerTerminalInput } = await import("@/stores/terminal-inputs");
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false };
+    const db = { ...api, id: "h2", label: "db" };
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    useLayoutStore.setState({ section: "snippets", sidebarVisible: true, hostFilter: "" });
+    useHostsStore.setState({ hosts: [], groups: [], loaded: false });
+    render(<AppShell />);
+    await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
+    act(() => useHostsStore.setState({ hosts: [api, db], groups: [] }));
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Run Disk usage on several hosts" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Run Disk usage on several hosts" }));
+    await user.click(dialog.getByRole("checkbox", { name: "api" }));
+    await user.click(dialog.getByRole("checkbox", { name: "db" }));
+    await user.click(dialog.getByRole("button", { name: "Review 2 hosts" }));
+    await user.click(dialog.getByRole("button", { name: "Run on 2 hosts" }));
+
+    const tabs = useTabsStore.getState().tabs;
+    expect(tabs.map((t) => t.title)).toEqual(["api", "db"]);
+    const send = vi.fn();
+    registerTerminalInput(tabs[1]!.id, send)();
+    expect(send).toHaveBeenCalledWith("df -h\r");
+  });
 });

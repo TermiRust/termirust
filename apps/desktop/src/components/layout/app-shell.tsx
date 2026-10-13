@@ -11,6 +11,7 @@ import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { ForwardsView } from "@/features/forwards/forwards-view";
 import { KeychainView } from "@/features/keychain/keychain-view";
 import { SettingsView } from "@/features/settings/settings-view";
+import { MultiHostRunDialog } from "@/features/snippets/multi-host-run-dialog";
 import { SnippetRunDialog } from "@/features/snippets/snippet-run-dialog";
 import { SnippetsView } from "@/features/snippets/snippets-view";
 import { CommandPalette, type PaletteCommand } from "@/features/palette/command-palette";
@@ -23,7 +24,7 @@ import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tab
 import { useAppVersion } from "@/lib/use-app-version";
 import { useAiStore } from "@/stores/ai-store";
 import { useSnippetsStore } from "@/stores/snippets-store";
-import { sendToTerminal } from "@/stores/terminal-inputs";
+import { sendToTerminal, sendWhenReady } from "@/stores/terminal-inputs";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -60,6 +61,17 @@ export function AppShell() {
   }, [loadHosts, loadSettings, loadAi, loadSnippets]);
 
   const [snippetRun, setSnippetRun] = useState<{ snippet: SnippetView; tab: Tab } | null>(null);
+  const [multiRun, setMultiRun] = useState<SnippetView | null>(null);
+  const runOnHosts = useCallback(
+    (targets: HostView[], keystrokes: string) => {
+      setSection("hosts");
+      for (const host of targets) {
+        const tabId = openHostTab(host, resolveTabColor(host, groups.find((g) => g.id === host.groupId)));
+        sendWhenReady(tabId, keystrokes);
+      }
+    },
+    [groups, openHostTab, setSection],
+  );
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const terminalReady = activeTab !== undefined && activeTab.status === "connected" && (activeTab.target.kind === "host" || activeTab.target.kind === "local");
   const runSnippet = useCallback(
@@ -166,7 +178,7 @@ export function AppShell() {
       {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
-        {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} />}
+        {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}
         {section === "forwards" && <ForwardsView />}
         {section === "settings" && <SettingsView />}
         {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
@@ -214,6 +226,7 @@ export function AppShell() {
         snippets={snippets}
         onRunSnippet={runSnippet}
       />
+      {multiRun && <MultiHostRunDialog snippet={multiRun} onRun={runOnHosts} onClose={() => setMultiRun(null)} />}
       {snippetRun && (
         <SnippetRunDialog
           snippet={snippetRun.snippet}

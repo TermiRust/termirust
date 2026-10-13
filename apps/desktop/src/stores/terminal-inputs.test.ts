@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { canSendToTerminal, registerTerminalInput, sendToTerminal } from "./terminal-inputs";
+import { canSendToTerminal, forgetPendingInput, registerTerminalInput, sendToTerminal, sendWhenReady } from "./terminal-inputs";
 
 describe("terminal inputs", () => {
   it("routes text to the registered tab until it unregisters", () => {
@@ -23,5 +23,28 @@ describe("terminal inputs", () => {
     old();
     sendToTerminal("t2", "x");
     expect(fresh).toHaveBeenCalledWith("x");
+  });
+
+  it("holds text for a tab until it connects, then sends it once", () => {
+    sendWhenReady("t3", "uptime\r");
+    const send = vi.fn();
+    const unregister = registerTerminalInput("t3", send);
+    expect(send).toHaveBeenCalledExactlyOnceWith("uptime\r");
+    unregister();
+    registerTerminalInput("t3", send)();
+    expect(send).toHaveBeenCalledTimes(1);
+
+    const live = vi.fn();
+    registerTerminalInput("t4", live);
+    sendWhenReady("t4", "now");
+    expect(live).toHaveBeenCalledWith("now");
+  });
+
+  it("forgets text for tabs closed before connecting", () => {
+    sendWhenReady("t5", "x");
+    forgetPendingInput("t5");
+    const send = vi.fn();
+    registerTerminalInput("t5", send);
+    expect(send).not.toHaveBeenCalled();
   });
 });

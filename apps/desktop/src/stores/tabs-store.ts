@@ -3,6 +3,8 @@ import { create } from "zustand";
 import type { HostView } from "@/bindings";
 import type { TabColor } from "@/features/tabs/tab-color";
 
+import { forgetPendingInput } from "./terminal-inputs";
+
 export type TabStatus = "connecting" | "connected" | "disconnected" | "error" | "idle";
 
 export type TabTarget = { kind: "host"; host: HostView } | { kind: "sftp"; host: HostView } | { kind: "local" } | { kind: "lab" };
@@ -54,7 +56,8 @@ export const useTabsStore = create<TabsState>()((set, get) => {
     openLocalTab: () => open({ title: "Local", target: { kind: "local" }, status: "connecting", color: null, size: null }),
 
     /** Closing the active tab activates its right neighbour, or the left one at the end. */
-    closeTab: (id) =>
+    closeTab: (id) => {
+      forgetPendingInput(id);
       set((s) => {
         const index = s.tabs.findIndex((t) => t.id === id);
         if (index === -1) return s;
@@ -62,7 +65,8 @@ export const useTabsStore = create<TabsState>()((set, get) => {
         const activeTabId =
           s.activeTabId === id ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? null) : s.activeTabId;
         return { tabs, activeTabId };
-      }),
+      });
+    },
 
     activateTab: (id) => {
       if (get().tabs.some((t) => t.id === id)) set({ activeTabId: id });
