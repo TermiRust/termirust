@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const commands = { settingsTerminalSet: vi.fn() };
+const commands = { settingsTerminalSet: vi.fn(), logsOpenFolder: vi.fn() };
 vi.mock("@/bindings", () => ({ commands }));
 
 const { useSettingsStore } = await import("@/stores/settings-store");
@@ -63,6 +63,13 @@ describe("SettingsView", () => {
     await user.type(field, "5000");
     await user.tab();
     await waitFor(() => expect(saved()).toMatchObject({ scrollback: 5000 }));
+  });
+
+  it("opens the log folder", async () => {
+    const user = userEvent.setup();
+    render(<SettingsView />);
+    await user.click(screen.getByRole("button", { name: "Open log folder" }));
+    expect(commands.logsOpenFolder).toHaveBeenCalledOnce();
   });
 
   it("shows a save error", async () => {

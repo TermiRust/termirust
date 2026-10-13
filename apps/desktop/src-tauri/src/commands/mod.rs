@@ -3,6 +3,7 @@ pub mod host_session;
 pub mod hosts;
 pub mod keys;
 pub mod local_session;
+pub mod logs;
 pub mod session;
 pub mod settings;
 pub mod ssh_config;

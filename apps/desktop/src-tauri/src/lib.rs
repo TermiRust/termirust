@@ -1,5 +1,6 @@
 mod command_error;
 mod commands;
+mod logging;
 mod raw_chunk;
 mod session_registry;
 mod vault_state;
@@ -13,7 +14,7 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    benchmark, host_session, hosts, keys, local_session, session, settings, ssh_config, vault,
+    benchmark, host_session, hosts, keys, local_session, logs, session, settings, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -57,6 +58,7 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         ssh_config::ssh_config_import,
         settings::settings_terminal_get,
         settings::settings_terminal_set,
+        logs::logs_open_folder,
     ])
 }
 
@@ -84,6 +86,13 @@ pub fn run() {
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);
+            match logging::init(&app.path().app_log_dir()?) {
+                Ok(guard) => {
+                    app.manage(guard);
+                }
+                Err(e) => eprintln!("logging disabled: {e}"),
+            }
+            tracing::info!(version = env!("CARGO_PKG_VERSION"), "Termirust starting");
             let data_dir = app.path().app_data_dir()?;
             let vault = tauri::async_runtime::block_on(VaultState::open(
                 &data_dir,

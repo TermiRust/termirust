@@ -18,6 +18,10 @@ impl VaultState {
             Vault::open_or_create(db, key_store).await
         }
         .await;
+        match &opened {
+            Ok(vault) => tracing::info!(vault_id = vault.vault_id(), "vault opened"),
+            Err(e) => tracing::error!(error = %e, "vault could not be opened"),
+        }
         Self(opened.map_err(CommandError::from))
     }
 

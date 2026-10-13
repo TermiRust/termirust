@@ -1,4 +1,4 @@
-import { FileInput, KeyRound, PanelLeft, Plus, Settings, SquareTerminal } from "lucide-react";
+import { FileInput, FolderOpen, KeyRound, PanelLeft, Plus, Settings, SquareTerminal } from "lucide-react";
 
 export const paletteIcons = {
   newHost: <Plus size={14} />,
@@ -7,4 +7,5 @@ export const paletteIcons = {
   keychain: <KeyRound size={14} />,
   sidebar: <PanelLeft size={14} />,
   settings: <Settings size={14} />,
+  logs: <FolderOpen size={14} />,
 };

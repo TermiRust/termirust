@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { HostView } from "@/bindings";
+import { commands, type HostView } from "@/bindings";
 import { AppDialogs } from "@/components/layout/app-dialogs";
 import { ConfirmCloseDialog } from "@/components/layout/confirm-close-dialog";
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
@@ -76,6 +76,7 @@ export function AppShell() {
       { id: "import-config", label: "Import from SSH config", icon: paletteIcons.importConfig, run: () => setImportConfigOpen(true) },
       { id: "keychain", label: "Open Keychain", icon: paletteIcons.keychain, run: () => setSection("keychain") },
       { id: "settings", label: "Open Settings", icon: paletteIcons.settings, run: () => setSection("settings") },
+      { id: "logs", label: "Open log folder", icon: paletteIcons.logs, run: () => void commands.logsOpenFolder() },
       { id: "sidebar", label: "Toggle sidebar", icon: paletteIcons.sidebar, shortcut: shortcutLabel("sidebar", onMac), run: toggleSidebar },
     ],
     [onMac, openNewHost, openLocalTab, setImportConfigOpen, setSection, toggleSidebar],

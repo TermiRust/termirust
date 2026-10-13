@@ -401,6 +401,7 @@ pub async fn session_open_host(
         cols: request.cols,
         rows: request.rows,
     };
+    crate::logging::log_connect_attempt(&request.host_id, &login, jump.is_some());
     let hop = jump.as_ref().map(|j| JumpHop {
         login: &j.login,
         verify_host_key: jump_verifier,
@@ -456,8 +457,12 @@ pub async fn session_open_host(
             ))
             .into());
         }
-        Err(err) => return Err(err.into()),
+        Err(err) => {
+            tracing::warn!(host_id = %request.host_id, error = %err, "connection failed");
+            return Err(err.into());
+        }
     };
+    tracing::info!(host_id = %request.host_id, "connected");
 
     if request.remember_host_key {
         trust_if_new(vault, &host, &offered).await?;

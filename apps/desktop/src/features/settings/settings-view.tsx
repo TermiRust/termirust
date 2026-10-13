@@ -1,4 +1,6 @@
-import { Minus, Plus, Settings as SettingsIcon } from "lucide-react";
+import { FolderOpen, Minus, Plus, Settings as SettingsIcon } from "lucide-react";
+
+import { commands } from "@/bindings";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -143,6 +145,12 @@ export function SettingsView() {
             </Row>
           </div>
           <TerminalPreview settings={terminal} />
+          <div className="border-t border-border pt-4 lg:col-span-2">
+            <Button variant="outline" size="sm" onClick={() => void commands.logsOpenFolder()}>
+              <FolderOpen size={13} /> Open log folder
+            </Button>
+            <p className="mt-1 text-xs text-fg-muted">Logs never contain passwords, keys or terminal content.</p>
+          </div>
         </div>
       </div>
     </section>

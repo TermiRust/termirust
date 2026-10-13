@@ -38,6 +38,8 @@ export const commands = {
 	sshConfigImport: (path: string | null, aliases: string[]) => typedError<SshConfigImportResult, CommandError>(__TAURI_INVOKE("ssh_config_import", { path, aliases })),
 	settingsTerminalGet: () => typedError<TerminalSettings, CommandError>(__TAURI_INVOKE("settings_terminal_get")),
 	settingsTerminalSet: (settings: TerminalSettings) => typedError<TerminalSettings, CommandError>(__TAURI_INVOKE("settings_terminal_set", { settings })),
+	/**  Opens the folder holding Termirust's log files in the system file manager. */
+	logsOpenFolder: () => typedError<null, CommandError>(__TAURI_INVOKE("logs_open_folder")),
 };
 
 /* Types */
