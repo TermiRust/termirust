@@ -140,7 +140,7 @@ export function ConnectionLab({ onExit, autoRunBenchmarks = false }: ConnectionL
         </div>
       )}
 
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-hidden">
         <TerminalView ref={terminalRef} onData={session.send} onResize={session.resize} />
       </div>
 

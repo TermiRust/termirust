@@ -91,5 +91,10 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     };
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full bg-[#100e0b] p-2" data-testid="terminal" />;
+  // FitAddon measures the mount element including its padding, so padding lives on the wrapper.
+  return (
+    <div className="h-full w-full overflow-hidden bg-[#100e0b] p-2">
+      <div ref={containerRef} className="h-full w-full" data-testid="terminal" />
+    </div>
+  );
 });
