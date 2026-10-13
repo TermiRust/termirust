@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
+import { useTabsStore } from "@/stores/tabs-store";
+import { StatusDot } from "@/components/ui/status-dot";
+import { hostDot } from "@/features/hosts/host-status";
 
 interface SidebarProps {
   onOpenHost: (host: HostView) => void;
@@ -23,6 +26,7 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
   const setHostFilter = useLayoutStore((s) => s.setHostFilter);
   const { hosts, groups, loaded, error, retryVault } = useHostsStore();
   const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
+  const tabs = useTabsStore((s) => s.tabs);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -55,8 +59,9 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         className="group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent"
         style={{ paddingLeft: 8 + depth * 14 }}
       >
-        <Server size={13} className="shrink-0 text-fg-muted" />
-        <span className="truncate">{host.label}</span>
+        <StatusDot state={hostDot(host.id, tabs)} />
+        <span className="flex-1 truncate">{host.label}</span>
+        {host.tags[0] && <span className="shrink-0 rounded border border-border-strong px-1 text-[10.5px] leading-4 text-fg-muted group-hover:hidden">{host.tags[0]}</span>}
         {onOpenSftp && (
           <button
             type="button"

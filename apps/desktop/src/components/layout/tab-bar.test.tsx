@@ -105,4 +105,14 @@ describe("TabBar", () => {
     act(() => store().setTabStatus(a, "disconnected"));
     expect(screen.getByRole("tab", { name: "prod-api (disconnected)" }).className).toContain("italic");
   });
+
+  it("shows a status dot on host tabs and a wifi-off mark when the link is lost", () => {
+    const id = store().openHostTab(host("a"), null);
+    render(<TabBar onRequestClose={vi.fn()} onNewLocalTab={vi.fn()} />);
+    expect(screen.getByRole("img", { name: "Connecting" })).toBeInTheDocument();
+    act(() => store().setTabStatus(id, "connected"));
+    expect(screen.getByRole("img", { name: "Connected" })).toBeInTheDocument();
+    act(() => store().setTabStatus(id, "disconnected"));
+    expect(screen.getByLabelText("Disconnected")).toBeInTheDocument();
+  });
 });

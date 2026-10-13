@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -90,6 +90,21 @@ describe("Sidebar", () => {
     expect(groupButton).toHaveTextContent("1");
     expect(within(list).getByRole("button", { name: "Connect to api" })).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Connect to laptop" })).toBeInTheDocument();
+  });
+
+  it("shows each host's status from its open tabs, and its first tag", async () => {
+    const { useTabsStore } = await import("@/stores/tabs-store");
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    await renderWith([host("api", { tags: ["nginx"] }), host("db")]);
+    const api = screen.getByRole("button", { name: "Connect to api" });
+    expect(within(api).getByRole("img", { name: "Not open" })).toBeInTheDocument();
+    expect(api).toHaveTextContent("nginx");
+
+    const tabId = useTabsStore.getState().openHostTab(host("api"), null);
+    act(() => useTabsStore.getState().setTabStatus(tabId, "connected"));
+    expect(within(screen.getByRole("button", { name: "Connect to api" })).getByRole("img", { name: "Connected" })).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "Connect to db" })).getByRole("img", { name: "Not open" })).toBeInTheDocument();
+    act(() => useTabsStore.setState({ tabs: [], activeTabId: null }));
   });
 
   it("opens an SFTP tab from a host row", async () => {

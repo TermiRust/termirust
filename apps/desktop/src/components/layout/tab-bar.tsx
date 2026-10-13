@@ -1,9 +1,11 @@
-import { Columns2, FlaskConical, FolderTree, Plus, Server, SquareTerminal, X } from "lucide-react";
+import { Columns2, FlaskConical, FolderTree, Plus, SquareTerminal, WifiOff, X } from "lucide-react";
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { tabColorVar } from "@/features/tabs/tab-color";
 import { cn } from "@/lib/utils";
+import { StatusDot } from "@/components/ui/status-dot";
+import { dotForStatus } from "@/features/hosts/host-status";
 import { splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 const statusDot: Record<TabStatus, string> = {
@@ -117,8 +119,10 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
                     <FolderTree size={12} className="shrink-0 opacity-60" />
                   ) : tab.target.kind === "local" ? (
                     <SquareTerminal size={12} className="shrink-0 opacity-60" />
+                  ) : dotForStatus(tab.status) === "err" ? (
+                    <WifiOff size={12} aria-label="Disconnected" className="shrink-0 text-danger" />
                   ) : (
-                    <Server size={12} className="shrink-0 opacity-60" />
+                    <StatusDot state={dotForStatus(tab.status)} className="h-[7px] w-[7px] shadow-none" />
                   )}
                   <span className="truncate">{tab.title}</span>
                 </button>
