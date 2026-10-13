@@ -5,10 +5,9 @@ import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
-import { HostFormDialog } from "@/features/hosts/host-form-dialog";
-import { ImportSshConfigDialog } from "@/features/hosts/import-ssh-config-dialog";
 import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
 import { cn } from "@/lib/utils";
+import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 
@@ -16,17 +15,14 @@ interface SidebarProps {
   onOpenHost: (host: HostView) => void;
 }
 
-type Editing = { mode: "new" } | { mode: "edit"; host: HostView } | null;
-
 export function Sidebar({ onOpenHost }: SidebarProps) {
   const section = useLayoutStore((s) => s.section);
   const setSection = useLayoutStore((s) => s.setSection);
   const hostFilter = useLayoutStore((s) => s.hostFilter);
   const setHostFilter = useLayoutStore((s) => s.setHostFilter);
-  const { hosts, groups, loaded, error, createHost, updateHost, deleteHost } = useHostsStore();
-  const [editing, setEditing] = useState<Editing>(null);
+  const { hosts, groups, loaded, error } = useHostsStore();
+  const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
   const [creatingGroup, setCreatingGroup] = useState(false);
-  const [importingConfig, setImportingConfig] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const openHost = (host: HostView) => {
@@ -62,7 +58,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         <button
           type="button"
           aria-label={`Edit ${host.label}`}
-          onClick={() => setEditing({ mode: "edit", host })}
+          onClick={() => openHostEditor(host)}
           className="ml-auto hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block"
         >
           <Pencil size={12} />
@@ -109,7 +105,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
           value={hostFilter}
           onChange={(e) => setHostFilter(e.target.value)}
         />
-        <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportingConfig(true)}>
+        <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportConfigOpen(true)}>
           <FileInput size={15} />
         </Button>
         <Button size="icon" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}>
@@ -149,21 +145,12 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         <Button className="justify-start" disabled title="Coming in M2">
           <SquareTerminal size={15} /> Snippets
         </Button>
-        <Button className="justify-start" variant="outline" onClick={() => setEditing({ mode: "new" })}>
+        <Button className="justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host
         </Button>
       </nav>
 
-      <HostFormDialog
-        open={editing !== null}
-        host={editing?.mode === "edit" ? editing.host : undefined}
-        onOpenChange={(open) => !open && setEditing(null)}
-        onSave={(input) => (editing?.mode === "edit" ? updateHost(editing.host.id, input) : createHost(input))}
-        onDelete={editing?.mode === "edit" ? () => deleteHost(editing.host.id) : undefined}
-        onConnect={openHost}
-      />
       <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
-      <ImportSshConfigDialog open={importingConfig} onOpenChange={setImportingConfig} />
     </aside>
   );
 }

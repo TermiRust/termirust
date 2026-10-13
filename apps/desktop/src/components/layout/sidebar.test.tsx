@@ -24,6 +24,8 @@ const { useHostsStore } = await import("@/stores/hosts-store");
 const { useLayoutStore } = await import("@/stores/layout-store");
 const { useKeysStore } = await import("@/stores/keys-store");
 const { Sidebar } = await import("./sidebar");
+const { AppDialogs } = await import("./app-dialogs");
+const { useDialogsStore } = await import("@/stores/dialogs-store");
 
 const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   id,
@@ -47,13 +49,19 @@ async function renderWith(hosts: HostView[], groups: GroupView[] = []) {
   commands.groupsList.mockResolvedValue(ok(groups));
   await useHostsStore.getState().load();
   const onOpenHost = vi.fn();
-  render(<Sidebar onOpenHost={onOpenHost} />);
+  render(
+    <>
+      <Sidebar onOpenHost={onOpenHost} />
+      <AppDialogs onConnect={onOpenHost} />
+    </>,
+  );
   return { onOpenHost, user: userEvent.setup() };
 }
 
 const initialHosts = useHostsStore.getState();
 const initialLayout = useLayoutStore.getState();
 const initialKeys = useKeysStore.getState();
+const initialDialogs = useDialogsStore.getState();
 
 describe("Sidebar", () => {
   beforeEach(() => {
@@ -61,6 +69,7 @@ describe("Sidebar", () => {
     useHostsStore.setState(initialHosts, true);
     useLayoutStore.setState(initialLayout, true);
     useKeysStore.setState(initialKeys, true);
+    useDialogsStore.setState(initialDialogs, true);
     commands.keysList.mockResolvedValue(ok([]));
   });
 

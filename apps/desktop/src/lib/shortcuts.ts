@@ -42,3 +42,22 @@ export function tabShortcut(event: KeyChord, onMac: boolean): TabShortcut {
   }
   return null;
 }
+
+export type AppShortcut = "palette" | "newHost" | null;
+
+/** ⌘K / ⌘N on macOS; Ctrl+Shift+K / Ctrl+Shift+N elsewhere (Ctrl+K kills the line in shells). */
+export function appShortcut(event: KeyChord, onMac: boolean): AppShortcut {
+  const key = event.key.toLowerCase();
+  if (key !== "k" && key !== "n") return null;
+  const matches = onMac
+    ? event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
+    : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;
+  if (!matches) return null;
+  return key === "k" ? "palette" : "newHost";
+}
+
+export function shortcutLabel(action: "palette" | "newHost" | "newLocal" | "sidebar", onMac: boolean): string {
+  const mac = { palette: "⌘K", newHost: "⌘N", newLocal: "⌘T", sidebar: "⌘B" };
+  const other = { palette: "Ctrl+Shift+K", newHost: "Ctrl+Shift+N", newLocal: "Ctrl+Shift+T", sidebar: "Ctrl+Shift+B" };
+  return (onMac ? mac : other)[action];
+}

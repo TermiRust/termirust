@@ -1,19 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { HostView } from "@/bindings";
+import { AppDialogs } from "@/components/layout/app-dialogs";
 import { ConfirmCloseDialog } from "@/components/layout/confirm-close-dialog";
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { KeychainView } from "@/features/keychain/keychain-view";
+import { CommandPalette, type PaletteCommand } from "@/features/palette/command-palette";
+import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
 import { groupTabColor } from "@/features/tabs/tab-color";
-import { isMacPlatform, isToggleSidebarShortcut, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
+import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
+import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
+import { loadRecentHostIds, rememberRecentHost } from "@/stores/recent-hosts";
 import { useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 export function AppShell() {
@@ -23,6 +28,9 @@ export function AppShell() {
   const setSection = useLayoutStore((s) => s.setSection);
   const loadHosts = useHostsStore((s) => s.load);
   const groups = useHostsStore((s) => s.groups);
+  const hosts = useHostsStore((s) => s.hosts);
+  const { paletteOpen, setPaletteOpen, openNewHost, setImportConfigOpen } = useDialogsStore();
+  const [recentHostIds, setRecentHostIds] = useState<string[]>(loadRecentHostIds);
   const { tabs, activeTabId, openHostTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus } = useTabsStore();
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
@@ -38,8 +46,32 @@ export function AppShell() {
   }, [autoRunBenchmarks, openLabTab]);
 
   const openHost = useCallback(
-    (host: HostView) => openHostTab(host, groupTabColor(groups.find((g) => g.id === host.groupId))),
-    [groups, openHostTab],
+    (host: HostView) => {
+      setSection("hosts");
+      setRecentHostIds(rememberRecentHost(host.id));
+      openHostTab(host, groupTabColor(groups.find((g) => g.id === host.groupId)));
+    },
+    [groups, openHostTab, setSection],
+  );
+
+  const paletteCommands = useMemo<PaletteCommand[]>(
+    () => [
+      { id: "new-host", label: "New host", icon: paletteIcons.newHost, shortcut: shortcutLabel("newHost", onMac), run: openNewHost },
+      {
+        id: "new-local",
+        label: "New local terminal",
+        icon: paletteIcons.newLocal,
+        shortcut: shortcutLabel("newLocal", onMac),
+        run: () => {
+          setSection("hosts");
+          openLocalTab();
+        },
+      },
+      { id: "import-config", label: "Import from SSH config", icon: paletteIcons.importConfig, run: () => setImportConfigOpen(true) },
+      { id: "keychain", label: "Open Keychain", icon: paletteIcons.keychain, run: () => setSection("keychain") },
+      { id: "sidebar", label: "Toggle sidebar", icon: paletteIcons.sidebar, shortcut: shortcutLabel("sidebar", onMac), run: toggleSidebar },
+    ],
+    [onMac, openNewHost, openLocalTab, setImportConfigOpen, setSection, toggleSidebar],
   );
 
   const requestClose = useCallback(
@@ -55,6 +87,13 @@ export function AppShell() {
       if (isToggleSidebarShortcut(event, onMac)) {
         event.preventDefault();
         toggleSidebar();
+        return;
+      }
+      const app = appShortcut(event, onMac);
+      if (app) {
+        event.preventDefault();
+        if (app === "palette") setPaletteOpen(!useDialogsStore.getState().paletteOpen);
+        else openNewHost();
         return;
       }
       const shortcut = tabShortcut(event, onMac);
@@ -73,7 +112,7 @@ export function AppShell() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onMac, toggleSidebar, activateTabAt, requestClose, openLocalTab, setSection]);
+  }, [onMac, toggleSidebar, activateTabAt, requestClose, openLocalTab, setSection, setPaletteOpen, openNewHost]);
 
   return (
     <div className="flex h-full">
@@ -88,6 +127,15 @@ export function AppShell() {
           <TabPanel key={tab.id} tab={tab} active={section === "hosts" && tab.id === activeTabId} onStatusChange={setTabStatus} onClose={closeTab} autoRunBenchmarks={autoRunBenchmarks} />
         ))}
       </main>
+      <AppDialogs onConnect={openHost} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        hosts={hosts}
+        recentHostIds={recentHostIds}
+        commands={paletteCommands}
+        onOpenHost={openHost}
+      />
       {closing && (
         <ConfirmCloseDialog
           title={closing.title}

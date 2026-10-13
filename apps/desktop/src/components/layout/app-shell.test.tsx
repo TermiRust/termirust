@@ -125,3 +125,15 @@ describe("AppShell tabs", () => {
     expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["local"]);
   });
 });
+
+describe("AppShell command palette", () => {
+  it("opens with the platform shortcut and lists commands", async () => {
+    render(<AppShell />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    act(() => {
+      fireEvent.keyDown(window, onMac ? { key: "k", metaKey: true } : { key: "k", ctrlKey: true, shiftKey: true });
+    });
+    const palette = await screen.findByRole("dialog", { name: "Command palette" });
+    expect(within(palette).getByText("New local terminal")).toBeInTheDocument();
+  });
+});
