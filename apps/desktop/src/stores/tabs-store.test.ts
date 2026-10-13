@@ -133,4 +133,92 @@ describe("tabs store", () => {
     state().moveTab(a!, -3);
     expect(titles()).toEqual(["host-a", "host-c", "host-b"]);
   });
+
+  describe("panes", () => {
+    const tab = () => state().tabs[0]!;
+
+    it("starts every tab with one focused pane", () => {
+      state().openLocalTab();
+      expect(paneIdsOf()).toHaveLength(1);
+      expect(tab().focusedPaneId).toBe(paneIdsOf()[0]);
+      expect(tab().broadcast).toBe(false);
+    });
+
+    it("splits terminal tabs only, focusing the new pane", () => {
+      state().openLocalTab();
+      const first = tab().focusedPaneId;
+      state().splitPane(tab().id, "row");
+      expect(paneIdsOf()).toHaveLength(2);
+      expect(tab().focusedPaneId).not.toBe(first);
+
+      state().openSftpTab(host("a"), null);
+      const sftp = state().tabs[1]!;
+      state().splitPane(sftp.id, "row");
+      expect(state().tabs[1]!.layout).toEqual(sftp.layout);
+    });
+
+    it("moves focus between panes and resizes splits", () => {
+      state().openLocalTab();
+      const left = tab().focusedPaneId;
+      state().splitPane(tab().id, "row");
+      const right = tab().focusedPaneId;
+      state().focusNeighbour(tab().id, "left");
+      expect(tab().focusedPaneId).toBe(left);
+      state().focusNeighbour(tab().id, "left");
+      expect(tab().focusedPaneId).toBe(left);
+      state().focusPane(tab().id, right);
+      expect(tab().focusedPaneId).toBe(right);
+      state().focusPane(tab().id, "nope");
+      expect(tab().focusedPaneId).toBe(right);
+
+      const layout = tab().layout;
+      if (layout.kind !== "split") throw new Error("expected a split");
+      state().setSplitRatio(tab().id, layout.id, 0.3);
+      expect(tab().layout).toMatchObject({ ratio: 0.3 });
+    });
+
+    it("closing a pane refocuses a neighbour; closing the last one closes the tab", () => {
+      state().openLocalTab();
+      const left = tab().focusedPaneId;
+      state().splitPane(tab().id, "row");
+      const right = tab().focusedPaneId;
+      state().closePane(tab().id, right);
+      expect(paneIdsOf()).toEqual([left]);
+      expect(tab().focusedPaneId).toBe(left);
+
+      state().closePane(tab().id, left);
+      expect(state().tabs).toEqual([]);
+    });
+
+    it("reports connected while any pane is connected", () => {
+      state().openLocalTab();
+      const left = tab().focusedPaneId;
+      state().splitPane(tab().id, "row");
+      const right = tab().focusedPaneId;
+      state().setPaneStatus(tab().id, left, "connected");
+      state().setPaneStatus(tab().id, right, "connecting");
+      expect(tab().status).toBe("connected");
+      state().setPaneStatus(tab().id, left, "disconnected");
+      expect(tab().status).toBe("connecting");
+      state().closePane(tab().id, right);
+      expect(tab().status).toBe("disconnected");
+    });
+
+    it("broadcast needs two panes and turns off when only one is left", () => {
+      state().openLocalTab();
+      state().toggleBroadcast(tab().id);
+      expect(tab().broadcast).toBe(false);
+      state().splitPane(tab().id, "column");
+      state().toggleBroadcast(tab().id);
+      expect(tab().broadcast).toBe(true);
+      state().closePane(tab().id, tab().focusedPaneId);
+      expect(tab().broadcast).toBe(false);
+    });
+  });
 });
+
+function paneIdsOf(): string[] {
+  const collect = (node: import("@/features/panes/pane-tree").PaneNode): string[] =>
+    node.kind === "pane" ? [node.id] : [...collect(node.first), ...collect(node.second)];
+  return collect(useTabsStore.getState().tabs[0]!.layout);
+}

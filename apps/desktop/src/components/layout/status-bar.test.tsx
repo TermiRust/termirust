@@ -28,6 +28,10 @@ const tab = (overrides: Partial<Tab>): Tab => ({
   status: "connected",
   color: null,
   size: { cols: 120, rows: 32 },
+  layout: { kind: "pane", id: "p" },
+  focusedPaneId: "p",
+  paneStatus: {},
+  broadcast: false,
   ...overrides,
 });
 

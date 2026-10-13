@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import type { HostView } from "@/bindings";
+import { closePane, neighbour, paneIds, setRatio, singlePane, splitPane, type Direction, type PaneNode } from "@/features/panes/pane-tree";
 import type { TabColor } from "@/features/tabs/tab-color";
 
 import { forgetPendingInput } from "./terminal-inputs";
@@ -17,6 +18,21 @@ export interface Tab {
   color: TabColor | null;
   /** Terminal size in characters, once the terminal has measured itself. */
   size: { cols: number; rows: number } | null;
+  /** Terminal tabs can be split; every pane runs its own session to the same target. */
+  layout: PaneNode;
+  focusedPaneId: string;
+  paneStatus: Record<string, TabStatus>;
+  /** Keystrokes in the focused pane go to every pane of the tab. */
+  broadcast: boolean;
+}
+
+export const splittable = (tab: Tab) => tab.target.kind === "host" || tab.target.kind === "local";
+
+/** Connected while any pane is; otherwise whatever the focused pane reports. */
+function aggregateStatus(tab: Pick<Tab, "paneStatus" | "focusedPaneId" | "status">): TabStatus {
+  const statuses = Object.values(tab.paneStatus);
+  if (statuses.includes("connected")) return "connected";
+  return tab.paneStatus[tab.focusedPaneId] ?? tab.status;
 }
 
 interface TabsState {
@@ -33,17 +49,30 @@ interface TabsState {
   setTabSize: (id: string, cols: number, rows: number) => void;
   renameTab: (id: string, title: string) => void;
   moveTab: (id: string, toIndex: number) => void;
+  splitPane: (tabId: string, direction: "row" | "column") => void;
+  closePane: (tabId: string, paneId: string) => void;
+  focusPane: (tabId: string, paneId: string) => void;
+  focusNeighbour: (tabId: string, direction: Direction) => void;
+  setSplitRatio: (tabId: string, splitId: string, ratio: number) => void;
+  setPaneStatus: (tabId: string, paneId: string, status: TabStatus) => void;
+  toggleBroadcast: (tabId: string) => void;
 }
 
 let counter = 0;
 const nextId = () => `tab-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 export const useTabsStore = create<TabsState>()((set, get) => {
-  const open = (tab: Omit<Tab, "id">) => {
+  type NewTab = Omit<Tab, "id" | "layout" | "focusedPaneId" | "paneStatus" | "broadcast">;
+  const open = (tab: NewTab) => {
     const id = nextId();
-    set((s) => ({ tabs: [...s.tabs, { ...tab, id }], activeTabId: id }));
+    const paneId = nextId();
+    set((s) => ({
+      tabs: [...s.tabs, { ...tab, id, layout: singlePane(paneId), focusedPaneId: paneId, paneStatus: {}, broadcast: false }],
+      activeTabId: id,
+    }));
     return id;
   };
+  const updateTab = (tabId: string, change: (tab: Tab) => Tab) => set((s) => ({ tabs: s.tabs.map((t) => (t.id === tabId ? change(t) : t)) }));
 
   return {
     tabs: [],
@@ -98,6 +127,51 @@ export const useTabsStore = create<TabsState>()((set, get) => {
       if (!trimmed) return;
       set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) }));
     },
+
+    splitPane: (tabId, direction) =>
+      updateTab(tabId, (tab) => {
+        if (!splittable(tab)) return tab;
+        const paneId = nextId();
+        return { ...tab, layout: splitPane(tab.layout, tab.focusedPaneId, direction, paneId, nextId()), focusedPaneId: paneId };
+      }),
+
+    closePane: (tabId, paneId) => {
+      const tab = get().tabs.find((t) => t.id === tabId);
+      if (!tab) return;
+      const layout = closePane(tab.layout, paneId);
+      if (!layout) {
+        get().closeTab(tabId);
+        return;
+      }
+      updateTab(tabId, (t) => {
+        const paneStatus = Object.fromEntries(Object.entries(t.paneStatus).filter(([id]) => id !== paneId));
+        const focusedPaneId = t.focusedPaneId === paneId ? (neighbour(t.layout, paneId, "left") ?? neighbour(t.layout, paneId, "up") ?? paneIds(layout)[0] ?? "") : t.focusedPaneId;
+        const next = { ...t, layout, paneStatus, focusedPaneId, broadcast: t.broadcast && paneIds(layout).length > 1 };
+        return { ...next, status: aggregateStatus(next) };
+      });
+    },
+
+    focusPane: (tabId, paneId) =>
+      updateTab(tabId, (tab) => (paneIds(tab.layout).includes(paneId) && tab.focusedPaneId !== paneId ? { ...tab, focusedPaneId: paneId } : tab)),
+
+    focusNeighbour: (tabId, direction) =>
+      updateTab(tabId, (tab) => {
+        const next = neighbour(tab.layout, tab.focusedPaneId, direction);
+        return next ? { ...tab, focusedPaneId: next } : tab;
+      }),
+
+    setSplitRatio: (tabId, splitId, ratio) => updateTab(tabId, (tab) => ({ ...tab, layout: setRatio(tab.layout, splitId, ratio) })),
+
+    setPaneStatus: (tabId, paneId, status) =>
+      set((s) => {
+        const tab = s.tabs.find((t) => t.id === tabId);
+        if (!tab || tab.paneStatus[paneId] === status) return s;
+        const paneStatus = { ...tab.paneStatus, [paneId]: status };
+        const updated = { ...tab, paneStatus, status: aggregateStatus({ ...tab, paneStatus }) };
+        return { tabs: s.tabs.map((t) => (t.id === tabId ? updated : t)) };
+      }),
+
+    toggleBroadcast: (tabId) => updateTab(tabId, (tab) => (paneIds(tab.layout).length > 1 ? { ...tab, broadcast: !tab.broadcast } : tab)),
 
     moveTab: (id, toIndex) =>
       set((s) => {

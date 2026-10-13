@@ -203,7 +203,7 @@ describe("AppShell warning border", () => {
     const { registerTerminalInput } = await import("@/stores/terminal-inputs");
     const { useSnippetsStore } = await import("@/stores/snippets-store");
     useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
-    useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null }], activeTabId: "t1" });
+    useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null, layout: { kind: "pane", id: "p1" }, focusedPaneId: "p1", paneStatus: {}, broadcast: false }], activeTabId: "t1" });
     const send = vi.fn();
     const unregister = registerTerminalInput("t1", send);
     render(<AppShell />);
