@@ -15,12 +15,21 @@ interface HostsState {
   createHost: (input: HostInput) => Promise<Outcome<HostView>>;
   updateHost: (id: string, input: HostInput) => Promise<Outcome<HostView>>;
   deleteHost: (id: string) => Promise<Outcome<null>>;
+  /** Puts a host in a group, or takes it out of every group with null. */
+  moveHost: (id: string, groupId: string | null) => Promise<Outcome<HostView>>;
   createGroup: (name: string) => Promise<Outcome<GroupView>>;
   updateGroup: (id: string, name: string, color: string | null, warningBorder: boolean, aiDisabled: boolean) => Promise<Outcome<GroupView>>;
   deleteGroup: (id: string) => Promise<Outcome<null>>;
 }
 
 export const useHostsStore = create<HostsState>()((set, get) => ({
+  moveHost: async (id, groupId) => {
+    const result = await commands.hostsMove(id, groupId);
+    if (result.status === "ok") set({ hosts: get().hosts.map((h) => (h.id === id ? result.data : h)) });
+    else set({ error: result.error.message });
+    return result;
+  },
+
   hosts: [],
   groups: [],
   loaded: false,

@@ -14,6 +14,7 @@ import { useTabsStore } from "@/stores/tabs-store";
 
 import { hostMatches } from "./host-tree";
 import { hostDot } from "./host-status";
+import { DROP_ATTR, useHostDrag } from "./use-host-drag";
 
 type ViewMode = "grid" | "list";
 const VIEW_KEY = "termirust.hosts.view";
@@ -38,6 +39,7 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
   const { hosts, groups, loaded } = useHostsStore();
   const tabs = useTabsStore((s) => s.tabs);
   const { openNewHost, openHostEditor } = useDialogsStore();
+  const drag = useHostDrag((hostId, groupId) => void useHostsStore.getState().moveHost(hostId, groupId));
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ViewMode>(readViewMode);
 
@@ -97,7 +99,12 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
         )}
         {hosts.length > 0 && sections.length === 0 && <p className="text-[13px] text-fg-muted">No host matches “{query}”.</p>}
         {sections.map(({ group, hosts: items }) => (
-          <section key={group?.id ?? "ungrouped"} aria-label={group?.name ?? "Ungrouped"} className="mb-5">
+          <section
+            key={group?.id ?? "ungrouped"}
+            aria-label={group?.name ?? "Ungrouped"}
+            {...{ [DROP_ATTR]: group?.id ?? "" }}
+            className={cn("mb-5 rounded-lg", drag.dropTarget === (group?.id ?? "") && "bg-accent/5 ring-1 ring-accent")}
+          >
             <h2 className="mb-2 text-[11px] font-semibold tracking-wider text-fg-muted uppercase">
               {group?.name ?? "Ungrouped"} <span className="font-normal">· {items.length}</span>
             </h2>
@@ -121,8 +128,10 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
                     key={host.id}
                     aria-label={host.label}
                     onDoubleClick={() => onOpenHost(host)}
+                    onPointerDown={(e) => drag.onPointerDown(e, host)}
                     className={cn(
                       "group flex cursor-default items-center gap-3 rounded-lg border border-border bg-bg-elev hover:border-border-strong",
+                      drag.draggingId === host.id && "opacity-50",
                       mode === "grid" ? "p-3" : "px-3 py-1.5",
                     )}
                     title={`${osName(host.os)} · double-click to connect`}
@@ -152,7 +161,16 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
             </ul>
           </section>
         ))}
+        {!query.trim() &&
+          groups
+          .filter((g) => !sections.some((s) => s.group?.id === g.id))
+          .map((g) => (
+            <section key={g.id} aria-label={g.name} {...{ [DROP_ATTR]: g.id }} className={cn("mb-3 rounded-lg border border-dashed border-border p-3 text-xs text-fg-muted", drag.dropTarget === g.id && "border-accent bg-accent/5")}>
+              {g.name} · empty — drag hosts here
+            </section>
+          ))}
       </div>
+      {drag.ghost}
     </section>
   );
 }

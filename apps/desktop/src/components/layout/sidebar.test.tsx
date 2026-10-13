@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,6 +10,7 @@ const commands = {
   hostsCreate: vi.fn(),
   hostsUpdate: vi.fn(),
   hostsDelete: vi.fn(),
+  hostsMove: vi.fn(),
   groupsCreate: vi.fn(),
   groupsUpdate: vi.fn(),
   groupsDelete: vi.fn(),
@@ -105,6 +106,22 @@ describe("Sidebar", () => {
     expect(within(screen.getByRole("button", { name: "Connect to api" })).getByRole("img", { name: "Connected" })).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: "Connect to db" })).getByRole("img", { name: "Not open" })).toBeInTheDocument();
     act(() => useTabsStore.setState({ tabs: [], activeTabId: null }));
+  });
+
+  it("moves a host into a group by dragging it onto the group", async () => {
+    commands.hostsMove.mockResolvedValue(ok({ ...host("laptop"), groupId: "g1" }));
+    await renderWith([host("api", { groupId: "g1" }), host("laptop")], [prod]);
+    const group = screen.getByRole("button", { name: /Production/, expanded: true });
+    document.elementFromPoint = vi.fn(() => group);
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Connect to laptop" }), { button: 0, clientX: 0, clientY: 0 });
+    act(() => {
+      fireEvent.pointerMove(window, { clientX: 0, clientY: 60 });
+    });
+    act(() => {
+      fireEvent.pointerUp(window);
+    });
+    await waitFor(() => expect(commands.hostsMove).toHaveBeenCalledWith("laptop", "g1"));
+    expect(useHostsStore.getState().hosts.find((h) => h.id === "laptop")?.groupId).toBe("g1");
   });
 
   it("opens an SFTP tab from a host row", async () => {

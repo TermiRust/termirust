@@ -16,6 +16,7 @@ import { useLayoutStore } from "@/stores/layout-store";
 import { useTabsStore } from "@/stores/tabs-store";
 import { StatusDot } from "@/components/ui/status-dot";
 import { hostDot } from "@/features/hosts/host-status";
+import { DROP_ATTR, useHostDrag } from "@/features/hosts/use-host-drag";
 
 interface SidebarProps {
   onOpenHost: (host: HostView) => void;
@@ -30,6 +31,7 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
   const { hosts, groups, loaded, error, retryVault } = useHostsStore();
   const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
   const tabs = useTabsStore((s) => s.tabs);
+  const drag = useHostDrag((hostId, groupId) => void useHostsStore.getState().moveHost(hostId, groupId));
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -58,8 +60,9 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         aria-label={`Connect to ${host.label}`}
         title={`${host.username ? `${host.username}@` : ""}${host.hostname}:${host.port} — double-click to connect`}
         onDoubleClick={() => openHost(host)}
+        onPointerDown={(e) => drag.onPointerDown(e, host)}
         onKeyDown={(e) => e.key === "Enter" && openHost(host)}
-        className="group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent"
+        className={cn("group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent", drag.draggingId === host.id && "opacity-50")}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         <StatusDot state={hostDot(host.id, tabs)} />
@@ -91,7 +94,11 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
   const groupNode = (node: GroupNode, depth: number) => {
     const open = filtering || !collapsed.has(node.group.id);
     return (
-      <li key={node.group.id}>
+      <li
+        key={node.group.id}
+        {...{ [DROP_ATTR]: node.group.id }}
+        className={cn("rounded-md", drag.dropTarget === node.group.id && "bg-accent/10 ring-1 ring-accent")}
+      >
         <div className="group/header flex items-center">
           <button
             type="button"
@@ -149,7 +156,11 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      {/* Dropping anywhere outside a group takes the host out of its group. */}
+      <div
+        {...{ [DROP_ATTR]: "" }}
+        className={cn("flex-1 overflow-y-auto px-2 pb-2", drag.dropTarget === "" && "bg-accent/5")}
+      >
         {!loaded && (
           <p role="status" className="flex items-center gap-2 px-1 text-sm text-fg-muted">
             <Lock size={13} className="animate-pulse" /> Unlocking vault…
@@ -216,6 +227,7 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
         </Button>
       </nav>
 
+      {drag.ghost}
       <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
       <GroupFormDialog
         open={editingGroup !== null}

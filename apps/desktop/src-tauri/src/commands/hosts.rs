@@ -220,6 +220,41 @@ pub async fn hosts_update(
     Ok(HostView::from(&record))
 }
 
+/// Moves a host into a group, or out of every group with `None`. Nothing else changes.
+#[tauri::command]
+#[specta::specta]
+pub async fn hosts_move(
+    state: State<'_, VaultState>,
+    id: String,
+    group_id: Option<String>,
+) -> Result<HostView, CommandError> {
+    let vault = state.vault().await?;
+    move_host(
+        &vault,
+        parse_id(&id)?,
+        parse_optional_id(group_id.as_ref())?,
+    )
+    .await
+}
+
+async fn move_host(
+    vault: &termirust_core::vault::Vault,
+    id: Uuid,
+    group_id: Option<Uuid>,
+) -> Result<HostView, CommandError> {
+    let hosts = vault.hosts();
+    let mut host = hosts
+        .get(id)
+        .await?
+        .ok_or_else(|| CoreError::NotFound {
+            kind: "host",
+            id: id.to_string(),
+        })?
+        .payload;
+    host.group_id = group_id;
+    Ok(HostView::from(&hosts.update(id, &host).await?))
+}
+
 #[tauri::command]
 #[specta::specta]
 pub async fn hosts_delete(state: State<'_, VaultState>, id: String) -> Result<(), CommandError> {
@@ -321,6 +356,51 @@ mod tests {
             color: None,
             ai_disabled: false,
         }
+    }
+
+    #[tokio::test]
+    async fn moving_a_host_changes_only_its_group() {
+        let db = Database::open_in_memory().await.unwrap();
+        let vault = Vault::open_or_create(db, &MemoryKeyStore::default())
+            .await
+            .unwrap();
+        let group = vault
+            .groups()
+            .create(&Group::new("prod"))
+            .await
+            .unwrap()
+            .meta
+            .id;
+        let saved = vault
+            .hosts()
+            .create(&Host {
+                auth: HostAuth::Password {
+                    password: Some(Secret::new("pw")),
+                },
+                ..Host::new("db")
+            })
+            .await
+            .unwrap();
+
+        let moved = move_host(&vault, saved.meta.id, Some(group)).await.unwrap();
+        assert_eq!(moved.group_id, Some(group.to_string()));
+        let stored = vault
+            .hosts()
+            .get(saved.meta.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .payload;
+        assert_eq!(saved_password(&stored).as_deref(), Some("pw"));
+
+        let out = move_host(&vault, saved.meta.id, None).await.unwrap();
+        assert_eq!(out.group_id, None);
+        assert!(
+            move_host(&vault, saved.meta.id, Some(Uuid::now_v7()))
+                .await
+                .is_err(),
+            "the group must exist"
+        );
     }
 
     #[test]

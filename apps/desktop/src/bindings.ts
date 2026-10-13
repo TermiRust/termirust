@@ -33,6 +33,8 @@ export const commands = {
 	hostsCreate: (input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_create", { input })),
 	hostsUpdate: (id: string, input: HostInput) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_update", { id, input })),
 	hostsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("hosts_delete", { id })),
+	/**  Moves a host into a group, or out of every group with `None`. Nothing else changes. */
+	hostsMove: (id: string, groupId: string | null) => typedError<HostView, CommandError>(__TAURI_INVOKE("hosts_move", { id, groupId })),
 	groupsList: () => typedError<GroupView[], CommandError>(__TAURI_INVOKE("groups_list")),
 	groupsCreate: (name: string, parentId: string | null) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_create", { name, parentId })),
 	groupsUpdate: (id: string, name: string, color: string | null, warningBorder: boolean, aiDisabled: boolean) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_update", { id, name, color, warningBorder, aiDisabled })),
