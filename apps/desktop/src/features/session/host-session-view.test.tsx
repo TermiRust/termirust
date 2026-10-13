@@ -39,7 +39,7 @@ const host: HostView = {
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false, os: null,
+  keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
 color: null,
 };
 const ok = (data: unknown) => ({ status: "ok", data });
@@ -118,6 +118,14 @@ describe("HostSessionView", () => {
     await screen.findByRole("button", { name: "Disconnect" });
     expect(screen.queryByRole("button", { name: "AI" })).not.toBeInTheDocument();
     useAiStore.setState({ settings: null });
+  });
+
+  it("watermarks the terminal of a production host", async () => {
+    commands.sessionOpenHost.mockResolvedValue(ok({ status: "opened", sessionId: 1 }));
+    render(<HostSessionView host={{ ...host, environment: "production" }} />);
+    await screen.findByRole("button", { name: "Disconnect" });
+    expect(screen.getByTestId("environment-watermark")).toHaveTextContent("PROD");
+    expect(screen.getByTitle("Production")).toBeInTheDocument();
   });
 
   it("explains when the saved password was rejected", async () => {

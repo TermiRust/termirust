@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
 import { OsIcon } from "@/components/ui/os-icon";
 import { useAiAllowed } from "@/features/ai/use-ai-allowed";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -13,6 +14,7 @@ import { useForwardsStore } from "@/stores/forwards-store";
 import { broadcastToTab, registerPaneInput, registerTerminalInput } from "@/stores/terminal-inputs";
 import type { TabStatus } from "@/stores/tabs-store";
 
+import { EnvironmentWatermark } from "./environment-watermark";
 import { HostKeyDialog } from "./host-key-dialog";
 import { ConnectionBanner } from "./connection-banner";
 import { CredentialsPrompt } from "./credentials-prompt";
@@ -106,6 +108,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
       <header className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-3">
         <OsIcon os={latestHost.os} size={14} />
         <span className="font-medium">{host.label}</span>
+        <EnvironmentBadge environment={latestHost.environment} />
         <span className="font-mono text-xs text-fg-muted">
           {host.username ? `${host.username}@` : ""}
           {endpoint}
@@ -142,6 +145,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
               onSizeChange?.(size);
             }}
           />
+          <EnvironmentWatermark environment={latestHost.environment} />
           {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
           {ai.commandBar}
         </div>

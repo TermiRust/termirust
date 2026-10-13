@@ -15,7 +15,7 @@ const host = (id: string): HostView => ({
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false, os: null,
+  keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
 color: null,
 });
 const state = () => useTabsStore.getState();

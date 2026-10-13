@@ -175,6 +175,8 @@ export type CustomTheme = {
 	ansi: string[],
 };
 
+export type EnvironmentView = "production" | "staging" | "development";
+
 /**  One row of a file panel, remote or local. */
 export type FileEntry = {
 	name: string,
@@ -236,6 +238,7 @@ export type HostInput = {
 	keepaliveSecs: number | null,
 	color: string | null,
 	aiDisabled: boolean,
+	environment: EnvironmentView | null,
 };
 
 /**  What the UI may know about a host. Saved passwords never leave Rust. */
@@ -254,6 +257,7 @@ export type HostView = {
 	color: string | null,
 	aiDisabled: boolean,
 	os: string | null,
+	environment: EnvironmentView | null,
 };
 
 /**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */

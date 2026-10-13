@@ -42,7 +42,7 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false, os: null,
+  keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
   color: null,
   ...overrides,
 });
@@ -382,5 +382,17 @@ describe("Sidebar", () => {
     expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(commands.hostsCreate).toHaveBeenCalledWith(expect.objectContaining({ auth: { method: "agent" } })));
+  });
+
+  it("marks a new host as production and shows its PROD badge", async () => {
+    const { user } = await renderWith([]);
+    commands.hostsCreate.mockImplementation(async (input) => ok(host("a", { label: input.hostname, environment: input.environment })));
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    await user.type(screen.getByRole("textbox", { name: "Host" }), "db-prod");
+    await user.click(screen.getByRole("radio", { name: "PROD" }));
+    expect(screen.getByText("Terminals show a PROD watermark")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(commands.hostsCreate).toHaveBeenCalledWith(expect.objectContaining({ environment: "production" })));
+    expect(await screen.findByTitle("Production")).toHaveTextContent("PROD");
   });
 });

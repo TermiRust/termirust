@@ -17,6 +17,15 @@ pub enum HostAuth {
     Agent,
 }
 
+/// Which kind of system a host is, so risky ones can be marked clearly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostEnvironment {
+    Production,
+    Staging,
+    Development,
+}
+
 /// A saved SSH server.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Host {
@@ -41,6 +50,9 @@ pub struct Host {
     /// Detected on the first successful connection, e.g. "ubuntu"; drives the host's icon.
     #[serde(default)]
     pub os: Option<String>,
+    /// Production hosts get a "PROD" watermark on their terminals.
+    #[serde(default)]
+    pub environment: Option<HostEnvironment>,
 }
 
 /// Colours a host or group may use for its tabs.
@@ -73,6 +85,7 @@ impl Host {
             color: None,
             ai_disabled: false,
             os: None,
+            environment: None,
         }
     }
 

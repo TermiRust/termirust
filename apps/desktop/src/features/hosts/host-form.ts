@@ -1,4 +1,4 @@
-import type { AuthInput, HostInput, HostView, PasswordChange } from "@/bindings";
+import type { AuthInput, EnvironmentView, HostInput, HostView, PasswordChange } from "@/bindings";
 import type { TabColor } from "@/features/tabs/tab-color";
 
 export type SavedPasswordAction = "keep" | "replace" | "clear";
@@ -20,6 +20,7 @@ export interface HostFormValues {
   keepaliveSecs: string;
   color: TabColor | null;
   aiDisabled: boolean;
+  environment: EnvironmentView | "none";
 }
 
 export type HostFormErrors = Partial<Record<keyof HostFormValues, string>>;
@@ -46,6 +47,7 @@ export function hostFormValues(host?: HostView): HostFormValues {
     keepaliveSecs: host?.keepaliveSecs == null ? "" : String(host.keepaliveSecs),
     color: (host?.color as TabColor | null | undefined) ?? null,
     aiDisabled: host?.aiDisabled ?? false,
+    environment: host?.environment ?? "none",
   };
 }
 
@@ -103,6 +105,7 @@ export function hostInputFromForm(values: HostFormValues, hasSavedPassword = fal
       keepaliveSecs,
       color: values.color,
       aiDisabled: values.aiDisabled,
+      environment: values.environment === "none" ? null : values.environment,
     },
   };
 }

@@ -214,6 +214,21 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
           <Input {...text("tags")} placeholder="prod, api" />
         </Field>
         <div className="col-span-6 flex items-center gap-3">
+          <span className="text-xs font-medium text-fg-2">Environment</span>
+          <SegmentedControl
+            label="Environment"
+            value={values.environment}
+            onChange={(v) => set("environment", v)}
+            options={[
+              { value: "none", label: "None" },
+              { value: "development", label: "Dev" },
+              { value: "staging", label: "Staging" },
+              { value: "production", label: <span className="font-semibold text-danger">PROD</span> },
+            ]}
+          />
+          {values.environment === "production" && <span className="text-[11px] text-fg-muted">Terminals show a PROD watermark</span>}
+        </div>
+        <div className="col-span-6 flex items-center gap-3">
           <span className="text-xs font-medium text-fg-2">Tab colour</span>
           <ColorSwatches label="Tab colour" value={values.color} onChange={(c) => set("color", c)} autoLabel="From group" />
         </div>
@@ -315,4 +330,5 @@ const fieldLabels: Record<keyof HostFormValues, string> = {
   keepaliveSecs: "Keepalive (s)",
   color: "Tab colour",
   aiDisabled: "Turn off AI",
+  environment: "Environment",
 };

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
 import { Kbd } from "@/components/ui/kbd";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts";
@@ -67,7 +68,8 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
       >
         <StatusDot state={hostDot(host.id, tabs)} />
         <span className="flex-1 truncate">{host.label}</span>
-        {host.tags[0] && <span className="shrink-0 rounded border border-border-strong px-1 text-[10.5px] leading-4 text-fg-muted group-hover:hidden">{host.tags[0]}</span>}
+        <EnvironmentBadge environment={host.environment} className="group-hover:hidden" />
+        {!host.environment && host.tags[0] && <span className="shrink-0 rounded border border-border-strong px-1 text-[10.5px] leading-4 text-fg-muted group-hover:hidden">{host.tags[0]}</span>}
         {onOpenSftp && (
           <button
             type="button"

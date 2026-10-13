@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { EnvironmentBadge } from "@/components/ui/environment-badge";
 import { Input } from "@/components/ui/input";
 import { OsIcon } from "@/components/ui/os-icon";
 import { StatusDot } from "@/components/ui/status-dot";
@@ -141,7 +142,10 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
                       <StatusDot state={hostDot(host.id, tabs)} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-bg-elev" />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[13px] font-medium">{host.label}</p>
+                      <p className="flex items-center gap-1.5 text-[13px] font-medium">
+                        <span className="truncate">{host.label}</span>
+                        <EnvironmentBadge environment={host.environment} />
+                      </p>
                       <p className="truncate font-mono text-[11px] text-fg-muted">{address(host)}</p>
                       {mode === "grid" && host.tags.length > 0 && (
                         <p className="mt-1 flex gap-1 overflow-hidden">

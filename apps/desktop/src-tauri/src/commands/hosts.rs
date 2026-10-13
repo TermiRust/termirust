@@ -1,11 +1,41 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use termirust_core::CoreError;
-use termirust_core::vault::{Group, GroupRecord, Host, HostAuth, HostRecord, Secret};
+use termirust_core::vault::{
+    Group, GroupRecord, Host, HostAuth, HostEnvironment, HostRecord, Secret,
+};
 use uuid::Uuid;
 
 use crate::command_error::CommandError;
 use crate::vault_state::VaultState;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum EnvironmentView {
+    Production,
+    Staging,
+    Development,
+}
+
+impl From<HostEnvironment> for EnvironmentView {
+    fn from(env: HostEnvironment) -> Self {
+        match env {
+            HostEnvironment::Production => Self::Production,
+            HostEnvironment::Staging => Self::Staging,
+            HostEnvironment::Development => Self::Development,
+        }
+    }
+}
+
+impl From<EnvironmentView> for HostEnvironment {
+    fn from(env: EnvironmentView) -> Self {
+        match env {
+            EnvironmentView::Production => Self::Production,
+            EnvironmentView::Staging => Self::Staging,
+            EnvironmentView::Development => Self::Development,
+        }
+    }
+}
 
 /// What the UI may know about a host. Saved passwords never leave Rust.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -25,6 +55,7 @@ pub struct HostView {
     pub color: Option<String>,
     pub ai_disabled: bool,
     pub os: Option<String>,
+    pub environment: Option<EnvironmentView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -56,6 +87,7 @@ pub struct HostInput {
     pub keepalive_secs: Option<u32>,
     pub color: Option<String>,
     pub ai_disabled: bool,
+    pub environment: Option<EnvironmentView>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -130,6 +162,7 @@ impl From<&HostRecord> for HostView {
             color: host.color.clone(),
             ai_disabled: host.ai_disabled,
             os: host.os.clone(),
+            environment: host.environment.map(Into::into),
         }
     }
 }
@@ -180,6 +213,7 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
         ai_disabled: input.ai_disabled,
         // Detected, not typed: editing a host must not forget it.
         os: previous.and_then(|h| h.os.clone()),
+        environment: input.environment.map(Into::into),
     })
 }
 
@@ -355,6 +389,7 @@ mod tests {
             keepalive_secs: None,
             color: None,
             ai_disabled: false,
+            environment: None,
         }
     }
 
@@ -524,8 +559,9 @@ mod tests {
     fn input_json_from_the_frontend_is_accepted() {
         let json = r#"{"label":"a","hostname":"h","port":22,"username":null,
             "auth":{"method":"password","password":{"kind":"set","value":"pw"}},
-            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30,"color":"teal","aiDisabled":false}"#;
+            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30,"color":"teal","aiDisabled":false,"environment":"production"}"#;
         let parsed: HostInput = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.environment, Some(EnvironmentView::Production));
         assert!(
             matches!(parsed.auth, AuthInput::Password { password: PasswordChange::Set(ref v) } if v == "pw")
         );
