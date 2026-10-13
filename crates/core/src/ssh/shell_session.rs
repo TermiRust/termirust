@@ -2,11 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use russh::client::{self, Handle, Handler};
-use russh::keys::PublicKeyOrCertificate;
+use russh::keys::agent::AgentIdentity;
+use russh::keys::{PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::{ChannelMsg, ChannelWriteHalf, Disconnect};
 use tokio::sync::mpsc;
 
 use super::host_key::{HostKeyInfo, HostKeyVerifier};
+use super::keys::load_private_key;
 use crate::{CoreError, Result};
 
 const TERM: &str = "xterm-256color";
@@ -34,6 +36,55 @@ impl std::fmt::Debug for PasswordLogin {
             .field("username", &self.username)
             .field("password", &"[REDACTED]")
             .finish()
+    }
+}
+
+/// How to prove the user's identity to the server.
+#[derive(Clone)]
+pub enum LoginMethod {
+    Password(String),
+    PrivateKey {
+        pem: String,
+        passphrase: Option<String>,
+    },
+    /// Keys held by a running ssh-agent; `socket` overrides `SSH_AUTH_SOCK` (Unix only).
+    Agent {
+        socket: Option<std::path::PathBuf>,
+    },
+}
+
+impl std::fmt::Debug for LoginMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoginMethod::Password(_) => f.write_str("Password([REDACTED])"),
+            LoginMethod::PrivateKey { passphrase, .. } => f
+                .debug_struct("PrivateKey")
+                .field("pem", &"[REDACTED]")
+                .field("passphrase", &passphrase.as_ref().map(|_| "[REDACTED]"))
+                .finish(),
+            LoginMethod::Agent { socket } => {
+                f.debug_struct("Agent").field("socket", socket).finish()
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SshLogin {
+    pub host: String,
+    pub port: u16,
+    pub username: String,
+    pub method: LoginMethod,
+}
+
+impl From<&PasswordLogin> for SshLogin {
+    fn from(login: &PasswordLogin) -> Self {
+        Self {
+            host: login.host.clone(),
+            port: login.port,
+            username: login.username.clone(),
+            method: LoginMethod::Password(login.password.clone()),
+        }
     }
 }
 
@@ -67,14 +118,36 @@ pub struct ShellSession {
 }
 
 impl ShellSession {
-    /// Connects, authenticates with a password and starts a login shell on a PTY.
-    /// Output and the final close arrive on the returned receiver.
     pub async fn open_with_password(
         login: &PasswordLogin,
         size: PtySize,
         verify_host_key: HostKeyVerifier,
         connect_timeout: Duration,
     ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
+        Self::open(
+            &SshLogin::from(login),
+            size,
+            verify_host_key,
+            connect_timeout,
+        )
+        .await
+    }
+
+    /// Connects, authenticates and starts a login shell on a PTY.
+    /// Output and the final close arrive on the returned receiver.
+    pub async fn open(
+        login: &SshLogin,
+        size: PtySize,
+        verify_host_key: HostKeyVerifier,
+        connect_timeout: Duration,
+    ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
+        // Fail on a bad key or passphrase before touching the network.
+        let private_key = match &login.method {
+            LoginMethod::PrivateKey { pem, passphrase } => {
+                Some(load_private_key(pem, passphrase.as_deref())?)
+            }
+            _ => None,
+        };
         let config = Arc::new(client::Config {
             keepalive_interval: Some(Duration::from_secs(30)),
             ..Default::default()
@@ -95,10 +168,7 @@ impl ShellSession {
                 other => CoreError::Ssh(other.to_string()),
             })?;
 
-        let auth = connection
-            .authenticate_password(login.username.clone(), login.password.clone())
-            .await?;
-        if !auth.success() {
+        if !authenticate(&mut connection, login, private_key).await? {
             return Err(CoreError::AuthenticationFailed);
         }
 
@@ -164,9 +234,162 @@ impl ShellSession {
     }
 }
 
+async fn authenticate(
+    connection: &mut Handle<ClientHandler>,
+    login: &SshLogin,
+    private_key: Option<PrivateKey>,
+) -> Result<bool> {
+    let user = login.username.clone();
+    match (&login.method, private_key) {
+        (LoginMethod::Password(password), _) => Ok(connection
+            .authenticate_password(user, password.clone())
+            .await?
+            .success()),
+        (LoginMethod::PrivateKey { .. }, Some(key)) => {
+            let hash = connection.best_supported_rsa_hash().await?.flatten();
+            Ok(connection
+                .authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), hash))
+                .await?
+                .success())
+        }
+        (LoginMethod::PrivateKey { .. }, None) => {
+            Err(CoreError::InvalidData("private key was not loaded".into()))
+        }
+        (LoginMethod::Agent { socket }, _) => {
+            authenticate_with_agent(connection, user, socket.as_deref()).await
+        }
+    }
+}
+
+/// Offers each agent key in turn; the first one the server accepts wins.
+#[cfg(unix)]
+async fn authenticate_with_agent(
+    connection: &mut Handle<ClientHandler>,
+    user: String,
+    socket: Option<&std::path::Path>,
+) -> Result<bool> {
+    use russh::keys::agent::client::AgentClient;
+
+    let mut agent = match socket {
+        Some(path) => AgentClient::connect_uds(path).await,
+        None => AgentClient::connect_env().await,
+    }
+    .map_err(|e| CoreError::AgentUnavailable(e.to_string()))?;
+    try_agent_keys(connection, user, &mut agent).await
+}
+
+#[cfg(windows)]
+async fn authenticate_with_agent(
+    connection: &mut Handle<ClientHandler>,
+    user: String,
+    _socket: Option<&std::path::Path>,
+) -> Result<bool> {
+    use russh::keys::agent::client::AgentClient;
+
+    let mut agent = AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent")
+        .await
+        .map_err(|e| CoreError::AgentUnavailable(e.to_string()))?;
+    try_agent_keys(connection, user, &mut agent).await
+}
+
+async fn try_agent_keys<S>(
+    connection: &mut Handle<ClientHandler>,
+    user: String,
+    agent: &mut russh::keys::agent::client::AgentClient<S>,
+) -> Result<bool>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let identities = agent
+        .request_identities()
+        .await
+        .map_err(|e| CoreError::AgentUnavailable(e.to_string()))?;
+    if identities.is_empty() {
+        return Err(CoreError::AgentUnavailable(
+            "the agent holds no keys".into(),
+        ));
+    }
+    let hash = connection.best_supported_rsa_hash().await?.flatten();
+    for identity in identities {
+        let AgentIdentity::PublicKey { key, .. } = identity else {
+            continue;
+        };
+        let accepted = connection
+            .authenticate_publickey_with(user.clone(), key, hash, agent)
+            .await
+            .map_err(|e| CoreError::Ssh(e.to_string()))?
+            .success();
+        if accepted {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn login_method_debug_hides_secrets() {
+        let password = format!("{:?}", LoginMethod::Password("hunter2".into()));
+        let key = format!(
+            "{:?}",
+            LoginMethod::PrivateKey {
+                pem: "-----BEGIN OPENSSH PRIVATE KEY-----".into(),
+                passphrase: Some("pp".into())
+            }
+        );
+        assert!(!password.contains("hunter2"));
+        assert!(!key.contains("BEGIN") && !key.contains("\"pp\""));
+    }
+
+    #[tokio::test]
+    async fn a_wrong_passphrase_fails_before_any_network_access() {
+        let login = SshLogin {
+            host: "203.0.113.1".into(),
+            port: 22,
+            username: "x".into(),
+            method: LoginMethod::PrivateKey {
+                pem: super::super::keys::fixtures::ED25519_ENCRYPTED.into(),
+                passphrase: Some("nope".into()),
+            },
+        };
+        let started = std::time::Instant::now();
+        let result = ShellSession::open(
+            &login,
+            PtySize { cols: 80, rows: 24 },
+            Arc::new(|_| true),
+            Duration::from_secs(10),
+        )
+        .await;
+        assert!(matches!(result.err(), Some(CoreError::WrongPassphrase)));
+        assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_agent_socket_is_reported() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let login = SshLogin {
+            host: "127.0.0.1".into(),
+            port,
+            username: "x".into(),
+            method: LoginMethod::Agent {
+                socket: Some("/nonexistent/agent.sock".into()),
+            },
+        };
+        // The port is closed, so this fails at connect; agent errors are covered by integration tests.
+        let result = ShellSession::open(
+            &login,
+            PtySize { cols: 80, rows: 24 },
+            Arc::new(|_| true),
+            Duration::from_secs(5),
+        )
+        .await;
+        assert!(matches!(result.err(), Some(CoreError::Unreachable { .. })));
+    }
 
     #[test]
     fn password_is_never_printed_by_debug() {

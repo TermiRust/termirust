@@ -48,6 +48,15 @@ pub enum CoreError {
 
     #[error("invalid data: {0}")]
     InvalidData(String),
+
+    #[error("this private key is protected by a passphrase")]
+    PassphraseRequired,
+
+    #[error("wrong passphrase for this private key")]
+    WrongPassphrase,
+
+    #[error("no SSH agent is running: {0}")]
+    AgentUnavailable(String),
 }
 
 impl From<russh::Error> for CoreError {

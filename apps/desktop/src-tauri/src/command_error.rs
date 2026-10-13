@@ -25,6 +25,9 @@ pub enum CommandErrorCode {
     DecryptionFailed,
     NotFound,
     InvalidData,
+    PassphraseRequired,
+    WrongPassphrase,
+    AgentUnavailable,
     Internal,
 }
 
@@ -53,6 +56,9 @@ impl From<CoreError> for CommandError {
             CoreError::DecryptionFailed => CommandErrorCode::DecryptionFailed,
             CoreError::NotFound { .. } => CommandErrorCode::NotFound,
             CoreError::InvalidData(_) => CommandErrorCode::InvalidData,
+            CoreError::PassphraseRequired => CommandErrorCode::PassphraseRequired,
+            CoreError::WrongPassphrase => CommandErrorCode::WrongPassphrase,
+            CoreError::AgentUnavailable(_) => CommandErrorCode::AgentUnavailable,
             CoreError::NotImplemented(_) | CoreError::Crypto(_) => CommandErrorCode::Internal,
         };
         Self {

@@ -38,7 +38,7 @@ export type CommandError = {
 	message: string,
 };
 
-export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "internal";
+export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "internal";
 
 export type GroupView = {
 	id: string,

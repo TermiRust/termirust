@@ -13,6 +13,12 @@ services:
       PASSWORD_ACCESS: "true"
       USER_NAME: termirust
       USER_PASSWORD: termirust-test
+      # Public halves of crates/core/tests/fixtures/keys.
+      PUBLIC_KEY: |-
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFBV+krWrQZZjPmKoiHb2r0vvmReK5C8TASqnRiOmK7w termirust-test
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEUQmwJbheLbLPM2hdVGFwm3Kv11WwrEHNqJHRvN2PDX termirust-test-encrypted
+        ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCxWExklcN6v6sEtsVVt3QUHOic7lJ2hml/I2ynqEFTfgR1JLPxTyTl9cVZ4KeHyaHrr1OcH53VpM7fPLE27vucyXZn6SUpuEdUGeOf3uWvecQtY9+PLU5V5Efe7Jgk70YQKWucKrWGzjfIetYVnsKGXvqlK6N3JGGCBAfEhIC6uIBkGBaSSAhkMKZACQIV27p0ZoJ1rCY7iJW2cuvYD1Hnpd3nnNKtGMN4LhqK9CQzWu3BCwfdKN06mJXTa/hWbTW2c0TmZjt2qQL60rzLUvDWYL9l8CasjLmJJqc4OcPJo+sKppf8744368Y7EtMVYtTjeBMcBEb4vRjjB/xNOJMX termirust-test-rsa
+        ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBDTWd0+1zkDXQUr1q3GQy6DSe1ON7wYro/A32ZYZ5krSUBwZkdC2iUOTSrsBG0uKViN3S613Hx0zATaqpVpY/yA= termirust-test-ecdsa
     ports:
       - "127.0.0.1:2222:2222"
     healthcheck:
