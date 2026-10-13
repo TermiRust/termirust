@@ -6,6 +6,7 @@ import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
+import { HostSessionView } from "@/features/session/host-session-view";
 import { isMacPlatform, isToggleSidebarShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -17,8 +18,8 @@ export function AppShell() {
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
-  const [view, setView] = useState<"empty" | "lab">(autoRunBenchmarks ? "lab" : "empty");
-  const [labHost, setLabHost] = useState<HostView | null>(null);
+  const [view, setView] = useState<"empty" | "lab" | "host">(autoRunBenchmarks ? "lab" : "empty");
+  const [activeHost, setActiveHost] = useState<{ host: HostView; attempt: number } | null>(null);
   const loadHosts = useHostsStore((s) => s.load);
 
   useEffect(() => {
@@ -26,8 +27,8 @@ export function AppShell() {
   }, [loadHosts]);
 
   const openHost = (host: HostView) => {
-    setLabHost(host);
-    setView("lab");
+    setActiveHost((current) => ({ host, attempt: (current?.attempt ?? 0) + 1 }));
+    setView("host");
   };
 
   useEffect(() => {
@@ -46,16 +47,17 @@ export function AppShell() {
       {sidebarVisible && <Sidebar onOpenHost={openHost} />}
       <main className="flex min-w-0 flex-1 flex-col">
         <TabBar />
-        {view === "lab" ? (
-          <ConnectionLab
-            key={labHost?.id ?? "manual"}
-            host={labHost ?? undefined}
+        {view === "host" && activeHost ? (
+          <HostSessionView
+            key={`${activeHost.host.id}:${activeHost.attempt}`}
+            host={activeHost.host}
             onExit={() => {
               setView("empty");
-              setLabHost(null);
+              setActiveHost(null);
             }}
-            autoRunBenchmarks={autoRunBenchmarks}
           />
+        ) : view === "lab" ? (
+          <ConnectionLab onExit={() => setView("empty")} autoRunBenchmarks={autoRunBenchmarks} />
         ) : (
           <EmptyWorkspace
             version={version}

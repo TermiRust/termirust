@@ -6,6 +6,7 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 export const commands = {
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	sessionOpenWithPassword: (request: PasswordSessionRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenSessionOutcome, CommandError>(__TAURI_INVOKE("session_open_with_password", { request, onOutput, onClosed })),
+	sessionOpenHost: (request: OpenHostRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenHostOutcome, CommandError>(__TAURI_INVOKE("session_open_host", { request, onOutput, onClosed })),
 	sessionWrite: (sessionId: number, data: string) => typedError<null, CommandError>(__TAURI_INVOKE("session_write", { sessionId, data })),
 	/**  Called by the frontend after xterm has rendered `bytes` of this session's output. */
 	sessionAcknowledgeOutput: (sessionId: number, bytes: number) => typedError<null, CommandError>(__TAURI_INVOKE("session_acknowledge_output", { sessionId, bytes })),
@@ -73,6 +74,17 @@ export type HostView = {
 	keepaliveSecs: number | null,
 };
 
+export type OpenHostOutcome = { status: "opened"; sessionId: number } | { status: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean } | { status: "hostKeyUnknown"; algorithm: string; fingerprint: string } | { status: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string };
+
+export type OpenHostRequest = {
+	hostId: string,
+	cols: number,
+	rows: number,
+	prompted: PromptedLogin | null,
+	/**  Fingerprint the user just confirmed in the host-key dialog. */
+	confirmedFingerprint: string | null,
+};
+
 export type OpenSessionOutcome = { status: "opened"; sessionId: number } | 
 /**  The server's key is not trusted yet; ask the user, then retry with `trusted_fingerprint`. */
 { status: "hostKeyNeedsConfirmation"; algorithm: string; fingerprint: string };
@@ -95,6 +107,14 @@ export type PasswordSessionRequest = {
 	rows: number,
 	/**  Fingerprint the user has already confirmed for this host, if any. */
 	trustedFingerprint: string | null,
+};
+
+/**  Credentials the user typed because the host had none saved (or they were rejected). */
+export type PromptedLogin = {
+	username: string | null,
+	password: string,
+	/**  Save the password (and username) into the host after a successful login. */
+	remember: boolean,
 };
 
 export type SessionClosed = {

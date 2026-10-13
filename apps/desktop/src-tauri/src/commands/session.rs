@@ -56,7 +56,7 @@ pub struct SessionClosed {
 }
 
 /// Trusts only the fingerprint the user confirmed and remembers whichever key was offered.
-fn confirmed_fingerprint_verifier(
+pub(crate) fn confirmed_fingerprint_verifier(
     trusted: Option<String>,
 ) -> (
     impl Fn(&HostKeyInfo) -> bool + Send + Sync + 'static,
@@ -94,7 +94,7 @@ pub async fn session_open_with_password(
     };
     let (verifier, offered_key) = confirmed_fingerprint_verifier(request.trusted_fingerprint);
 
-    let (session, mut events) =
+    let (session, events) =
         match ShellSession::open_with_password(&login, size, Arc::new(verifier), CONNECT_TIMEOUT)
             .await
         {
@@ -112,6 +112,19 @@ pub async fn session_open_with_password(
             Err(err) => return Err(err.into()),
         };
 
+    let session_id = start_session(app, &sessions, session, events, on_output, on_closed).await;
+    Ok(OpenSessionOutcome::Opened { session_id })
+}
+
+/// Registers a connected shell and streams its output (batched, with backpressure) to the UI.
+pub(crate) async fn start_session(
+    app: AppHandle,
+    sessions: &Sessions,
+    session: ShellSession,
+    mut events: mpsc::Receiver<ShellEvent>,
+    on_output: Channel<RawChunk>,
+    on_closed: Channel<SessionClosed>,
+) -> u32 {
     let output_flow = Arc::new(OutputFlowControl::default());
     let session_id = sessions
         .insert(LiveSession {
@@ -154,7 +167,7 @@ pub async fn session_open_with_password(
         let _ = on_closed.send(SessionClosed { exit_status });
     });
 
-    Ok(OpenSessionOutcome::Opened { session_id })
+    session_id
 }
 
 #[tauri::command]
