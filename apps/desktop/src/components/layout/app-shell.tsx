@@ -19,6 +19,7 @@ import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
+import { useAiStore } from "@/stores/ai-store";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useSettingsStore } from "@/stores/settings-store";
 import { useHostsStore } from "@/stores/hosts-store";
@@ -44,10 +45,12 @@ export function AppShell() {
   const [closing, setClosing] = useState<Tab | null>(null);
 
   const loadSettings = useSettingsStore((s) => s.load);
+  const loadAi = useAiStore((s) => s.load);
   useEffect(() => {
     void loadHosts();
     void loadSettings();
-  }, [loadHosts, loadSettings]);
+    void loadAi();
+  }, [loadHosts, loadSettings, loadAi]);
 
   useEffect(() => {
     if (autoRunBenchmarks && useTabsStore.getState().tabs.length === 0) openLabTab();

@@ -88,6 +88,9 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         ai::ai_settings_get,
         ai::ai_settings_set,
         ai::ai_test_connection,
+        ai::ai_preview,
+        ai::ai_ask,
+        ai::ai_cancel,
     ])
 }
 
@@ -115,6 +118,7 @@ pub fn run() {
         .manage(sftp::SftpSessions::default())
         .manage(transfer_queue::TransferQueue::default())
         .manage(forwards::RunningForwards::default())
+        .manage(ai::AiRequests::default())
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);

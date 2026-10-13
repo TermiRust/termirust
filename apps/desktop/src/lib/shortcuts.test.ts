@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appShortcut, isFindShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
+import { aiShortcutLabel, appShortcut, isAiShortcut, isFindShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel, type KeyChord } from "./shortcuts";
 
 const chord = (overrides: Partial<KeyChord>): KeyChord => ({
   key: "b",
@@ -94,5 +94,19 @@ describe("isFindShortcut", () => {
     [chord({ key: "g", metaKey: true }), true, false],
   ])("%j on mac=%s → %s", (event, onMac, expected) => {
     expect(isFindShortcut(event, onMac)).toBe(expected);
+  });
+});
+
+describe("isAiShortcut", () => {
+  const chord = (key: string, mods: Partial<KeyChord> = {}): KeyChord => ({ key, metaKey: false, ctrlKey: false, shiftKey: false, altKey: false, ...mods });
+
+  it("uses ⌘I on macOS and never steals Ctrl+I (Tab) elsewhere", () => {
+    expect(isAiShortcut(chord("i", { metaKey: true }), true)).toBe(true);
+    expect(isAiShortcut(chord("I", { ctrlKey: true, shiftKey: true }), false)).toBe(true);
+    expect(isAiShortcut(chord("i", { ctrlKey: true }), false)).toBe(false);
+    expect(isAiShortcut(chord("i", { ctrlKey: true }), true)).toBe(false);
+    expect(isAiShortcut(chord("i", { metaKey: true, altKey: true }), true)).toBe(false);
+    expect(aiShortcutLabel(true)).toBe("⌘I");
+    expect(aiShortcutLabel(false)).toBe("Ctrl+Shift+I");
   });
 });

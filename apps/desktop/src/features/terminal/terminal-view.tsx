@@ -9,7 +9,7 @@ import { Terminal } from "@xterm/xterm";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
-import { isFindShortcut, isMacPlatform } from "@/lib/shortcuts";
+import { isAiShortcut, isFindShortcut, isMacPlatform } from "@/lib/shortcuts";
 import { terminalTheme } from "@/lib/terminal-theme";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
@@ -32,6 +32,8 @@ export interface TerminalHandle {
 interface TerminalViewProps {
   onData?: (data: string) => void;
   onResize?: (size: TerminalSize) => void;
+  /** ⌘I / Ctrl+Shift+I, with whatever text is selected (often empty). */
+  onAskAi?: (selection: string) => void;
 }
 
 function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
@@ -44,7 +46,7 @@ function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
   terminal.options.theme = terminalTheme(settings.theme).colors;
 }
 
-export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize }, ref) {
+export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize, onAskAi }, ref) {
   const settings = useSettingsStore((s) => s.terminal);
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -53,6 +55,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
   const settingsRef = useRef(settings);
   const onDataRef = useRef(onData);
   const onResizeRef = useRef(onResize);
+  const onAskAiRef = useRef(onAskAi);
   const [searching, setSearching] = useState(false);
   const [pendingPaste, setPendingPaste] = useState<string | null>(null);
 
@@ -60,6 +63,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     settingsRef.current = settings;
     onDataRef.current = onData;
     onResizeRef.current = onResize;
+    onAskAiRef.current = onAskAi;
   });
 
   useImperativeHandle(ref, () => ({
@@ -96,6 +100,10 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type === "keydown" && isFindShortcut(event, onMac)) {
         setSearching(true);
+        return false;
+      }
+      if (event.type === "keydown" && onAskAiRef.current && isAiShortcut(event, onMac)) {
+        onAskAiRef.current(terminal.getSelection());
         return false;
       }
       return true;

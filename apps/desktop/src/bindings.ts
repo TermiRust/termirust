@@ -77,10 +77,39 @@ export const commands = {
 	aiSettingsSet: (input: AiSettingsInput) => typedError<AiSettingsView, CommandError>(__TAURI_INVOKE("ai_settings_set", { input })),
 	/**  Sends a one-word prompt with the given (possibly unsaved) settings and returns the reply. */
 	aiTestConnection: (input: AiSettingsInput) => typedError<string, CommandError>(__TAURI_INVOKE("ai_test_connection", { input })),
+	aiPreview: (ask: AiAsk) => typedError<AiPreview, CommandError>(__TAURI_INVOKE("ai_preview", { ask })),
+	/**  Starts a streamed answer and returns its id for [`ai_cancel`]. */
+	aiAsk: (ask: AiAsk, onEvent: Channel<AiEvent>) => typedError<number, CommandError>(__TAURI_INVOKE("ai_ask", { ask, onEvent })),
+	aiCancel: (requestId: number) => typedError<boolean, CommandError>(__TAURI_INVOKE("ai_cancel", { requestId })),
 };
 
 /* Types */
+export type AiAsk = {
+	target: AiTarget,
+	/**  The saved host of the tab, so its AI opt-out is enforced here too. */
+	hostId: string | null,
+	question: AiQuestion,
+};
+
+export type AiEvent = { kind: "text"; text: string } | 
+/**  `command` is set in command mode; `commands` lists code blocks in explanations. */
+{ kind: "done"; reply: string; command: string | null; danger: string | null; commands: string[] } | { kind: "failed"; message: string } | { kind: "cancelled" };
+
+/**  Exactly what would be sent, after masking. */
+export type AiPreview = {
+	provider: string,
+	system: string,
+	user: string,
+	masked: number,
+};
+
 export type AiProviderKind = "anthropic" | "openAiCompatible";
+
+export type AiQuestion = 
+/**  ⌘I: describe a task, get one command back. */
+{ mode: "command"; prompt: string } | 
+/**  Ask about selected output; `question` may be empty. */
+{ mode: "explain"; selection: string; question: string };
 
 export type AiSettingsInput = {
 	enabled: boolean,
@@ -98,6 +127,9 @@ export type AiSettingsView = {
 	model: string,
 	hasApiKey: boolean,
 };
+
+/**  Where the terminal runs; decides the environment the model is told about. */
+export type AiTarget = "local" | "remote";
 
 export type ApiKeyChange = { kind: "keep" } | { kind: "set"; value: string } | { kind: "clear" };
 

@@ -67,3 +67,13 @@ export function isFindShortcut(event: KeyChord, onMac: boolean): boolean {
   if (event.key.toLowerCase() !== "f" || event.altKey) return false;
   return onMac ? event.metaKey && !event.ctrlKey && !event.shiftKey : event.ctrlKey && event.shiftKey && !event.metaKey;
 }
+
+/** ⌘I on macOS; Ctrl+Shift+I elsewhere, because Ctrl+I is Tab inside a terminal. */
+export function isAiShortcut(event: KeyChord, onMac: boolean): boolean {
+  if (event.key.toLowerCase() !== "i" || event.altKey) return false;
+  return onMac ? event.metaKey && !event.ctrlKey && !event.shiftKey : event.ctrlKey && event.shiftKey && !event.metaKey;
+}
+
+export function aiShortcutLabel(onMac: boolean): string {
+  return onMac ? "⌘I" : "Ctrl+Shift+I";
+}

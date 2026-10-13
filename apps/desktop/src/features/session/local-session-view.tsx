@@ -1,7 +1,9 @@
 import { RotateCw } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AiCommandBar } from "@/features/ai/ai-command-bar";
+import { useAiAllowed } from "@/features/ai/use-ai-allowed";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import type { TabStatus } from "@/stores/tabs-store";
 
@@ -24,6 +26,12 @@ export function LocalSessionView({ onStatusChange, onSizeChange }: LocalSessionV
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useLocalSession(getTerminal);
   const { state } = session;
+  const aiAllowed = useAiAllowed(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const closeAi = () => {
+    setAiOpen(false);
+    terminalRef.current?.focus();
+  };
 
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
@@ -43,15 +51,17 @@ export function LocalSessionView({ onStatusChange, onSizeChange }: LocalSessionV
           </Button>
         </div>
       )}
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <TerminalView
           ref={terminalRef}
           onData={session.send}
+          onAskAi={aiAllowed ? () => setAiOpen(true) : undefined}
           onResize={(size) => {
             session.resize(size);
             onSizeChange?.(size);
           }}
         />
+        {aiOpen && aiAllowed && <AiCommandBar target="local" hostId={null} onInsert={session.send} onClose={closeAi} />}
       </div>
     </div>
   );

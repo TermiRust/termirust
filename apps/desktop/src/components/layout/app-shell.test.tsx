@@ -11,6 +11,7 @@ vi.mock("@/bindings", () => ({
     hostsList: () => Promise.resolve({ status: "ok", data: [] }),
     groupsList: () => Promise.resolve({ status: "ok", data: [] }),
     settingsTerminalGet: () => Promise.resolve({ status: "ok", data: {} }),
+    aiSettingsGet: () => Promise.resolve({ status: "ok", data: { enabled: false, kind: "anthropic", baseUrl: "", model: "", hasApiKey: false } }),
     sshConfigPreview: () =>
       Promise.resolve({
         status: "ok",

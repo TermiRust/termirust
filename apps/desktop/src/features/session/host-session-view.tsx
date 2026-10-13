@@ -1,8 +1,11 @@
-import { FolderTree, PlugZap } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { FolderTree, PlugZap, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { AiCommandBar } from "@/features/ai/ai-command-bar";
+import { useAiAllowed } from "@/features/ai/use-ai-allowed";
+import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import { useForwardsStore } from "@/stores/forwards-store";
 import type { TabStatus } from "@/stores/tabs-store";
@@ -45,6 +48,12 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   const waitingToRetry = session.recovering && (state.phase === "closed" || state.phase === "error");
   const auto = useAutoReconnect(waitingToRetry, state.phase === "connected", session.reconnect);
   const dimmed = session.everConnected && state.phase !== "connected";
+  const aiAllowed = useAiAllowed(host);
+  const [aiOpen, setAiOpen] = useState(false);
+  const closeAi = () => {
+    setAiOpen(false);
+    terminalRef.current?.focus();
+  };
 
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
@@ -65,6 +74,11 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
           {endpoint}
         </span>
         <div className="ml-auto flex gap-2">
+          {state.phase === "connected" && aiAllowed && (
+            <Button size="sm" variant="outline" title={`Ask AI for a command (${aiShortcutLabel(isMacPlatform())})`} onClick={() => setAiOpen(true)}>
+              <Sparkles size={14} /> AI
+            </Button>
+          )}
           {state.phase === "connected" && onOpenSftp && (
             <Button size="sm" variant="outline" title="Browse files on this host" onClick={() => onOpenSftp(host)}>
               <FolderTree size={14} /> SFTP
@@ -83,12 +97,14 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
         <TerminalView
           ref={terminalRef}
           onData={session.send}
+          onAskAi={aiAllowed ? () => setAiOpen(true) : undefined}
           onResize={(size) => {
             session.resize(size);
             onSizeChange?.(size);
           }}
         />
         {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
+        {aiOpen && aiAllowed && <AiCommandBar target="remote" hostId={host.id} onInsert={session.send} onClose={closeAi} />}
       </div>
 
       {credentials && (

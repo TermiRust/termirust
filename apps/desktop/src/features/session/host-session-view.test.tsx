@@ -26,6 +26,7 @@ const commands = {
 vi.mock("@/bindings", () => ({ commands }));
 
 const { HostSessionView } = await import("./host-session-view");
+const { useAiStore } = await import("@/stores/ai-store");
 
 const host: HostView = {
   id: "h1",
@@ -95,6 +96,28 @@ describe("HostSessionView", () => {
 
     await screen.findByRole("button", { name: "Disconnect" });
     expect(commands.forwardsAutoStart).toHaveBeenCalledExactlyOnceWith("h1");
+  });
+
+  it("offers AI only when it is on and the host did not opt out", async () => {
+    commands.sessionOpenHost.mockResolvedValue(ok({ status: "opened", sessionId: 1 }));
+    const enabled = { enabled: true, kind: "anthropic" as const, baseUrl: "", model: "", hasApiKey: true };
+    useAiStore.setState({ settings: { ...enabled, enabled: false } });
+    const { unmount } = render(<HostSessionView host={host} />);
+    await screen.findByRole("button", { name: "Disconnect" });
+    expect(screen.queryByRole("button", { name: "AI" })).not.toBeInTheDocument();
+    unmount();
+
+    useAiStore.setState({ settings: enabled });
+    const user = userEvent.setup();
+    const second = render(<HostSessionView host={host} />);
+    await user.click(await screen.findByRole("button", { name: "AI" }));
+    expect(screen.getByRole("dialog", { name: "Ask AI for a command" })).toBeInTheDocument();
+    second.unmount();
+
+    render(<HostSessionView host={{ ...host, aiDisabled: true }} />);
+    await screen.findByRole("button", { name: "Disconnect" });
+    expect(screen.queryByRole("button", { name: "AI" })).not.toBeInTheDocument();
+    useAiStore.setState({ settings: null });
   });
 
   it("explains when the saved password was rejected", async () => {
