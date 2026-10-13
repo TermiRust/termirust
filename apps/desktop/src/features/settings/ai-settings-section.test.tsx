@@ -50,18 +50,29 @@ describe("AiSettingsSection", () => {
     expect(form.getByLabelText("API key")).toHaveValue("");
   });
 
-  it("switches defaults with the provider but keeps a custom model", async () => {
+  it("fills URL and model from the chosen provider, keeping a model the user typed", async () => {
     const user = userEvent.setup();
     const form = await renderForm();
-    await user.click(form.getByRole("radio", { name: "OpenAI-compatible" }));
-    expect(form.getByRole("textbox", { name: "Base URL" })).toHaveValue("https://api.openai.com/v1");
-    expect(form.getByRole("textbox", { name: "Model" })).toHaveValue("gpt-4o-mini");
+    await user.selectOptions(form.getByRole("combobox", { name: "AI provider" }), "deepseek");
+    expect(form.getByRole("textbox", { name: "Base URL" })).toHaveValue("https://api.deepseek.com");
+    expect(form.getByRole("textbox", { name: "Model" })).toHaveValue("deepseek-chat");
+    expect(form.getByText("From platform.deepseek.com")).toBeInTheDocument();
+
+    await user.selectOptions(form.getByRole("combobox", { name: "AI provider" }), "gemini");
+    expect(form.getByRole("textbox", { name: "Base URL" })).toHaveValue("https://generativelanguage.googleapis.com/v1beta/openai");
+    expect(form.getByRole("textbox", { name: "Model" })).toHaveValue("gemini-2.5-flash");
 
     await user.clear(form.getByRole("textbox", { name: "Model" }));
-    await user.type(form.getByRole("textbox", { name: "Model" }), "llama3.2");
-    await user.click(form.getByRole("radio", { name: "Anthropic" }));
-    expect(form.getByRole("textbox", { name: "Model" })).toHaveValue("llama3.2");
-    expect(form.getByRole("textbox", { name: "Base URL" })).toHaveValue("https://api.anthropic.com");
+    await user.type(form.getByRole("textbox", { name: "Model" }), "gemini-2.5-pro");
+    await user.selectOptions(form.getByRole("combobox", { name: "AI provider" }), "anthropic");
+    expect(form.getByRole("textbox", { name: "Model" })).toHaveValue("gemini-2.5-pro");
+    await user.click(form.getByRole("button", { name: "Save" }));
+    expect(commands.aiSettingsSet).toHaveBeenCalledWith(expect.objectContaining({ kind: "anthropic", baseUrl: "https://api.anthropic.com" }));
+  });
+
+  it("opens on the preset that matches what is saved", async () => {
+    const form = await renderForm({ ...off, kind: "openAiCompatible", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.5-flash" });
+    expect(form.getByRole("combobox", { name: "AI provider" })).toHaveValue("gemini");
   });
 
   it("keeps or forgets a saved key without ever showing it", async () => {

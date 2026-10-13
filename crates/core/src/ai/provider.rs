@@ -212,14 +212,18 @@ fn http_error(status: reqwest::StatusCode, body: &str) -> CoreError {
     let detail = serde_json::from_str::<Value>(body)
         .ok()
         .and_then(|v| {
+            // Gemini wraps its error object in an array.
+            let v = if v.is_array() { v[0].clone() } else { v };
             v["error"]["message"]
                 .as_str()
                 .or(v["error"].as_str())
                 .map(str::to_owned)
         })
         .unwrap_or_else(|| body.chars().take(200).collect());
+    let key_problem = detail.to_lowercase().contains("api key");
     let hint = match status.as_u16() {
         401 | 403 => "the provider rejected the API key",
+        400 if key_problem => "the provider rejected the API key",
         404 => "model or URL not found",
         429 => "rate limited or out of credit",
         500..=599 => "the provider is having problems",
@@ -584,6 +588,23 @@ mod tests {
     }
 
     #[test]
+    fn reads_gemini_style_errors() {
+        let body = r#"[{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT"}}]"#;
+        assert_eq!(
+            http_error(reqwest::StatusCode::BAD_REQUEST, body).to_string(),
+            "AI: the provider rejected the API key (HTTP 400): API key not valid. Please pass a valid API key."
+        );
+        assert!(
+            http_error(
+                reqwest::StatusCode::BAD_REQUEST,
+                r#"{"error":{"message":"bad model"}}"#
+            )
+            .to_string()
+            .starts_with("AI: request failed (HTTP 400)")
+        );
+    }
+
+    #[test]
     fn parses_provider_events() {
         assert_eq!(
             Anthropic.parse_event("{\"type\":\"ping\"}").unwrap(),
@@ -616,5 +637,37 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("HTTP 401"), "{err}");
+    }
+
+    /// The paths must exist: a bad key gives an auth error, a wrong URL would give 404.
+    #[tokio::test]
+    #[ignore = "reaches DeepSeek and Google over the internet"]
+    async fn deepseek_and_gemini_answer_on_the_openai_compatible_paths() {
+        for (base, model) in [
+            ("https://api.deepseek.com", "deepseek-chat"),
+            (
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                "gemini-2.5-flash",
+            ),
+        ] {
+            let client = AiClient::new(ProviderConfig {
+                kind: ProviderKind::OpenAiCompatible,
+                base_url: base.into(),
+                model: model.into(),
+                api_key: Some("invalid".into()),
+            })
+            .unwrap();
+            let err = client
+                .stream(&chat(), &CancelFlag::default(), |_| {})
+                .await
+                .unwrap_err()
+                .to_string();
+            assert!(!err.contains("HTTP 404"), "{base}: {err}");
+            assert!(
+                err.contains("HTTP 401") || err.contains("HTTP 400") || err.contains("HTTP 403"),
+                "{base}: {err}"
+            );
+            println!("{base}: {err}");
+        }
     }
 }

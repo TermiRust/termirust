@@ -6,13 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { Select } from "@/components/ui/select";
 import { useAiStore } from "@/stores/ai-store";
 
-const defaults: Record<AiProviderKind, { baseUrl: string; model: string; keyHint: string }> = {
-  anthropic: { baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5", keyHint: "From console.anthropic.com" },
-  openAiCompatible: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", keyHint: "Leave empty for Ollama or LM Studio" },
-};
+import { AI_PRESETS, presetOf, type AiPreset } from "./ai-presets";
+
 
 /** Loads the settings, then mounts the form once so its state starts from what is saved. */
 export function AiSettingsSection() {
@@ -44,6 +42,7 @@ function AiSettingsForm({ initial }: { initial: AiSettingsView }) {
   const saved = useAiStore((s) => s.settings) ?? initial;
   const [enabled, setEnabled] = useState(initial.enabled);
   const [kind, setKind] = useState<AiProviderKind>(initial.kind);
+  const [preset, setPreset] = useState<AiPreset>(() => presetOf(initial.kind, initial.baseUrl));
   const [baseUrl, setBaseUrl] = useState(initial.baseUrl);
   const [model, setModel] = useState(initial.model);
   const [apiKey, setApiKey] = useState("");
@@ -58,11 +57,14 @@ function AiSettingsForm({ initial }: { initial: AiSettingsView }) {
     apiKey: apiKey ? { kind: "set", value: apiKey } : clearKey ? { kind: "clear" } : { kind: "keep" },
   });
 
-  const changeKind = (next: AiProviderKind) => {
-    // Swap the defaults along with the provider, but keep anything the user typed.
-    if (baseUrl === defaults[kind].baseUrl || !baseUrl) setBaseUrl(defaults[next].baseUrl);
-    if (model === defaults[kind].model || !model) setModel(defaults[next].model);
-    setKind(next);
+  const changePreset = (id: string) => {
+    const next = AI_PRESETS.find((p) => p.id === id);
+    if (!next) return;
+    // Swap the defaults along with the provider, but keep a model the user typed.
+    setBaseUrl(next.id === "custom" ? "" : next.baseUrl);
+    if (model === preset.model || !model) setModel(next.model);
+    setKind(next.kind);
+    setPreset(next);
   };
 
   const onSave = async () => {
@@ -86,24 +88,24 @@ function AiSettingsForm({ initial }: { initial: AiSettingsView }) {
   return (
     <form aria-label="AI assistant" className="grid max-w-2xl gap-3" onSubmit={(e) => (e.preventDefault(), void onSave())}>
       <Checkbox label="Turn on AI help" description="⌘I / Ctrl+I in a terminal, and “Ask AI” about selected output." checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-      <SegmentedControl
-        label="AI provider"
-        value={kind}
-        onChange={changeKind}
-        options={[
-          { value: "anthropic", label: "Anthropic" },
-          { value: "openAiCompatible", label: "OpenAI-compatible" },
-        ]}
-      />
+      <Field label="Provider">
+        <Select aria-label="AI provider" value={preset.id} onChange={(e) => changePreset(e.target.value)}>
+          {AI_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Base URL" hint={kind === "openAiCompatible" ? "OpenRouter, Ollama (http://localhost:11434/v1), LM Studio…" : undefined}>
+        <Field label="Base URL" hint={preset.id === "custom" ? "The server's OpenAI-compatible base, ending before /chat/completions" : undefined}>
           <Input aria-label="Base URL" value={baseUrl} spellCheck={false} onChange={(e) => setBaseUrl(e.target.value)} />
         </Field>
         <Field label="Model">
           <Input aria-label="Model" value={model} spellCheck={false} onChange={(e) => setModel(e.target.value)} />
         </Field>
       </div>
-      <Field label="API key" hint={saved.hasApiKey ? "A key is saved in the vault. Type a new one to replace it." : defaults[kind].keyHint}>
+      <Field label="API key" hint={saved.hasApiKey ? "A key is saved in the vault. Type a new one to replace it." : preset.keyHint}>
         <Input
           aria-label="API key"
           type="password"
