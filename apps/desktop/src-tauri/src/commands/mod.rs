@@ -2,6 +2,7 @@ pub mod benchmark;
 pub mod host_session;
 pub mod hosts;
 pub mod keys;
+pub mod local_session;
 pub mod session;
 pub mod ssh_config;
 pub mod vault;

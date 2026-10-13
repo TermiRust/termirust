@@ -7,6 +7,8 @@ export const commands = {
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	sessionOpenWithPassword: (request: PasswordSessionRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenSessionOutcome, CommandError>(__TAURI_INVOKE("session_open_with_password", { request, onOutput, onClosed })),
 	sessionOpenHost: (request: OpenHostRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenHostOutcome, CommandError>(__TAURI_INVOKE("session_open_host", { request, onOutput, onClosed })),
+	/**  Opens the user's login shell on this machine in a new session. */
+	sessionOpenLocal: (cols: number, rows: number, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<number, CommandError>(__TAURI_INVOKE("session_open_local", { cols, rows, onOutput, onClosed })),
 	sessionWrite: (sessionId: number, data: string) => typedError<null, CommandError>(__TAURI_INVOKE("session_write", { sessionId, data })),
 	/**  Called by the frontend after xterm has rendered `bytes` of this session's output. */
 	sessionAcknowledgeOutput: (sessionId: number, bytes: number) => typedError<null, CommandError>(__TAURI_INVOKE("session_acknowledge_output", { sessionId, bytes })),
@@ -47,7 +49,7 @@ export type CommandError = {
 	message: string,
 };
 
-export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "internal";
+export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "local_shell" | "internal";
 
 export type GroupView = {
 	id: string,

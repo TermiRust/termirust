@@ -1,4 +1,5 @@
 mod error;
+pub mod pty;
 pub mod ssh;
 pub mod storage;
 pub mod terminal;

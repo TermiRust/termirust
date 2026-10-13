@@ -52,12 +52,15 @@ describe("tabShortcut", () => {
     ["Ctrl+W is left to the shell on macOS", chord({ key: "w", ctrlKey: true }), true, null],
     ["Ctrl+Shift+W closes on Windows/Linux", chord({ key: "W", ctrlKey: true, shiftKey: true }), false, { action: "close" }],
     ["Ctrl+W is left to the shell on Windows/Linux", chord({ key: "w", ctrlKey: true }), false, null],
+    ["⌘T opens a local terminal on macOS", chord({ key: "t", metaKey: true }), true, { action: "newLocal" }],
+    ["Ctrl+Shift+T opens a local terminal on Windows/Linux", chord({ key: "T", ctrlKey: true, shiftKey: true }), false, { action: "newLocal" }],
+    ["Ctrl+T is left to the shell on Windows/Linux", chord({ key: "t", ctrlKey: true }), false, null],
     ["⌘3 selects the third tab", chord({ key: "3", metaKey: true }), true, { action: "select", index: 2 }],
     ["Alt+1 selects the first tab on Windows/Linux", chord({ key: "1", altKey: true }), false, { action: "select", index: 0 }],
     ["Ctrl+1 is left to the shell on Windows/Linux", chord({ key: "1", ctrlKey: true }), false, null],
     ["⌘⇧3 is not a tab shortcut", chord({ key: "3", metaKey: true, shiftKey: true }), true, null],
     ["0 is not a tab", chord({ key: "0", metaKey: true }), true, null],
-    ["other keys are ignored", chord({ key: "t", metaKey: true }), true, null],
+    ["other keys are ignored", chord({ key: "k", metaKey: true }), true, null],
   ])("%s", (_name, event, onMac, expected) => {
     expect(tabShortcut(event, onMac)).toEqual(expected);
   });

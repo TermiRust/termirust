@@ -1,4 +1,4 @@
-import { FlaskConical, Plus, Server, X } from "lucide-react";
+import { FlaskConical, Plus, Server, SquareTerminal, X } from "lucide-react";
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -24,9 +24,10 @@ const statusLabel: Record<TabStatus, string> = {
 
 interface TabBarProps {
   onRequestClose: (tab: Tab) => void;
+  onNewLocalTab: () => void;
 }
 
-export function TabBar({ onRequestClose }: TabBarProps) {
+export function TabBar({ onRequestClose, onNewLocalTab }: TabBarProps) {
   const { tabs, activeTabId, activateTab, renameTab, moveTab } = useTabsStore();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
@@ -108,7 +109,13 @@ export function TabBar({ onRequestClose }: TabBarProps) {
                   onKeyDown={(e) => onTabKeyDown(e, tab, index)}
                   className={cn("flex min-w-0 flex-1 items-center gap-1.5 truncate text-left outline-offset-2", dim && "italic")}
                 >
-                  {tab.target.kind === "lab" ? <FlaskConical size={12} className="shrink-0" /> : <Server size={12} className="shrink-0 opacity-60" />}
+                  {tab.target.kind === "lab" ? (
+                    <FlaskConical size={12} className="shrink-0" />
+                  ) : tab.target.kind === "local" ? (
+                    <SquareTerminal size={12} className="shrink-0 opacity-60" />
+                  ) : (
+                    <Server size={12} className="shrink-0 opacity-60" />
+                  )}
                   <span className="truncate">{tab.title}</span>
                 </button>
               )}
@@ -124,7 +131,7 @@ export function TabBar({ onRequestClose }: TabBarProps) {
           );
         })}
       </div>
-      <Button size="icon" aria-label="New tab" disabled title="Local terminal is coming soon" className="mb-1">
+      <Button size="icon" aria-label="New local terminal" title="New local terminal" onClick={onNewLocalTab} className="mb-1">
         <Plus size={15} />
       </Button>
     </div>

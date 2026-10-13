@@ -28,6 +28,7 @@ pub enum CommandErrorCode {
     PassphraseRequired,
     WrongPassphrase,
     AgentUnavailable,
+    LocalShell,
     Internal,
 }
 
@@ -59,6 +60,7 @@ impl From<CoreError> for CommandError {
             CoreError::PassphraseRequired => CommandErrorCode::PassphraseRequired,
             CoreError::WrongPassphrase => CommandErrorCode::WrongPassphrase,
             CoreError::AgentUnavailable(_) => CommandErrorCode::AgentUnavailable,
+            CoreError::LocalShell(_) => CommandErrorCode::LocalShell,
             CoreError::NotImplemented(_) | CoreError::Crypto(_) => CommandErrorCode::Internal,
         };
         Self {

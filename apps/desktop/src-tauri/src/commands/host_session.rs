@@ -13,7 +13,7 @@ use termirust_core::vault::{
 };
 use uuid::Uuid;
 
-use super::session::{SessionClosed, Sessions, start_session};
+use super::session::{SessionBackend, SessionClosed, Sessions, start_session};
 use crate::command_error::CommandError;
 use crate::raw_chunk::RawChunk;
 use crate::vault_state::VaultState;
@@ -362,7 +362,15 @@ pub async fn session_open_host(
         .await?;
     }
 
-    let session_id = start_session(app, &sessions, shell, events, on_output, on_closed).await;
+    let session_id = start_session(
+        app,
+        &sessions,
+        SessionBackend::Ssh(shell),
+        events,
+        on_output,
+        on_closed,
+    )
+    .await;
     Ok(OpenHostOutcome::Opened { session_id })
 }
 

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 use termirust_core::CoreError;
+use termirust_core::pty::LocalShell;
 use termirust_core::ssh::{HostKeyInfo, PasswordLogin, PtySize, ShellEvent, ShellSession};
 use termirust_core::terminal::{BatchPolicy, OutputFlowControl, forward_in_batches};
 use tokio::sync::mpsc;
@@ -15,8 +16,37 @@ use crate::session_registry::SessionRegistry;
 
 /// A connected shell plus the backpressure state of its output stream.
 pub struct LiveSession {
-    shell: ShellSession,
+    backend: SessionBackend,
     output_flow: Arc<OutputFlowControl>,
+}
+
+/// Where a tab's bytes go: a remote SSH shell or a shell on this machine.
+pub enum SessionBackend {
+    Ssh(ShellSession),
+    Local(LocalShell),
+}
+
+impl SessionBackend {
+    async fn write(&self, input: &[u8]) -> termirust_core::Result<()> {
+        match self {
+            SessionBackend::Ssh(shell) => shell.write(input).await,
+            SessionBackend::Local(shell) => shell.write(input),
+        }
+    }
+
+    async fn resize(&self, size: PtySize) -> termirust_core::Result<()> {
+        match self {
+            SessionBackend::Ssh(shell) => shell.resize(size).await,
+            SessionBackend::Local(shell) => shell.resize(size),
+        }
+    }
+
+    async fn close(&self) -> termirust_core::Result<()> {
+        match self {
+            SessionBackend::Ssh(shell) => shell.close().await,
+            SessionBackend::Local(shell) => shell.close(),
+        }
+    }
 }
 
 pub type Sessions = SessionRegistry<LiveSession>;
@@ -112,7 +142,15 @@ pub async fn session_open_with_password(
             Err(err) => return Err(err.into()),
         };
 
-    let session_id = start_session(app, &sessions, session, events, on_output, on_closed).await;
+    let session_id = start_session(
+        app,
+        &sessions,
+        SessionBackend::Ssh(session),
+        events,
+        on_output,
+        on_closed,
+    )
+    .await;
     Ok(OpenSessionOutcome::Opened { session_id })
 }
 
@@ -120,7 +158,7 @@ pub async fn session_open_with_password(
 pub(crate) async fn start_session(
     app: AppHandle,
     sessions: &Sessions,
-    session: ShellSession,
+    backend: SessionBackend,
     mut events: mpsc::Receiver<ShellEvent>,
     on_output: Channel<RawChunk>,
     on_closed: Channel<SessionClosed>,
@@ -128,7 +166,7 @@ pub(crate) async fn start_session(
     let output_flow = Arc::new(OutputFlowControl::default());
     let session_id = sessions
         .insert(LiveSession {
-            shell: session,
+            backend,
             output_flow: output_flow.clone(),
         })
         .await;
@@ -182,7 +220,7 @@ pub async fn session_write(
         .await
         .ok_or_else(|| CommandError::session_not_found(session_id))?;
     session
-        .shell
+        .backend
         .write(data.as_bytes())
         .await
         .map_err(Into::into)
@@ -217,7 +255,7 @@ pub async fn session_resize(
         .await
         .ok_or_else(|| CommandError::session_not_found(session_id))?;
     session
-        .shell
+        .backend
         .resize(PtySize { cols, rows })
         .await
         .map_err(Into::into)
@@ -230,7 +268,7 @@ pub async fn session_close(
     session_id: u32,
 ) -> Result<(), CommandError> {
     match sessions.remove(session_id).await {
-        Some(session) => session.shell.close().await.map_err(Into::into),
+        Some(session) => session.backend.close().await.map_err(Into::into),
         None => Ok(()),
     }
 }

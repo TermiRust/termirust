@@ -37,6 +37,11 @@ describe("tabs store", () => {
     expect(state().tabs).toHaveLength(2);
   });
 
+  it("opens a local terminal tab", () => {
+    state().openLocalTab();
+    expect(state().tabs[0]).toMatchObject({ title: "Local", target: { kind: "local" }, status: "connecting", color: null });
+  });
+
   it("opens a lab tab", () => {
     state().openLabTab();
     expect(state().tabs[0]).toMatchObject({ title: "Connection lab", target: { kind: "lab" }, status: "idle" });

@@ -22,16 +22,17 @@ export function toggleSidebarLabel(onMac: boolean): string {
   return onMac ? "⌘B" : "Ctrl+Shift+B";
 }
 
-export type TabShortcut = { action: "close" } | { action: "select"; index: number } | null;
+export type TabShortcut = { action: "close" } | { action: "newLocal" } | { action: "select"; index: number } | null;
 
-/** ⌘W / ⌘1–9 on macOS; Ctrl+Shift+W / Alt+1–9 elsewhere so Ctrl+W still reaches the shell. */
+/** ⌘T / ⌘W / ⌘1–9 on macOS; Ctrl+Shift+T / Ctrl+Shift+W / Alt+1–9 elsewhere so Ctrl+T/W reach the shell. */
 export function tabShortcut(event: KeyChord, onMac: boolean): TabShortcut {
   const key = event.key.toLowerCase();
-  if (key === "w") {
-    const close = onMac
+  if (key === "w" || key === "t") {
+    const matches = onMac
       ? event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey
       : event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey;
-    return close ? { action: "close" } : null;
+    if (!matches) return null;
+    return key === "w" ? { action: "close" } : { action: "newLocal" };
   }
   if (/^[1-9]$/.test(key)) {
     const select = onMac

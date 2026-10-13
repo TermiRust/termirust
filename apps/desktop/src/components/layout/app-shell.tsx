@@ -8,6 +8,7 @@ import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { KeychainView } from "@/features/keychain/keychain-view";
 import { HostSessionView } from "@/features/session/host-session-view";
+import { LocalSessionView } from "@/features/session/local-session-view";
 import { groupTabColor } from "@/features/tabs/tab-color";
 import { isMacPlatform, isToggleSidebarShortcut, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
@@ -19,9 +20,10 @@ export function AppShell() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
   const section = useLayoutStore((s) => s.section);
+  const setSection = useLayoutStore((s) => s.setSection);
   const loadHosts = useHostsStore((s) => s.load);
   const groups = useHostsStore((s) => s.groups);
-  const { tabs, activeTabId, openHostTab, openLabTab, closeTab, activateTabAt, setTabStatus } = useTabsStore();
+  const { tabs, activeTabId, openHostTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus } = useTabsStore();
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
@@ -60,6 +62,9 @@ export function AppShell() {
       event.preventDefault();
       if (shortcut.action === "select") {
         activateTabAt(shortcut.index);
+      } else if (shortcut.action === "newLocal") {
+        setSection("hosts");
+        openLocalTab();
       } else {
         const { tabs: current, activeTabId: activeId } = useTabsStore.getState();
         const active = current.find((t) => t.id === activeId);
@@ -68,14 +73,14 @@ export function AppShell() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onMac, toggleSidebar, activateTabAt, requestClose]);
+  }, [onMac, toggleSidebar, activateTabAt, requestClose, openLocalTab, setSection]);
 
   return (
     <div className="flex h-full">
       {sidebarVisible && <Sidebar onOpenHost={openHost} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
-        {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} />}
+        {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
         {section === "hosts" && tabs.length === 0 && (
           <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} onOpenConnectionLab={openLabTab} />
         )}
@@ -112,6 +117,8 @@ function TabPanel({ tab, active, onStatusChange, onClose, autoRunBenchmarks }: T
     <div role="tabpanel" aria-labelledby={`tab-${tab.id}`} hidden={!active} className={active ? "flex min-h-0 flex-1 flex-col" : undefined}>
       {tab.target.kind === "host" ? (
         <HostSessionView host={tab.target.host} onStatusChange={reportStatus} />
+      ) : tab.target.kind === "local" ? (
+        <LocalSessionView onStatusChange={reportStatus} />
       ) : (
         <ConnectionLab onExit={() => onClose(tab.id)} autoRunBenchmarks={autoRunBenchmarks} />
       )}

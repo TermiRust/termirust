@@ -5,7 +5,7 @@ import type { TabColor } from "@/features/tabs/tab-color";
 
 export type TabStatus = "connecting" | "connected" | "disconnected" | "error" | "idle";
 
-export type TabTarget = { kind: "host"; host: HostView } | { kind: "lab" };
+export type TabTarget = { kind: "host"; host: HostView } | { kind: "local" } | { kind: "lab" };
 
 export interface Tab {
   id: string;
@@ -20,6 +20,7 @@ interface TabsState {
   activeTabId: string | null;
   openHostTab: (host: HostView, color: TabColor | null) => string;
   openLabTab: () => string;
+  openLocalTab: () => string;
   closeTab: (id: string) => void;
   activateTab: (id: string) => void;
   activateTabAt: (index: number) => void;
@@ -44,6 +45,7 @@ export const useTabsStore = create<TabsState>()((set, get) => {
 
     openHostTab: (host, color) => open({ title: host.label, target: { kind: "host", host }, status: "connecting", color }),
     openLabTab: () => open({ title: "Connection lab", target: { kind: "lab" }, status: "idle", color: null }),
+    openLocalTab: () => open({ title: "Local", target: { kind: "local" }, status: "connecting", color: null }),
 
     /** Closing the active tab activates its right neighbour, or the left one at the end. */
     closeTab: (id) =>

@@ -57,6 +57,9 @@ pub enum CoreError {
 
     #[error("no SSH agent is running: {0}")]
     AgentUnavailable(String),
+
+    #[error("local terminal error: {0}")]
+    LocalShell(String),
 }
 
 impl From<russh::Error> for CoreError {

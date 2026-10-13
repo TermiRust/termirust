@@ -12,6 +12,7 @@ vi.mock("@/bindings", () => ({
     groupsList: () => Promise.resolve({ status: "ok", data: [] }),
   },
 }));
+vi.mock("@/features/session/local-session-view", () => ({ LocalSessionView: () => <div>local shell</div> }));
 vi.mock("@/features/connection-lab/connection-lab", () => ({
   ConnectionLab: ({ onExit }: { onExit: () => void }) => (
     <button type="button" onClick={onExit}>
@@ -113,5 +114,14 @@ describe("AppShell tabs", () => {
       fireEvent.keyDown(window, onMac ? { key: "1", metaKey: true } : { key: "1", altKey: true });
     });
     expect(useTabsStore.getState().activeTabId).toBe(first);
+  });
+
+  it("opens a local terminal with the new-tab shortcut", () => {
+    render(<AppShell />);
+    const onMac = /Mac/i.test(navigator.userAgent);
+    act(() => {
+      fireEvent.keyDown(window, onMac ? { key: "t", metaKey: true } : { key: "t", ctrlKey: true, shiftKey: true });
+    });
+    expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["local"]);
   });
 });

@@ -27,7 +27,7 @@ function setup() {
   const a = store().openHostTab(host("prod-api"), "red");
   const b = store().openHostTab(host("staging"), null);
   const onRequestClose = vi.fn();
-  render(<TabBar onRequestClose={onRequestClose} />);
+  render(<TabBar onRequestClose={onRequestClose} onNewLocalTab={() => store().openLocalTab()} />);
   return { a, b, onRequestClose, user: userEvent.setup() };
 }
 
@@ -91,6 +91,12 @@ describe("TabBar", () => {
     fireEvent.drop(tabs[0]!, { dataTransfer });
 
     expect(store().tabs.map((t) => t.id)[0]).toBe(b);
+  });
+
+  it("opens a local terminal from the + button", async () => {
+    const { user } = setup();
+    await user.click(screen.getByRole("button", { name: "New local terminal" }));
+    expect(store().tabs.at(-1)).toMatchObject({ title: "Local", target: { kind: "local" } });
   });
 
   it("shows disconnected tabs dimmed in italics", () => {
