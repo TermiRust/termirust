@@ -159,7 +159,8 @@ describe("useHostSession", () => {
     await waitFor(() => expect(hook.result.current.state.phase).toBe("connected"));
 
     act(() => FakeChannel.created[1]?.emit({ exitStatus: 0 }));
-    expect(hook.result.current.state).toEqual({ phase: "closed", exitStatus: 0 });
+    expect(hook.result.current.state).toEqual({ phase: "closed", reason: "exited", exitStatus: 0 });
+    expect(hook.result.current.recovering).toBe(false);
 
     await act(async () => hook.result.current.reconnect());
     await waitFor(() => expect(hook.result.current.state).toEqual({ phase: "connected", sessionId: 9 }));
@@ -188,6 +189,32 @@ describe("useHostSession", () => {
     await waitFor(() => expect(hook.result.current.state.phase).toBe("connected"));
     await act(() => hook.result.current.disconnect());
     expect(commands.sessionClose).toHaveBeenCalledWith(12);
-    expect(hook.result.current.state).toEqual({ phase: "closed", exitStatus: null });
+    expect(hook.result.current.state).toEqual({ phase: "closed", reason: "disconnected", exitStatus: null });
+  });
+
+  it("treats a close without exit status as a lost connection and marks the reconnect", async () => {
+    commands.sessionOpenHost.mockResolvedValueOnce(opened(20)).mockResolvedValueOnce(opened(21));
+    const { hook, terminal } = setup();
+    await waitFor(() => expect(hook.result.current.everConnected).toBe(true));
+
+    act(() => FakeChannel.created[1]?.emit({ exitStatus: null }));
+    expect(hook.result.current.state).toEqual({ phase: "closed", reason: "lost", exitStatus: null });
+    expect(hook.result.current.recovering).toBe(true);
+
+    await act(async () => hook.result.current.reconnect());
+    await waitFor(() => expect(hook.result.current.state).toEqual({ phase: "connected", sessionId: 21 }));
+    expect(hook.result.current.recovering).toBe(false);
+    const marker = new TextDecoder().decode(terminal.write.mock.calls.at(-1)?.[0] as Uint8Array);
+    expect(marker).toContain("reconnected");
+  });
+
+  it("ignores a close event after the user already disconnected", async () => {
+    commands.sessionOpenHost.mockResolvedValue(opened(22));
+    const { hook } = setup();
+    await waitFor(() => expect(hook.result.current.state.phase).toBe("connected"));
+    await act(() => hook.result.current.disconnect());
+    act(() => FakeChannel.created[1]?.emit({ exitStatus: null }));
+    expect(hook.result.current.state).toEqual({ phase: "closed", reason: "disconnected", exitStatus: null });
+    expect(hook.result.current.recovering).toBe(false);
   });
 });

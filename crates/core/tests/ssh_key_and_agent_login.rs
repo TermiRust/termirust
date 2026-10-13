@@ -20,6 +20,7 @@ fn fixture(name: &str) -> PathBuf {
 
 fn login(method: LoginMethod) -> SshLogin {
     SshLogin {
+        keepalive_secs: None,
         host: "127.0.0.1".into(),
         port: std::env::var("TERMIRUST_TEST_SSH_PORT")
             .ok()

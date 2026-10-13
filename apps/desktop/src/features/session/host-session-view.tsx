@@ -1,4 +1,4 @@
-import { PlugZap, RotateCw } from "lucide-react";
+import { PlugZap } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
@@ -7,7 +7,9 @@ import { TerminalView, type TerminalHandle } from "@/features/terminal/terminal-
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
+import { ConnectionBanner } from "./connection-banner";
 import { CredentialsPrompt, type CredentialsRequest } from "./credentials-prompt";
+import { useAutoReconnect } from "./use-auto-reconnect";
 import { useHostSession, type HostSessionState } from "./use-host-session";
 
 interface HostSessionViewProps {
@@ -35,6 +37,9 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
   const { state } = session;
   const endpoint = `${host.hostname}:${host.port}`;
   const credentials = credentialsRequest(state);
+  const waitingToRetry = session.recovering && (state.phase === "closed" || state.phase === "error");
+  const auto = useAutoReconnect(waitingToRetry, state.phase === "connected", session.reconnect);
+  const dimmed = session.everConnected && state.phase !== "connected";
 
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
@@ -48,22 +53,19 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
           {host.username ? `${host.username}@` : ""}
           {endpoint}
         </span>
-        <StatusText state={state} />
         <div className="ml-auto flex gap-2">
-          {state.phase === "connected" ? (
+          {state.phase === "connected" && (
             <Button size="sm" variant="outline" onClick={() => void session.disconnect()}>
               <PlugZap size={14} /> Disconnect
-            </Button>
-          ) : state.phase === "connecting" ? null : (
-            <Button size="sm" variant="outline" onClick={session.reconnect}>
-              <RotateCw size={14} /> Reconnect
             </Button>
           )}
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <TerminalView ref={terminalRef} onData={session.send} onResize={session.resize} />
+        {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
       </div>
 
       {credentials && (
@@ -101,24 +103,4 @@ function credentialsRequest(state: HostSessionState): CredentialsRequest | null 
     default:
       return null;
   }
-}
-
-function StatusText({ state }: { state: HostSessionState }) {
-  const text: Partial<Record<HostSessionState["phase"], string>> = {
-    connecting: "Connecting…",
-    connected: "Connected",
-    cancelled: "Not connected",
-  };
-  const message =
-    state.phase === "error"
-      ? state.message
-      : state.phase === "closed"
-        ? `Disconnected${state.exitStatus === null ? "" : ` (exit ${state.exitStatus})`}`
-        : text[state.phase];
-  if (!message) return null;
-  return (
-    <span role="status" className={`text-xs ${state.phase === "error" ? "text-accent" : "text-fg-muted"}`}>
-      · {message}
-    </span>
-  );
 }

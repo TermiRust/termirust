@@ -1,7 +1,9 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useImperativeHandle } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { FakeChannel } from "@/test/tauri-channel-mock";
 
 import type { HostView } from "@/bindings";
 
@@ -61,7 +63,7 @@ describe("HostSessionView", () => {
     await user.type(within(dialog).getByLabelText("Password"), "pw");
     await user.click(within(dialog).getByRole("button", { name: "Connect" }));
 
-    expect(await screen.findByRole("status")).toHaveTextContent("Connected");
+    expect(await screen.findByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({
       prompted: { username: "deploy", password: "pw", passphrase: null, remember: true },
     });
@@ -153,5 +155,47 @@ describe("HostSessionView", () => {
     render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
     await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("error"));
     expect(screen.getByRole("status")).toHaveTextContent("agent not supported");
+  });
+
+  describe("after the connection is lost", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      FakeChannel.created = [];
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it("dims the terminal, counts down and reconnects on its own", async () => {
+      commands.sessionOpenHost
+        .mockResolvedValueOnce(ok({ status: "opened", sessionId: 7 }))
+        .mockResolvedValueOnce(ok({ status: "opened", sessionId: 8 }));
+      const onStatusChange = vi.fn();
+      render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
+      await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("connected"));
+
+      act(() => FakeChannel.created[1]?.emit({ exitStatus: null }));
+      expect(await screen.findByRole("status")).toHaveTextContent(/Reconnecting in [45]s \(attempt 1 of 3\)/);
+      expect(onStatusChange).toHaveBeenLastCalledWith("disconnected");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5500);
+      });
+      await vi.waitFor(() => expect(commands.sessionOpenHost).toHaveBeenCalledTimes(2));
+      await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("connected"));
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    });
+
+    it("does not reconnect after the user cancels", async () => {
+      commands.sessionOpenHost.mockResolvedValue(ok({ status: "opened", sessionId: 9 }));
+      render(<HostSessionView host={host} />);
+      await screen.findByRole("button", { name: "Disconnect" });
+      act(() => FakeChannel.created[1]?.emit({ exitStatus: null }));
+
+      await act(async () => {
+        screen.getByRole("button", { name: "Cancel" }).click();
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(commands.sessionOpenHost).toHaveBeenCalledOnce();
+      expect(screen.getByRole("status")).toHaveTextContent("Connection lost.");
+    });
   });
 });

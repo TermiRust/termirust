@@ -16,6 +16,7 @@ const TIMEOUT: Duration = Duration::from_secs(10);
 
 fn jump_login(method: LoginMethod) -> SshLogin {
     SshLogin {
+        keepalive_secs: None,
         host: "127.0.0.1".into(),
         port: 2222,
         username: "termirust".into(),
@@ -36,6 +37,7 @@ fn jump_key() -> LoginMethod {
 
 fn target(host: &str) -> SshLogin {
     SshLogin {
+        keepalive_secs: None,
         host: host.into(),
         port: 2222,
         username: "target".into(),

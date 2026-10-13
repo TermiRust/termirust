@@ -18,9 +18,12 @@ export type HostSessionState =
   | { phase: "hostKeyUnknown"; server: string; algorithm: string; fingerprint: string }
   | { phase: "hostKeyChanged"; server: string; algorithm: string; fingerprint: string; previousFingerprint: string }
   | { phase: "connected"; sessionId: number }
-  | { phase: "closed"; exitStatus: number | null }
+  /** `lost`: the link died (no exit status); `exited`: the remote shell ended; `disconnected`: by the user. */
+  | { phase: "closed"; reason: "lost" | "exited" | "disconnected"; exitStatus: number | null }
   | { phase: "cancelled" }
   | { phase: "error"; message: string };
+
+const RECONNECTED_MARK = new TextEncoder().encode("\r\n\x1b[2m── reconnected ──\x1b[0m\r\n");
 
 interface Attempt {
   prompted: PromptedLogin | null;
@@ -30,11 +33,15 @@ interface Attempt {
 /** Connects to a saved host as soon as the terminal is mounted; the vault supplies secrets. */
 export function useHostSession(host: HostView, getTerminal: () => HostSessionTerminal | null) {
   const [state, setState] = useState<HostSessionState>({ phase: "connecting" });
+  // True from a lost connection until it is restored or the user gives up.
+  const [recovering, setRecovering] = useState(false);
+  const [everConnected, setEverConnected] = useState(false);
   const sessionIdRef = useRef<number | null>(null);
   const unsentAckRef = useRef(0);
   const attemptRef = useRef<Attempt>({ prompted: null, confirmedFingerprint: null });
   const startedRef = useRef(false);
   const unmountedRef = useRef(false);
+  const everConnectedRef = useRef(false);
   // Read through a ref so a new getTerminal identity never re-runs the connect effect.
   const getTerminalRef = useRef(getTerminal);
   useLayoutEffect(() => {
@@ -60,8 +67,10 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
       };
       const onClosed = new Channel<{ exitStatus: number | null }>();
       onClosed.onmessage = ({ exitStatus }) => {
+        if (sessionIdRef.current === null) return;
         sessionIdRef.current = null;
-        setState({ phase: "closed", exitStatus });
+        setRecovering(exitStatus === null);
+        setState({ phase: "closed", reason: exitStatus === null ? "lost" : "exited", exitStatus });
       };
 
       const { cols, rows } = terminal.size();
@@ -82,6 +91,10 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
             void commands.sessionClose(outcome.sessionId);
             return;
           }
+          if (everConnectedRef.current) terminal.write(RECONNECTED_MARK);
+          everConnectedRef.current = true;
+          setEverConnected(true);
+          setRecovering(false);
           sessionIdRef.current = outcome.sessionId;
           if (unsentAckRef.current > 0) {
             void commands.sessionAcknowledgeOutput(outcome.sessionId, unsentAckRef.current);
@@ -148,7 +161,10 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
   const submitCredentials = useCallback((prompted: PromptedLogin) => retry({ prompted }), [retry]);
   const trustHostKey = useCallback((fingerprint: string) => retry({ confirmedFingerprint: fingerprint }), [retry]);
   const reconnect = useCallback(() => retry({}), [retry]);
-  const cancel = useCallback(() => setState({ phase: "cancelled" }), []);
+  const cancel = useCallback(() => {
+    setRecovering(false);
+    setState({ phase: "cancelled" });
+  }, []);
 
   const send = useCallback((data: string) => {
     const id = sessionIdRef.current;
@@ -164,9 +180,10 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
     const id = sessionIdRef.current;
     if (id === null) return;
     sessionIdRef.current = null;
+    setRecovering(false);
+    setState({ phase: "closed", reason: "disconnected", exitStatus: null });
     await commands.sessionClose(id);
-    setState({ phase: "closed", exitStatus: null });
   }, []);
 
-  return { state, submitCredentials, trustHostKey, reconnect, cancel, send, resize, disconnect };
+  return { state, recovering, everConnected, submitCredentials, trustHostKey, reconnect, cancel, send, resize, disconnect };
 }

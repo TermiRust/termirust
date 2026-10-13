@@ -292,6 +292,7 @@ async fn resolve_jump(vault: &Vault, host: &Host) -> Result<Option<ResolvedJump>
             username, method, ..
         } => Ok(Some(ResolvedJump {
             login: SshLogin {
+                keepalive_secs: jump.keepalive_secs,
                 host: jump.hostname.clone(),
                 port: jump.port,
                 username,
@@ -388,6 +389,7 @@ pub async fn session_open_host(
     );
 
     let login = SshLogin {
+        keepalive_secs: host.keepalive_secs,
         host: host.hostname.clone(),
         port: host.port,
         username: username.clone(),

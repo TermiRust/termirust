@@ -75,6 +75,8 @@ pub struct SshLogin {
     pub port: u16,
     pub username: String,
     pub method: LoginMethod,
+    /// Seconds between keepalives; `None` means 30, `Some(0)` disables them.
+    pub keepalive_secs: Option<u32>,
 }
 
 impl From<&PasswordLogin> for SshLogin {
@@ -84,6 +86,7 @@ impl From<&PasswordLogin> for SshLogin {
             port: login.port,
             username: login.username.clone(),
             method: LoginMethod::Password(login.password.clone()),
+            keepalive_secs: None,
         }
     }
 }
@@ -125,6 +128,14 @@ pub struct JumpHop<'a> {
     pub verify_host_key: HostKeyVerifier,
 }
 
+fn keepalive_interval(secs: Option<u32>) -> Option<Duration> {
+    match secs {
+        None => Some(Duration::from_secs(30)),
+        Some(0) => None,
+        Some(n) => Some(Duration::from_secs(u64::from(n))),
+    }
+}
+
 /// Connects (directly or through an open jump connection) and authenticates.
 async fn establish(
     login: &SshLogin,
@@ -140,7 +151,9 @@ async fn establish(
         _ => None,
     };
     let config = Arc::new(client::Config {
-        keepalive_interval: Some(Duration::from_secs(30)),
+        keepalive_interval: keepalive_interval(login.keepalive_secs),
+        // Three unanswered keepalives mean the network is gone: the session closes as lost.
+        keepalive_max: 3,
         ..Default::default()
     });
     let handler = ClientHandler { verify_host_key };
@@ -396,6 +409,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn keepalive_defaults_to_30s_and_zero_disables_it() {
+        assert_eq!(keepalive_interval(None), Some(Duration::from_secs(30)));
+        assert_eq!(keepalive_interval(Some(0)), None);
+        assert_eq!(keepalive_interval(Some(15)), Some(Duration::from_secs(15)));
+    }
+
+    #[test]
     fn login_method_debug_hides_secrets() {
         let password = format!("{:?}", LoginMethod::Password("hunter2".into()));
         let key = format!(
@@ -412,6 +432,7 @@ mod tests {
     #[tokio::test]
     async fn a_wrong_passphrase_fails_before_any_network_access() {
         let login = SshLogin {
+            keepalive_secs: None,
             host: "203.0.113.1".into(),
             port: 22,
             username: "x".into(),
@@ -438,6 +459,7 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         drop(listener);
         let login = SshLogin {
+            keepalive_secs: None,
             host: "127.0.0.1".into(),
             port,
             username: "x".into(),
