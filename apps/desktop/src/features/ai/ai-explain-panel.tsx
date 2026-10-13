@@ -40,7 +40,7 @@ export function AiExplainPanel({ target, hostId, selection, onInsert, onClose }:
   return (
     <aside
       aria-label="Ask AI about the selection"
-      className="flex w-[360px] shrink-0 flex-col border-l border-border bg-bg"
+      className="motion-slide-right flex w-[360px] shrink-0 flex-col border-l border-border bg-bg"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();

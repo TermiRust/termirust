@@ -15,7 +15,7 @@ export function TransferQueuePanel({ sftpId }: { sftpId: number }) {
   const active = items.filter((t) => !isFinished(t.event)).length;
 
   return (
-    <section aria-label="Transfers" className="flex max-h-48 shrink-0 flex-col border-t border-border bg-bg-sunk">
+    <section aria-label="Transfers" className="motion-rise flex max-h-48 shrink-0 flex-col border-t border-border bg-bg-sunk">
       <header className="flex h-7 shrink-0 items-center gap-2 px-3 text-[11px] text-fg-muted">
         <span className="font-semibold tracking-wider uppercase">Transfers</span>
         <span>{active > 0 ? `${active} active` : "all done"}</span>

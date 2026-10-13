@@ -21,10 +21,10 @@ export function Dialog({ open, onOpenChange, title, description, icon, tone = "d
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 bg-scrim" />
+        <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 bg-scrim" />
         <DialogPrimitive.Content
           className={cn(
-            "fixed top-1/2 left-1/2 flex max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-bg shadow-dialog",
+            "motion-dialog fixed top-1/2 left-1/2 flex max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-bg shadow-dialog",
             tone === "danger" ? "border-danger-border" : "border-border",
             widths[width],
           )}

@@ -9,7 +9,7 @@ export function SelectionMenu({ x, y, onAsk, onCopy, onClose }: { x: number; y: 
       <div
         role="menu"
         aria-label="Selection"
-        className="fixed z-40 min-w-48 rounded-md border border-border bg-bg p-1 shadow-dialog"
+        className="motion-pop fixed z-40 min-w-48 rounded-md border border-border bg-bg p-1 shadow-dialog"
         style={{ left: x, top: y }}
         onKeyDown={(e) => e.key === "Escape" && onClose()}
       >

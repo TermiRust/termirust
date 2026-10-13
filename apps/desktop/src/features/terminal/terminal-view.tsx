@@ -31,6 +31,8 @@ export interface TerminalHandle {
   selection: () => string;
 }
 
+export const RESIZE_SETTLE_MS = 120;
+
 interface TerminalViewProps {
   onData?: (data: string) => void;
   onResize?: (size: TerminalSize) => void;
@@ -129,7 +131,13 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     container.addEventListener("paste", onPaste, true);
 
     const dataSub = terminal.onData((d) => onDataRef.current?.(d));
-    const resizeSub = terminal.onResize(({ cols, rows }) => onResizeRef.current?.({ cols, rows }));
+    // Animations resize xterm every frame; tell the session only once the size settles,
+    // or the remote shell redraws its prompt over and over.
+    let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+    const resizeSub = terminal.onResize(({ cols, rows }) => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => onResizeRef.current?.({ cols, rows }), RESIZE_SETTLE_MS);
+    });
     const selectionSub = terminal.onSelectionChange(() => {
       const selected = terminal.getSelection();
       if (settingsRef.current.copyOnSelect && selected) void navigator.clipboard?.writeText(selected);
@@ -147,6 +155,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     searchRef.current = search;
 
     return () => {
+      clearTimeout(resizeTimer);
       cancelAnimationFrame(frame);
       observer.disconnect();
       container.removeEventListener("paste", onPaste, true);

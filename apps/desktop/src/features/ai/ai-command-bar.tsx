@@ -35,7 +35,7 @@ export function AiCommandBar({ target, hostId, onInsert, onClose }: AiCommandBar
     <div
       role="dialog"
       aria-label="Ask AI for a command"
-      className="absolute inset-x-3 bottom-3 z-20 flex flex-col gap-2 rounded-lg border border-border bg-bg p-2.5 shadow-dialog"
+      className="motion-rise absolute inset-x-3 bottom-3 z-20 flex flex-col gap-2 rounded-lg border border-border bg-bg p-2.5 shadow-dialog"
       onKeyDown={(e) => {
         if (e.key === "Escape") {
           e.stopPropagation();

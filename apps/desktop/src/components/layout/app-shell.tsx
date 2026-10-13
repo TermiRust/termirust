@@ -234,7 +234,15 @@ export function AppShell() {
         onOpenSettings={() => setSection(section === "settings" ? "hosts" : "settings")}
       />
       <div className="flex min-h-0 flex-1">
-        {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
+        {/* Kept mounted so it can slide; hidden from focus and screen readers while collapsed. */}
+        <div
+          className={cn("shrink-0 overflow-hidden transition-[width] duration-200 ease-out", sidebarVisible ? "w-64" : "w-0")}
+          inert={!sidebarVisible}
+          aria-hidden={!sidebarVisible}
+          data-testid="sidebar-slot"
+        >
+          <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />
+        </div>
         <main className="flex min-w-0 flex-1 flex-col">
           {section === "keychain" && <KeychainView />}
           {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}

@@ -67,6 +67,9 @@ describe("AppShell", () => {
       fireEvent.keyDown(window, { key: "b", ...chord });
     });
     expect(screen.queryByRole("complementary", { name: "Hosts sidebar" })).not.toBeInTheDocument();
+    // Still mounted so it can slide closed, but out of reach for keyboard and screen readers.
+    expect(screen.getByTestId("sidebar-slot")).toHaveAttribute("inert");
+    expect(screen.getByTestId("sidebar-slot").className).toMatch(/\bw-0\b/);
 
     act(() => {
       fireEvent.keyDown(window, { key: "b", ...chord });

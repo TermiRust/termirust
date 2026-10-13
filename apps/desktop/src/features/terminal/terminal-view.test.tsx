@@ -10,6 +10,7 @@ interface FakeTerminal {
   keyHandler: ((e: KeyboardEvent) => boolean) | null;
   selection: string;
   selectionListener: (() => void) | null;
+  resizeListener: ((size: { cols: number; rows: number }) => void) | null;
 }
 const terminals: FakeTerminal[] = [];
 const opened: HTMLElement[] = [];
@@ -23,6 +24,7 @@ vi.mock("@xterm/xterm", () => ({
     keyHandler: ((e: KeyboardEvent) => boolean) | null = null;
     selection = "";
     selectionListener: (() => void) | null = null;
+    resizeListener: ((size: { cols: number; rows: number }) => void) | null = null;
     unicode = { activeVersion: "" };
     constructor() {
       terminals.push(this);
@@ -37,7 +39,8 @@ vi.mock("@xterm/xterm", () => ({
     onData() {
       return { dispose() {} };
     }
-    onResize() {
+    onResize(listener: (size: { cols: number; rows: number }) => void) {
+      this.resizeListener = listener;
       return { dispose() {} };
     }
     onSelectionChange(listener: () => void) {
@@ -79,7 +82,7 @@ vi.stubGlobal(
   },
 );
 
-const { TerminalView } = await import("./terminal-view");
+const { TerminalView, RESIZE_SETTLE_MS } = await import("./terminal-view");
 const { fitIfVisible } = await import("./fit-if-visible");
 const initialSettings = useSettingsStore.getState();
 
@@ -200,5 +203,19 @@ describe("TerminalView", () => {
     terminals[0]!.selection = "uptime output";
     act(() => terminals[0]!.selectionListener!());
     await waitFor(async () => expect(await navigator.clipboard.readText()).toBe("uptime output"));
+  });
+
+  it("reports a size change once it settles, not on every animation frame", () => {
+    vi.useFakeTimers();
+    const onResize = vi.fn();
+    render(<TerminalView onResize={onResize} />);
+    const terminal = terminals[0]!;
+    act(() => {
+      for (let cols = 60; cols <= 80; cols += 5) terminal.resizeListener?.({ cols, rows: 24 });
+    });
+    expect(onResize).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(RESIZE_SETTLE_MS));
+    expect(onResize).toHaveBeenCalledExactlyOnceWith({ cols: 80, rows: 24 });
+    vi.useRealTimers();
   });
 });

@@ -172,3 +172,41 @@ select {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* Motion: short and calm; switched off when the OS asks for reduced motion. */
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+/* Tailwind positions dialogs with the separate `translate` property, so only scale here. */
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes dialog-out {
+  to { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.97); }
+}
+
+.motion-fade { animation: fade-in 140ms ease-out; }
+.motion-rise { animation: rise-in 160ms ease-out; }
+.motion-slide-right { animation: slide-in-right 180ms ease-out; }
+.motion-pop { animation: pop-in 120ms ease-out; transform-origin: top left; }
+.motion-dialog[data-state="open"] { animation: dialog-in 160ms ease-out; }
+.motion-dialog[data-state="closed"] { animation: dialog-out 120ms ease-in; }
+.motion-overlay[data-state="open"] { animation: fade-in 160ms ease-out; }
+.motion-overlay[data-state="closed"] { animation: fade-in 120ms ease-in reverse; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
