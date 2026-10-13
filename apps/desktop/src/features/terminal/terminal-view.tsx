@@ -27,6 +27,7 @@ export interface TerminalHandle {
   clear: () => void;
   focus: () => void;
   size: () => TerminalSize;
+  selection: () => string;
 }
 
 interface TerminalViewProps {
@@ -71,6 +72,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     clear: () => terminalRef.current?.reset(),
     focus: () => terminalRef.current?.focus(),
     size: () => ({ cols: terminalRef.current?.cols ?? 80, rows: terminalRef.current?.rows ?? 24 }),
+    selection: () => terminalRef.current?.getSelection() ?? "",
   }));
 
   useEffect(() => {

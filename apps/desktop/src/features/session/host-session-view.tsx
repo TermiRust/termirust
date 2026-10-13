@@ -1,10 +1,10 @@
 import { FolderTree, PlugZap, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import { AiCommandBar } from "@/features/ai/ai-command-bar";
 import { useAiAllowed } from "@/features/ai/use-ai-allowed";
+import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import { useForwardsStore } from "@/stores/forwards-store";
@@ -49,11 +49,13 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   const auto = useAutoReconnect(waitingToRetry, state.phase === "connected", session.reconnect);
   const dimmed = session.everConnected && state.phase !== "connected";
   const aiAllowed = useAiAllowed(host);
-  const [aiOpen, setAiOpen] = useState(false);
-  const closeAi = () => {
-    setAiOpen(false);
-    terminalRef.current?.focus();
-  };
+  const ai = useTerminalAi({
+    allowed: aiAllowed,
+    target: "remote",
+    hostId: host.id,
+    insert: session.send,
+    focusTerminal: () => terminalRef.current?.focus(),
+  });
 
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
@@ -75,7 +77,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
         </span>
         <div className="ml-auto flex gap-2">
           {state.phase === "connected" && aiAllowed && (
-            <Button size="sm" variant="outline" title={`Ask AI for a command (${aiShortcutLabel(isMacPlatform())})`} onClick={() => setAiOpen(true)}>
+            <Button size="sm" variant="outline" title={`Ask AI for a command (${aiShortcutLabel(isMacPlatform())})`} onClick={ai.openCommandBar}>
               <Sparkles size={14} /> AI
             </Button>
           )}
@@ -93,19 +95,23 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
       </header>
 
       <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <TerminalView
-          ref={terminalRef}
-          onData={session.send}
-          onAskAi={aiAllowed ? () => setAiOpen(true) : undefined}
-          onResize={(size) => {
-            session.resize(size);
-            onSizeChange?.(size);
-          }}
-        />
-        {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
-        {aiOpen && aiAllowed && <AiCommandBar target="remote" hostId={host.id} onInsert={session.send} onClose={closeAi} />}
+      <div className="flex min-h-0 flex-1">
+        <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selection() ?? "")}>
+          <TerminalView
+            ref={terminalRef}
+            onData={session.send}
+            onAskAi={ai.onAskAi}
+            onResize={(size) => {
+              session.resize(size);
+              onSizeChange?.(size);
+            }}
+          />
+          {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
+          {ai.commandBar}
+        </div>
+        {ai.explainPanel}
       </div>
+      {ai.contextMenu}
 
       {credentials && (
         <CredentialsPrompt

@@ -93,7 +93,7 @@ export type AiAsk = {
 
 export type AiEvent = { kind: "text"; text: string } | 
 /**  `command` is set in command mode; `commands` lists code blocks in explanations. */
-{ kind: "done"; reply: string; command: string | null; danger: string | null; commands: string[] } | { kind: "failed"; message: string } | { kind: "cancelled" };
+{ kind: "done"; reply: string; command: string | null; danger: string | null; commands: SuggestedCommand[] } | { kind: "failed"; message: string } | { kind: "cancelled" };
 
 /**  Exactly what would be sent, after masking. */
 export type AiPreview = {
@@ -341,6 +341,12 @@ export type StartForwardRequest = {
 	prompted: PromptedLogin | null,
 	confirmedFingerprint: string | null,
 	rememberHostKey: boolean,
+};
+
+export type SuggestedCommand = {
+	command: string,
+	/**  Why it deserves a second look, if it does. */
+	danger: string | null,
 };
 
 /**  Terminal preferences; missing or out-of-range values fall back to defaults. */

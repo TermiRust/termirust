@@ -208,12 +208,19 @@ pub enum AiEvent {
         reply: String,
         command: Option<String>,
         danger: Option<String>,
-        commands: Vec<String>,
+        commands: Vec<SuggestedCommand>,
     },
     Failed {
         message: String,
     },
     Cancelled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+pub struct SuggestedCommand {
+    pub command: String,
+    /// Why it deserves a second look, if it does.
+    pub danger: Option<String>,
 }
 
 /// AI requests in flight, so the UI can cancel one.
@@ -364,16 +371,18 @@ async fn run_ask(
             } else {
                 None
             };
-            let commands = if command_mode {
+            let commands: Vec<SuggestedCommand> = if command_mode {
                 Vec::new()
             } else {
                 code_blocks(&reply)
+                    .into_iter()
+                    .map(|command| SuggestedCommand {
+                        danger: danger(&command).map(str::to_owned),
+                        command,
+                    })
+                    .collect()
             };
-            let danger = command
-                .as_deref()
-                .and_then(danger)
-                .or_else(|| commands.iter().find_map(|c| danger(c)))
-                .map(str::to_owned);
+            let danger = command.as_deref().and_then(danger).map(str::to_owned);
             AiEvent::Done {
                 reply,
                 command,
@@ -660,7 +669,7 @@ mod tests {
         )
         .await;
         assert!(
-            matches!(done, AiEvent::Done { ref commands, command: None, danger: None, .. } if commands == &vec!["lsof -i :80".to_owned()])
+            matches!(done, AiEvent::Done { ref commands, command: None, danger: None, .. } if commands == &vec![SuggestedCommand { command: "lsof -i :80".into(), danger: None }])
         );
 
         let dead = AiClient::new(termirust_core::ai::provider::ProviderConfig {

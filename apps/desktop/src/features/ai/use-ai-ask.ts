@@ -1,7 +1,7 @@
 import { Channel } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { commands, type AiAsk, type AiEvent, type AiPreview } from "@/bindings";
+import { commands, type AiAsk, type AiEvent, type AiPreview, type SuggestedCommand } from "@/bindings";
 import { needsPreview, useAiStore } from "@/stores/ai-store";
 
 export type AiAskState =
@@ -9,7 +9,7 @@ export type AiAskState =
   | { phase: "preparing" }
   | { phase: "previewing"; preview: AiPreview; ask: AiAsk }
   | { phase: "streaming"; text: string }
-  | { phase: "done"; reply: string; command: string | null; danger: string | null; commands: string[] }
+  | { phase: "done"; reply: string; command: string | null; danger: string | null; commands: SuggestedCommand[] }
   | { phase: "failed"; message: string }
   | { phase: "cancelled" };
 
