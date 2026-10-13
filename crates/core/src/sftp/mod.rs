@@ -209,6 +209,192 @@ impl SftpClient {
         let _ = self.sftp.close().await;
         self.connection.disconnect().await
     }
+
+    /// Uploads a file or a whole directory to `remote` (the new item's full path).
+    pub async fn upload_tree(
+        &self,
+        local: &Path,
+        remote: &str,
+        cancel: &CancelFlag,
+        mut progress: impl FnMut(&TreeProgress) + Send,
+    ) -> Result<u64> {
+        let plan = plan_local_tree(local, remote)?;
+        let mut state = TreeProgress::new(&plan);
+        for step in &plan {
+            match step {
+                TreeStep::Dir { remote, .. } => {
+                    if self.kind(remote).await.ok() != Some(EntryKind::Directory) {
+                        self.create_dir(remote).await?;
+                    }
+                }
+                TreeStep::File { local, remote, .. } => {
+                    state.current = remote.clone();
+                    let base = state.done;
+                    self.upload(local, remote, cancel, |done, _| {
+                        state.done = base + done;
+                        progress(&state);
+                    })
+                    .await?;
+                    state.files_done += 1;
+                    progress(&state);
+                }
+            }
+        }
+        Ok(state.done)
+    }
+
+    /// Downloads a file or a whole directory from `remote` into `local` (the new item's full path).
+    pub async fn download_tree(
+        &self,
+        remote: &str,
+        local: &Path,
+        cancel: &CancelFlag,
+        mut progress: impl FnMut(&TreeProgress) + Send,
+    ) -> Result<u64> {
+        let plan = self.plan_remote_tree(remote, local).await?;
+        let mut state = TreeProgress::new(&plan);
+        for step in &plan {
+            match step {
+                TreeStep::Dir { local, .. } => {
+                    tokio::fs::create_dir_all(local).await.map_err(|e| {
+                        CoreError::Sftp(format!("cannot create {}: {e}", local.display()))
+                    })?;
+                }
+                TreeStep::File { local, remote, .. } => {
+                    state.current = remote.clone();
+                    let base = state.done;
+                    self.download(remote, local, cancel, |done, _| {
+                        state.done = base + done;
+                        progress(&state);
+                    })
+                    .await?;
+                    state.files_done += 1;
+                    progress(&state);
+                }
+            }
+        }
+        Ok(state.done)
+    }
+
+    async fn plan_remote_tree(&self, remote: &str, local: &Path) -> Result<Vec<TreeStep>> {
+        let mut plan = Vec::new();
+        let mut pending = vec![(remote.to_owned(), local.to_path_buf())];
+        let root_kind = self.kind(remote).await?;
+        if root_kind != EntryKind::Directory {
+            let size = self
+                .sftp
+                .metadata(remote)
+                .await
+                .map_err(sftp_error)?
+                .size
+                .unwrap_or(0);
+            return Ok(vec![TreeStep::File {
+                local: local.to_path_buf(),
+                remote: remote.to_owned(),
+                size,
+            }]);
+        }
+        while let Some((dir, local_dir)) = pending.pop() {
+            plan.push(TreeStep::Dir {
+                local: local_dir.clone(),
+                remote: dir.clone(),
+            });
+            for entry in self.list(&dir).await? {
+                let target = local_dir.join(&entry.name);
+                match entry.kind {
+                    EntryKind::Directory => pending.push((entry.path, target)),
+                    EntryKind::File => plan.push(TreeStep::File {
+                        local: target,
+                        remote: entry.path,
+                        size: entry.size,
+                    }),
+                    EntryKind::Symlink | EntryKind::Other => {}
+                }
+            }
+        }
+        Ok(plan)
+    }
+}
+
+/// Progress over a whole file or directory transfer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TreeProgress {
+    pub done: u64,
+    pub total: u64,
+    pub files_done: u32,
+    pub files_total: u32,
+    /// Remote path of the file being transferred.
+    pub current: String,
+}
+
+impl TreeProgress {
+    fn new(plan: &[TreeStep]) -> Self {
+        let (total, files_total) =
+            plan.iter()
+                .fold((0u64, 0u32), |(bytes, files), step| match step {
+                    TreeStep::File { size, .. } => (bytes + size, files + 1),
+                    TreeStep::Dir { .. } => (bytes, files),
+                });
+        Self {
+            done: 0,
+            total,
+            files_done: 0,
+            files_total,
+            current: String::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum TreeStep {
+    Dir {
+        local: std::path::PathBuf,
+        remote: String,
+    },
+    File {
+        local: std::path::PathBuf,
+        remote: String,
+        size: u64,
+    },
+}
+
+/// Directories before their contents; symlinks are skipped rather than followed.
+fn plan_local_tree(local: &Path, remote: &str) -> Result<Vec<TreeStep>> {
+    let meta = std::fs::symlink_metadata(local)
+        .map_err(|e| CoreError::Sftp(format!("cannot read {}: {e}", local.display())))?;
+    if meta.is_file() {
+        return Ok(vec![TreeStep::File {
+            local: local.to_path_buf(),
+            remote: remote.to_owned(),
+            size: meta.len(),
+        }]);
+    }
+    if !meta.is_dir() {
+        return Err(CoreError::Sftp(format!(
+            "{} is not a regular file or directory",
+            local.display()
+        )));
+    }
+    let mut plan = vec![TreeStep::Dir {
+        local: local.to_path_buf(),
+        remote: remote.to_owned(),
+    }];
+    let mut entries: Vec<_> = std::fs::read_dir(local)
+        .map_err(|e| CoreError::Sftp(format!("cannot list {}: {e}", local.display())))?
+        .flatten()
+        .collect();
+    entries.sort_by_key(|e| e.file_name());
+    for entry in entries {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_symlink() {
+            continue;
+        }
+        plan.extend(plan_local_tree(&entry.path(), &join_remote(remote, &name))?);
+    }
+    Ok(plan)
 }
 
 async fn copy_chunks<R, W>(
@@ -255,6 +441,54 @@ mod tests {
             modified: None,
             permissions: None,
         }
+    }
+
+    #[test]
+    fn plans_a_local_tree_with_directories_first_and_skips_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("site");
+        std::fs::create_dir_all(root.join("assets")).unwrap();
+        std::fs::write(root.join("index.html"), b"12345").unwrap();
+        std::fs::write(root.join("assets/app.js"), b"123").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("/etc/passwd", root.join("link")).unwrap();
+
+        let plan = plan_local_tree(&root, "/srv/site").unwrap();
+        let remotes: Vec<String> = plan
+            .iter()
+            .map(|s| match s {
+                TreeStep::Dir { remote, .. } => format!("dir {remote}"),
+                TreeStep::File { remote, size, .. } => format!("file {remote} {size}"),
+            })
+            .collect();
+        assert_eq!(
+            remotes,
+            [
+                "dir /srv/site",
+                "dir /srv/site/assets",
+                "file /srv/site/assets/app.js 3",
+                "file /srv/site/index.html 5"
+            ]
+        );
+
+        let progress = TreeProgress::new(&plan);
+        assert_eq!((progress.total, progress.files_total), (8, 2));
+    }
+
+    #[test]
+    fn plans_a_single_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("a.txt"), b"hello").unwrap();
+        let plan = plan_local_tree(&dir.path().join("a.txt"), "/tmp/a.txt").unwrap();
+        assert_eq!(
+            plan,
+            vec![TreeStep::File {
+                local: dir.path().join("a.txt"),
+                remote: "/tmp/a.txt".into(),
+                size: 5
+            }]
+        );
+        assert!(plan_local_tree(&dir.path().join("missing"), "/x").is_err());
     }
 
     #[test]

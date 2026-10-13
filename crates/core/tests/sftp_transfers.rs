@@ -222,3 +222,45 @@ async fn works_through_a_jump_host() {
     assert_eq!(sftp.home().await.unwrap(), "/config");
     sftp.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn transfers_whole_directories_both_ways_with_overall_progress() {
+    let sftp = client().await;
+    let dir = scratch(&sftp, "tree").await;
+    let local = tempfile::tempdir().unwrap();
+    let site = local.path().join("site");
+    std::fs::create_dir_all(site.join("css")).unwrap();
+    std::fs::write(site.join("index.html"), random_bytes(300_000)).unwrap();
+    std::fs::write(site.join("css/app.css"), random_bytes(700_000)).unwrap();
+
+    let remote = join_remote(&dir, "site");
+    let mut last = None;
+    let sent = sftp
+        .upload_tree(&site, &remote, &CancelFlag::default(), |p| {
+            last = Some(p.clone())
+        })
+        .await
+        .unwrap();
+    let last = last.unwrap();
+    assert_eq!(sent, 1_000_000);
+    assert_eq!(
+        (last.done, last.total, last.files_done, last.files_total),
+        (1_000_000, 1_000_000, 2, 2)
+    );
+
+    let back = local.path().join("back");
+    sftp.download_tree(&remote, &back, &CancelFlag::default(), |_| {})
+        .await
+        .unwrap();
+    assert_eq!(
+        std::fs::read(back.join("css/app.css")).unwrap(),
+        std::fs::read(site.join("css/app.css")).unwrap()
+    );
+    assert_eq!(
+        std::fs::read(back.join("index.html")).unwrap(),
+        std::fs::read(site.join("index.html")).unwrap()
+    );
+
+    sftp.remove(&dir).await.unwrap();
+    sftp.close().await.unwrap();
+}
