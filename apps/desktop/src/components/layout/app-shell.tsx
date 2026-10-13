@@ -20,6 +20,7 @@ import { CommandPalette, type PaletteCommand } from "@/features/palette/command-
 import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
+import { SftpLauncher } from "@/features/sftp/sftp-launcher";
 import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { allThemes } from "@/lib/terminal-theme";
@@ -246,6 +247,7 @@ export function AppShell() {
         </div>
         <main className="flex min-w-0 flex-1 flex-col">
           {section === "library" && <HostsView onOpenHost={openHost} onOpenSftp={openSftp} />}
+          {section === "sftp" && <SftpLauncher onOpen={openSftp} />}
           {section === "keychain" && <KeychainView />}
           {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}
           {section === "forwards" && <ForwardsView />}

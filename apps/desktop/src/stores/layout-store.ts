@@ -1,7 +1,7 @@
 import { create } from "zustand";
 
 /** "hosts" is the terminal workspace (tabs); "library" is the saved-host manager. */
-export type Section = "hosts" | "library" | "keychain" | "snippets" | "forwards" | "settings";
+export type Section = "hosts" | "library" | "sftp" | "keychain" | "snippets" | "forwards" | "settings";
 
 interface LayoutState {
   section: Section;

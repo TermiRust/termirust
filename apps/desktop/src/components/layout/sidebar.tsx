@@ -201,6 +201,13 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
           {tabs.length > 0 && <span className="ml-auto rounded bg-bg-sunk-2 px-1.5 font-mono text-[11px] text-fg-muted">{tabs.length}</span>}
         </Button>
         <Button
+          className={cn("justify-start", section === "sftp" && "bg-active text-fg")}
+          aria-current={section === "sftp" ? "page" : undefined}
+          onClick={() => setSection("sftp")}
+        >
+          <FolderTree size={15} /> SFTP
+        </Button>
+        <Button
           className={cn("justify-start", section === "keychain" && "bg-active text-fg")}
           aria-current={section === "keychain" ? "page" : undefined}
           onClick={() => setSection("keychain")}

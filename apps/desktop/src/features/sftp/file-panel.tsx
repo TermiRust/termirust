@@ -117,7 +117,7 @@ export function FilePanel(props: FilePanelProps) {
         </Button>
       </div>
 
-      <div className="grid shrink-0 grid-cols-[1fr_80px_150px] gap-2 border-b border-border px-3 py-1 text-[11px] text-fg-muted">
+      <div className="grid shrink-0 grid-cols-[1fr_88px_160px] gap-3 border-b border-border bg-bg-sunk px-3 py-1.5 text-[11px] font-semibold tracking-wide text-fg-muted uppercase">
         <SortHeader label="Name" column="name" sort={sort} onSort={setSort} />
         <SortHeader label="Size" column="size" sort={sort} onSort={setSort} className="justify-end" />
         <SortHeader label="Modified" column="modified" sort={sort} onSort={setSort} />
@@ -154,8 +154,8 @@ export function FilePanel(props: FilePanelProps) {
                 }}
                 onDoubleClick={() => open(entry)}
                 className={cn(
-                  "grid h-6 cursor-default grid-cols-[1fr_80px_150px] items-center gap-2 px-3 text-[13px]",
-                  isSelected ? "bg-active text-fg" : "hover:bg-hover",
+                  "grid h-7 cursor-default grid-cols-[1fr_88px_160px] items-center gap-3 px-3 text-[13.5px] even:bg-bg-sunk/50",
+                  isSelected ? "bg-accent/15 text-fg even:bg-accent/15" : "hover:bg-hover",
                 )}
               >
                 <span className="flex min-w-0 items-center gap-1.5">

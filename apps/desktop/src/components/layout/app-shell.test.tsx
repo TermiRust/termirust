@@ -346,4 +346,22 @@ describe("AppShell warning border", () => {
       .filter((b) => !b.textContent?.trim() && !b.getAttribute("aria-label") && !b.getAttribute("aria-labelledby"));
     expect(unnamed.map((b) => b.outerHTML.slice(0, 120))).toEqual([]);
   });
+
+  it("opens SFTP from the menu by picking a host, without a terminal first", async () => {
+    const { useHostsStore } = await import("@/stores/hosts-store");
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useHostsStore.setState({ hosts: [], groups: [], loaded: false });
+    render(<AppShell />);
+    await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false, os: null, environment: null };
+    act(() => useHostsStore.setState({ hosts: [api], groups: [] }));
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "SFTP" }));
+    await user.click(await screen.findByRole("button", { name: "Browse files on api" }));
+    expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["sftp"]);
+    expect(useLayoutStore.getState().section).toBe("hosts");
+    expect(screen.getByText("sftp browser")).toBeInTheDocument();
+  });
 });
