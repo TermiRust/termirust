@@ -41,6 +41,8 @@ pub struct OpenHostRequest {
     pub prompted: Option<PromptedLogin>,
     /// Fingerprint the user just confirmed in the host-key dialog.
     pub confirmed_fingerprint: Option<String>,
+    /// False for "connect once without saving": a confirmed key is used but not remembered.
+    pub remember_host_key: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -407,6 +409,7 @@ pub async fn session_open_host(
 
     // The jump hop proved its key as soon as it let us through, even if the target then failed.
     if let Some(j) = &jump
+        && request.remember_host_key
         && !matches!(result, Err(CoreError::JumpHost(_)))
     {
         trust_if_new(vault, &j.host, &jump_offered).await?;
@@ -456,7 +459,9 @@ pub async fn session_open_host(
         Err(err) => return Err(err.into()),
     };
 
-    trust_if_new(vault, &host, &offered).await?;
+    if request.remember_host_key {
+        trust_if_new(vault, &host, &offered).await?;
+    }
     if let Some(prompted) = request.prompted.as_ref().filter(|p| p.remember) {
         remember_typed_secrets(
             vault,

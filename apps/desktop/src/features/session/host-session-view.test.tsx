@@ -132,13 +132,47 @@ describe("HostSessionView", () => {
     render(<HostSessionView host={host} />);
 
     const dialog = await screen.findByRole("dialog", { name: "Host key has changed" });
-    expect(dialog).toHaveTextContent("Previous: SHA256:old");
-    expect(dialog).toHaveTextContent("Now: SHA256:new");
+    expect(dialog).toHaveTextContent("SHA256:old");
+    expect(dialog).toHaveTextContent("SHA256:new");
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "I understand, update the key" })).toBeDisabled();
 
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Not connected");
     expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
+  });
+
+  it("updates a changed key only after the user confirms they verified it", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(
+        ok({ status: "hostKeyChanged", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:new", previousFingerprint: "SHA256:old" }),
+      )
+      .mockResolvedValueOnce(ok({ status: "opened", sessionId: 12 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+    const dialog = await screen.findByRole("dialog", { name: "Host key has changed" });
+
+    await user.click(within(dialog).getByRole("checkbox", { name: /verified the new fingerprint/ }));
+    await user.click(within(dialog).getByRole("button", { name: "I understand, update the key" }));
+    expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({ confirmedFingerprint: "SHA256:new", rememberHostKey: true });
+  });
+
+  it("connects once without saving a new key", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", server: "prod (10.0.0.1:22)", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" }))
+      .mockResolvedValueOnce(ok({ status: "opened", sessionId: 13 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+    await user.click(await screen.findByRole("button", { name: "Connect once without saving" }));
+    expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({ confirmedFingerprint: "SHA256:abc", rememberHostKey: false });
+  });
+
+  it("copies the fingerprint", async () => {
+    commands.sessionOpenHost.mockResolvedValue(ok({ status: "hostKeyUnknown", server: "s", algorithm: "ssh-ed25519", fingerprint: "SHA256:copyme" }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+    await user.click(await screen.findByRole("button", { name: /Copy fingerprint/ }));
+    expect(await navigator.clipboard.readText()).toBe("SHA256:copyme");
   });
 
   it("reports its connection status for the tab", async () => {

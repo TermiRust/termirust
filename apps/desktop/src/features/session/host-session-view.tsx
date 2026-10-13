@@ -92,7 +92,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange }: HostSess
           algorithm={state.algorithm}
           fingerprint={state.fingerprint}
           previousFingerprint={state.phase === "hostKeyChanged" ? state.previousFingerprint : undefined}
-          onTrust={() => session.trustHostKey(state.fingerprint)}
+          onTrust={(remember) => session.trustHostKey(state.fingerprint, remember)}
           onCancel={session.cancel}
         />
       )}

@@ -28,6 +28,7 @@ const RECONNECTED_MARK = new TextEncoder().encode("\r\n\x1b[2m── reconnected
 interface Attempt {
   prompted: PromptedLogin | null;
   confirmedFingerprint: string | null;
+  rememberHostKey: boolean;
 }
 
 /** Connects to a saved host as soon as the terminal is mounted; the vault supplies secrets. */
@@ -38,7 +39,7 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
   const [everConnected, setEverConnected] = useState(false);
   const sessionIdRef = useRef<number | null>(null);
   const unsentAckRef = useRef(0);
-  const attemptRef = useRef<Attempt>({ prompted: null, confirmedFingerprint: null });
+  const attemptRef = useRef<Attempt>({ prompted: null, confirmedFingerprint: null, rememberHostKey: true });
   const startedRef = useRef(false);
   const unmountedRef = useRef(false);
   const everConnectedRef = useRef(false);
@@ -75,7 +76,14 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
 
       const { cols, rows } = terminal.size();
       const result = await commands.sessionOpenHost(
-        { hostId: host.id, cols, rows, prompted: attempt.prompted, confirmedFingerprint: attempt.confirmedFingerprint },
+        {
+          hostId: host.id,
+          cols,
+          rows,
+          prompted: attempt.prompted,
+          confirmedFingerprint: attempt.confirmedFingerprint,
+          rememberHostKey: attempt.rememberHostKey,
+        },
         onOutput,
         onClosed,
       );
@@ -141,7 +149,7 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
     unmountedRef.current = false;
     if (!startedRef.current) {
       startedRef.current = true;
-      void open({ prompted: null, confirmedFingerprint: null });
+      void open({ prompted: null, confirmedFingerprint: null, rememberHostKey: true });
     }
     return () => {
       unmountedRef.current = true;
@@ -159,7 +167,10 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
   }, [open]);
 
   const submitCredentials = useCallback((prompted: PromptedLogin) => retry({ prompted }), [retry]);
-  const trustHostKey = useCallback((fingerprint: string) => retry({ confirmedFingerprint: fingerprint }), [retry]);
+  const trustHostKey = useCallback(
+    (fingerprint: string, remember = true) => retry({ confirmedFingerprint: fingerprint, rememberHostKey: remember }),
+    [retry],
+  );
   const reconnect = useCallback(() => retry({}), [retry]);
   const cancel = useCallback(() => {
     setRecovering(false);

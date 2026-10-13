@@ -58,6 +58,7 @@ describe("useHostSession", () => {
       rows: 30,
       prompted: null,
       confirmedFingerprint: null,
+      rememberHostKey: true,
     });
   });
 
@@ -105,6 +106,16 @@ describe("useHostSession", () => {
     );
     await act(async () => hook.result.current.submitCredentials({ username: "me", password: null, passphrase: "pp", remember: false }));
     await waitFor(() => expect(hook.result.current.state).toEqual({ phase: "needsUsername" }));
+  });
+
+  it("can trust a key for this connection only", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "hostKeyUnknown", server: "s", algorithm: "ssh-ed25519", fingerprint: "SHA256:once" }))
+      .mockResolvedValueOnce(opened(30));
+    const { hook } = setup();
+    await waitFor(() => expect(hook.result.current.state.phase).toBe("hostKeyUnknown"));
+    await act(async () => hook.result.current.trustHostKey("SHA256:once", false));
+    expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({ confirmedFingerprint: "SHA256:once", rememberHostKey: false });
   });
 
   it("surfaces a changed host key with both fingerprints", async () => {

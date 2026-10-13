@@ -115,6 +115,8 @@ export type OpenHostRequest = {
 	prompted: PromptedLogin | null,
 	/**  Fingerprint the user just confirmed in the host-key dialog. */
 	confirmedFingerprint: string | null,
+	/**  False for "connect once without saving": a confirmed key is used but not remembered. */
+	rememberHostKey: boolean,
 };
 
 export type OpenSessionOutcome = { status: "opened"; sessionId: number } | 
