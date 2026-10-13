@@ -10,5 +10,6 @@ pub mod logs;
 pub mod session;
 pub mod settings;
 pub mod sftp;
+pub mod snippets;
 pub mod ssh_config;
 pub mod vault;

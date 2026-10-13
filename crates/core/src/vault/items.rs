@@ -18,6 +18,7 @@ pub enum ItemKind {
     KnownHost,
     PortForward,
     AiSettings,
+    Snippet,
 }
 
 impl ItemKind {
@@ -29,6 +30,7 @@ impl ItemKind {
             ItemKind::KnownHost => "known_host",
             ItemKind::PortForward => "port_forward",
             ItemKind::AiSettings => "ai_settings",
+            ItemKind::Snippet => "snippet",
         }
     }
 }

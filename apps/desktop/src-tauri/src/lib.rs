@@ -17,7 +17,7 @@ use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
     ai, benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, session,
-    settings, sftp, ssh_config, vault,
+    settings, sftp, snippets, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -91,6 +91,10 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         ai::ai_preview,
         ai::ai_ask,
         ai::ai_cancel,
+        snippets::snippets_list,
+        snippets::snippets_create,
+        snippets::snippets_update,
+        snippets::snippets_delete,
     ])
 }
 

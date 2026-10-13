@@ -9,6 +9,7 @@ mod known_hosts;
 mod open;
 mod port_forwards;
 mod secret;
+mod snippets;
 mod ssh_config_import;
 
 pub use ai_settings::{AiSettings, AiSettingsRepository};
@@ -23,6 +24,7 @@ pub use port_forwards::{
     ForwardSpec, LOOPBACK, PortForwardRecord, PortForwardRepository, PortForwardRule,
 };
 pub use secret::Secret;
+pub use snippets::{Snippet, SnippetRecord, SnippetRepository};
 pub use ssh_config_import::{SshConfigImportSummary, import_ssh_config_hosts, is_already_saved};
 
 pub(crate) fn now_ms() -> i64 {

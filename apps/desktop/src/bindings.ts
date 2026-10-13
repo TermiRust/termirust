@@ -81,6 +81,10 @@ export const commands = {
 	/**  Starts a streamed answer and returns its id for [`ai_cancel`]. */
 	aiAsk: (ask: AiAsk, onEvent: Channel<AiEvent>) => typedError<number, CommandError>(__TAURI_INVOKE("ai_ask", { ask, onEvent })),
 	aiCancel: (requestId: number) => typedError<boolean, CommandError>(__TAURI_INVOKE("ai_cancel", { requestId })),
+	snippetsList: () => typedError<SnippetView[], CommandError>(__TAURI_INVOKE("snippets_list")),
+	snippetsCreate: (input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_create", { input })),
+	snippetsUpdate: (id: string, input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_update", { id, input })),
+	snippetsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("snippets_delete", { id })),
 };
 
 /* Types */
@@ -308,6 +312,21 @@ export type SessionClosed = {
 export type SkippedHost = {
 	alias: string,
 	reason: string,
+};
+
+export type SnippetInput = {
+	name: string,
+	command: string,
+	description: string,
+	tags: string[],
+};
+
+export type SnippetView = {
+	id: string,
+	name: string,
+	command: string,
+	description: string,
+	tags: string[],
 };
 
 export type SshConfigCandidate = {
