@@ -7,6 +7,7 @@ import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { StatusBar } from "@/components/layout/status-bar";
 import { TabBar } from "@/components/layout/tab-bar";
+import { Topbar } from "@/components/layout/topbar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { ForwardsView } from "@/features/forwards/forwards-view";
 import { KeychainView } from "@/features/keychain/keychain-view";
@@ -222,46 +223,57 @@ export function AppShell() {
   }, [onMac, toggleSidebar, activateTabAt, requestCloseFocused, openLocalTab, setSection, setPaletteOpen, openNewHost]);
 
   return (
-    <div className="flex h-full">
-      {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
-      <main className="flex min-w-0 flex-1 flex-col">
-        {section === "keychain" && <KeychainView />}
-        {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}
-        {section === "forwards" && <ForwardsView />}
-        {section === "settings" && <SettingsView />}
-        {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
-        {section === "hosts" && tabs.length === 0 && (
-          <EmptyWorkspace
-            version={version}
-            shortcuts={{
-              palette: shortcutLabel("palette", onMac),
-              newHost: shortcutLabel("newHost", onMac),
-              newLocal: shortcutLabel("newLocal", onMac),
-              sidebar: shortcutLabel("sidebar", onMac),
-            }}
-            onNewHost={openNewHost}
-            onImportConfig={() => setImportConfigOpen(true)}
-            onOpenLocal={openLocalTab}
-            onOpenConnectionLab={import.meta.env.DEV ? openLabTab : undefined}
-          />
-        )}
-        {tabs.map((tab) => (
-          <TabPanel
-            key={tab.id}
-            tab={tab}
-            active={section === "hosts" && tab.id === activeTabId}
-            onStatusChange={setTabStatus}
-            onSizeChange={setTabSize}
-            onClose={closeTab}
-            onOpenSftp={openSftp}
-            autoRunBenchmarks={autoRunBenchmarks}
-            warningBorder={
-              tab.target.kind !== "local" && tab.target.kind !== "lab" && tab.color !== null && groupWarns(groups, tab.target.host.groupId) ? tabColorVar[tab.color] : null
-            }
-          />
-        ))}
-        {section === "hosts" && showStatusBar && <StatusBar tab={tabs.find((t) => t.id === activeTabId)} hosts={hosts} />}
-      </main>
+    <div className="flex h-full flex-col">
+      <Topbar
+        onMac={onMac}
+        paletteShortcut={shortcutLabel("palette", onMac)}
+        sidebarShortcut={shortcutLabel("sidebar", onMac)}
+        settingsActive={section === "settings"}
+        onSearch={() => setPaletteOpen(true)}
+        onToggleSidebar={toggleSidebar}
+        onOpenSettings={() => setSection(section === "settings" ? "hosts" : "settings")}
+      />
+      <div className="flex min-h-0 flex-1">
+        {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
+        <main className="flex min-w-0 flex-1 flex-col">
+          {section === "keychain" && <KeychainView />}
+          {section === "snippets" && <SnippetsView onUse={terminalReady ? runSnippet : undefined} onRunOnHosts={hosts.length > 0 ? setMultiRun : undefined} />}
+          {section === "forwards" && <ForwardsView />}
+          {section === "settings" && <SettingsView />}
+          {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} splitShortcut={onMac ? "⌘D" : "Ctrl+Shift+D"} />}
+          {section === "hosts" && tabs.length === 0 && (
+            <EmptyWorkspace
+              version={version}
+              shortcuts={{
+                palette: shortcutLabel("palette", onMac),
+                newHost: shortcutLabel("newHost", onMac),
+                newLocal: shortcutLabel("newLocal", onMac),
+                sidebar: shortcutLabel("sidebar", onMac),
+              }}
+              onNewHost={openNewHost}
+              onImportConfig={() => setImportConfigOpen(true)}
+              onOpenLocal={openLocalTab}
+              onOpenConnectionLab={import.meta.env.DEV ? openLabTab : undefined}
+            />
+          )}
+          {tabs.map((tab) => (
+            <TabPanel
+              key={tab.id}
+              tab={tab}
+              active={section === "hosts" && tab.id === activeTabId}
+              onStatusChange={setTabStatus}
+              onSizeChange={setTabSize}
+              onClose={closeTab}
+              onOpenSftp={openSftp}
+              autoRunBenchmarks={autoRunBenchmarks}
+              warningBorder={
+                tab.target.kind !== "local" && tab.target.kind !== "lab" && tab.color !== null && groupWarns(groups, tab.target.host.groupId) ? tabColorVar[tab.color] : null
+              }
+            />
+          ))}
+          {section === "hosts" && showStatusBar && <StatusBar tab={tabs.find((t) => t.id === activeTabId)} hosts={hosts} />}
+        </main>
+      </div>
       <AppDialogs onConnect={openHost} />
       <CommandPalette
         open={paletteOpen}

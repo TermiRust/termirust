@@ -66,6 +66,8 @@ describe("broadcast input across panes", () => {
       </>,
     );
     expect(await screen.findAllByRole("button", { name: "Disconnect" })).toHaveLength(2);
+    // The DOM can show "connected" before the panes' input-registration effects have run.
+    await act(async () => {});
     return view;
   }
 

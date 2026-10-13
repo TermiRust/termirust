@@ -1,10 +1,10 @@
-import { FlaskConical, FolderTree, Plus, Server, SquareTerminal, X } from "lucide-react";
+import { Columns2, FlaskConical, FolderTree, Plus, Server, SquareTerminal, X } from "lucide-react";
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { tabColorVar } from "@/features/tabs/tab-color";
 import { cn } from "@/lib/utils";
-import { useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
+import { splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 const statusDot: Record<TabStatus, string> = {
   connecting: "bg-warn animate-pulse",
@@ -25,10 +25,12 @@ const statusLabel: Record<TabStatus, string> = {
 interface TabBarProps {
   onRequestClose: (tab: Tab) => void;
   onNewLocalTab: () => void;
+  splitShortcut?: string;
 }
 
-export function TabBar({ onRequestClose, onNewLocalTab }: TabBarProps) {
+export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarProps) {
   const { tabs, activeTabId, activateTab, renameTab, moveTab } = useTabsStore();
+  const activeTab = tabs.find((t) => t.id === activeTabId);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
 
@@ -135,6 +137,16 @@ export function TabBar({ onRequestClose, onNewLocalTab }: TabBarProps) {
       </div>
       <Button size="icon" aria-label="New local terminal" title="New local terminal" onClick={onNewLocalTab} className="mb-1">
         <Plus size={15} />
+      </Button>
+      <Button
+        size="icon"
+        aria-label="Split pane"
+        title={splitShortcut ? `Split pane (${splitShortcut})` : "Split pane"}
+        disabled={!activeTab || !splittable(activeTab)}
+        onClick={() => activeTab && useTabsStore.getState().splitPane(activeTab.id, "row")}
+        className="mb-1"
+      >
+        <Columns2 size={15} />
       </Button>
     </div>
   );

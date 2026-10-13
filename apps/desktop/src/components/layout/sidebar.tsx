@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal, Waypoints } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareTerminal, Waypoints } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -186,13 +186,6 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
           onClick={() => setSection("snippets")}
         >
           <SquareTerminal size={15} /> Snippets
-        </Button>
-        <Button
-          className={cn("justify-start", section === "settings" && "bg-active text-fg")}
-          aria-current={section === "settings" ? "page" : undefined}
-          onClick={() => setSection("settings")}
-        >
-          <Settings size={15} /> Settings
         </Button>
         <Button className="justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host

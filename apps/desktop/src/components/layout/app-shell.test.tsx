@@ -298,4 +298,35 @@ describe("AppShell warning border", () => {
     await user.keyboard("{Enter}");
     expect(update).toHaveBeenCalledWith({ theme: "tokyo-night" });
   });
+
+  it("opens the palette from the top bar search and settings from its gear", async () => {
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    const user = userEvent.setup();
+    render(<AppShell />);
+    await user.click(screen.getByRole("button", { name: "Search hosts and commands" }));
+    expect(await screen.findByRole("dialog", { name: "Command palette" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(useLayoutStore.getState().section).toBe("settings");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(useLayoutStore.getState().section).toBe("hosts");
+  });
+
+  it("splits the active terminal from the tab bar button, and disables it for SFTP tabs", async () => {
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    render(<AppShell />);
+    act(() => {
+      useTabsStore.getState().openLocalTab();
+    });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Split pane" }));
+    expect(screen.getAllByText("local shell")).toHaveLength(2);
+
+    const host = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false };
+    act(() => {
+      useTabsStore.getState().openSftpTab(host, null);
+    });
+    expect(screen.getByRole("button", { name: "Split pane" })).toBeDisabled();
+  });
 });
