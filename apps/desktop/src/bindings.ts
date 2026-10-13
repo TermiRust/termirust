@@ -43,6 +43,23 @@ export const commands = {
 	settingsTerminalSet: (settings: TerminalSettings) => typedError<TerminalSettings, CommandError>(__TAURI_INVOKE("settings_terminal_set", { settings })),
 	/**  Opens the folder holding Termirust's log files in the system file manager. */
 	logsOpenFolder: () => typedError<null, CommandError>(__TAURI_INVOKE("logs_open_folder")),
+	sftpOpen: (request: OpenSftpRequest) => typedError<OpenSftpOutcome, CommandError>(__TAURI_INVOKE("sftp_open", { request })),
+	sftpList: (sftpId: number, path: string) => typedError<FileEntry[], CommandError>(__TAURI_INVOKE("sftp_list", { sftpId, path })),
+	sftpCreateDir: (sftpId: number, path: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_create_dir", { sftpId, path })),
+	sftpRename: (sftpId: number, from: string, to: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_rename", { sftpId, from, to })),
+	/**  Removes a file, or a directory with everything in it. */
+	sftpRemove: (sftpId: number, path: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_remove", { sftpId, path })),
+	sftpClose: (sftpId: number) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_close", { sftpId })),
+	/**  Queues a file or directory transfer; progress, the result and cancellation arrive on `on_event`. */
+	sftpTransferStart: (request: TransferRequest, onEvent: Channel<TransferEvent>) => typedError<number, CommandError>(__TAURI_INVOKE("sftp_transfer_start", { request, onEvent })),
+	/**  Returns false when the transfer had already finished. */
+	sftpTransferCancel: (transferId: number) => typedError<boolean, CommandError>(__TAURI_INVOKE("sftp_transfer_cancel", { transferId })),
+	localHome: () => typedError<string, CommandError>(__TAURI_INVOKE("local_home")),
+	localList: (path: string) => typedError<FileEntry[], CommandError>(__TAURI_INVOKE("local_list", { path })),
+	localCreateDir: (path: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_create_dir", { path })),
+	localRename: (from: string, to: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_rename", { from, to })),
+	/**  Removes a file, or a directory with everything in it, without following symlinks. */
+	localRemove: (path: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_remove", { path })),
 };
 
 /* Types */
@@ -59,6 +76,19 @@ export type CommandError = {
 export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "local_shell" | "sftp" | "cancelled" | "internal";
 
 export type CursorStyle = "block" | "bar" | "underline";
+
+/**  One row of a file panel, remote or local. */
+export type FileEntry = {
+	name: string,
+	path: string,
+	kind: FileKind,
+	size: number,
+	/**  Seconds since the Unix epoch. */
+	modified: number | null,
+	permissions: number | null,
+};
+
+export type FileKind = "directory" | "file" | "symlink" | "other";
 
 export type GroupView = {
 	id: string,
@@ -132,6 +162,17 @@ export type OpenSessionOutcome = { status: "opened"; sessionId: number } |
 /**  The server's key is not trusted yet; ask the user, then retry with `trusted_fingerprint`. */
 { status: "hostKeyNeedsConfirmation"; algorithm: string; fingerprint: string };
 
+export type OpenSftpOutcome = { status: "opened"; sftpId: number; home: string } | 
+/**  Same prompts as a terminal tab: password, passphrase, username or host key. */
+{ status: "needsInput"; prompt: OpenHostOutcome };
+
+export type OpenSftpRequest = {
+	hostId: string,
+	prompted: PromptedLogin | null,
+	confirmedFingerprint: string | null,
+	rememberHostKey: boolean,
+};
+
 export type OutputBenchmark = {
 	totalBytes: number,
 	messages: number,
@@ -204,6 +245,22 @@ export type TerminalSettings = {
 	copyOnSelect?: boolean,
 	confirmMultilinePaste?: boolean,
 	showStatusBar?: boolean,
+};
+
+export type TransferDirection = "upload" | "download";
+
+/**
+ *  What the queue panel shows for one transfer. Byte counts are typed as numbers for
+ *  TypeScript; JSON numbers are exact up to 2^53 bytes.
+ */
+export type TransferEvent = { state: "queued" } | { state: "running"; done: number; total: number; filesDone: number; filesTotal: number; current: string } | { state: "completed"; bytes: number } | { state: "failed"; message: string } | { state: "cancelled" };
+
+/**  `local_path` and `remote_path` are the full paths of the source and of the item to create. */
+export type TransferRequest = {
+	sftpId: number,
+	direction: TransferDirection,
+	localPath: string,
+	remotePath: string,
 };
 
 export type VaultOverview = {

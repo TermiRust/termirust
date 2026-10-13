@@ -19,3 +19,6 @@ apps/*/src-tauri/gen/
 .env
 .env.*
 !.env.example
+
+# Claude Code scratch
+.claude/tmp/

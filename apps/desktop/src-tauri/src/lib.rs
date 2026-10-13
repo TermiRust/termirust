@@ -3,6 +3,7 @@ mod commands;
 mod logging;
 mod raw_chunk;
 mod session_registry;
+mod transfer_queue;
 mod vault_state;
 
 use std::path::Path;
@@ -15,7 +16,8 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    benchmark, host_session, hosts, keys, local_session, logs, session, settings, ssh_config, vault,
+    benchmark, host_session, hosts, keys, local_files, local_session, logs, session, settings,
+    sftp, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -62,6 +64,19 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         settings::settings_terminal_get,
         settings::settings_terminal_set,
         logs::logs_open_folder,
+        sftp::sftp_open,
+        sftp::sftp_list,
+        sftp::sftp_create_dir,
+        sftp::sftp_rename,
+        sftp::sftp_remove,
+        sftp::sftp_close,
+        sftp::sftp_transfer_start,
+        sftp::sftp_transfer_cancel,
+        local_files::local_home,
+        local_files::local_list,
+        local_files::local_create_dir,
+        local_files::local_rename,
+        local_files::local_remove,
     ])
 }
 
@@ -86,6 +101,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(session::Sessions::default())
         .manage(benchmark::ActiveBenchmark::default())
+        .manage(sftp::SftpSessions::default())
+        .manage(transfer_queue::TransferQueue::default())
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);

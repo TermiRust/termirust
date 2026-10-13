@@ -69,7 +69,7 @@ pub fn join_remote(dir: &str, name: &str) -> String {
 }
 
 /// Directories first, then names case-insensitively, like most file managers.
-fn sort_entries(entries: &mut [RemoteEntry]) {
+pub(crate) fn sort_entries(entries: &mut [RemoteEntry]) {
     entries.sort_by(|a, b| {
         let dir_first = (b.kind == EntryKind::Directory).cmp(&(a.kind == EntryKind::Directory));
         dir_first.then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
