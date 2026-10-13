@@ -5,6 +5,8 @@ import { commands, type HostView, type PromptedLogin } from "@/bindings";
 import type { TerminalSize } from "@/features/terminal/terminal-view";
 import { toBytes } from "@/features/terminal/to-bytes";
 
+import { hostPromptOf, type HostPrompt } from "./host-prompt";
+
 export interface HostSessionTerminal {
   write: (data: Uint8Array, onWritten?: () => void) => void;
   size: () => TerminalSize;
@@ -12,11 +14,7 @@ export interface HostSessionTerminal {
 
 export type HostSessionState =
   | { phase: "connecting" }
-  | { phase: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean }
-  | { phase: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean }
-  | { phase: "needsUsername" }
-  | { phase: "hostKeyUnknown"; server: string; algorithm: string; fingerprint: string }
-  | { phase: "hostKeyChanged"; server: string; algorithm: string; fingerprint: string; previousFingerprint: string }
+  | HostPrompt
   | { phase: "connected"; sessionId: number }
   /** `lost`: the link died (no exit status); `exited`: the remote shell ended; `disconnected`: by the user. */
   | { phase: "closed"; reason: "lost" | "exited" | "disconnected"; exitStatus: number | null }
@@ -110,36 +108,8 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
           }
           setState({ phase: "connected", sessionId: outcome.sessionId });
           break;
-        case "needsPassphrase":
-          setState({
-            phase: "needsPassphrase",
-            keyLabel: outcome.keyLabel,
-            wrongPassphrase: outcome.wrongPassphrase,
-            usernameRequired: outcome.usernameRequired,
-          });
-          break;
-        case "needsUsername":
-          setState({ phase: "needsUsername" });
-          break;
-        case "needsPassword":
-          setState({
-            phase: "needsPassword",
-            usernameRequired: outcome.usernameRequired,
-            savedPasswordRejected: outcome.savedPasswordRejected,
-          });
-          break;
-        case "hostKeyUnknown":
-          setState({ phase: "hostKeyUnknown", server: outcome.server, algorithm: outcome.algorithm, fingerprint: outcome.fingerprint });
-          break;
-        case "hostKeyChanged":
-          setState({
-            phase: "hostKeyChanged",
-            server: outcome.server,
-            algorithm: outcome.algorithm,
-            fingerprint: outcome.fingerprint,
-            previousFingerprint: outcome.previousFingerprint,
-          });
-          break;
+        default:
+          setState(hostPromptOf(outcome));
       }
     },
     [host.id, acknowledge],

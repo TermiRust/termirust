@@ -43,6 +43,11 @@ describe("tabs store", () => {
     expect(state().tabs[0]).toMatchObject({ title: "Local", target: { kind: "local" }, status: "connecting", color: null });
   });
 
+  it("opens an SFTP tab for a host", () => {
+    state().openSftpTab(host("a"), "teal");
+    expect(state().tabs[0]).toMatchObject({ title: "host-a · SFTP", target: { kind: "sftp" }, status: "connecting", color: "teal" });
+  });
+
   it("opens a lab tab", () => {
     state().openLabTab();
     expect(state().tabs[0]).toMatchObject({ title: "Connection lab", target: { kind: "lab" }, status: "idle" });

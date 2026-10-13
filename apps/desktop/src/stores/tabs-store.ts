@@ -5,7 +5,7 @@ import type { TabColor } from "@/features/tabs/tab-color";
 
 export type TabStatus = "connecting" | "connected" | "disconnected" | "error" | "idle";
 
-export type TabTarget = { kind: "host"; host: HostView } | { kind: "local" } | { kind: "lab" };
+export type TabTarget = { kind: "host"; host: HostView } | { kind: "sftp"; host: HostView } | { kind: "local" } | { kind: "lab" };
 
 export interface Tab {
   id: string;
@@ -21,6 +21,7 @@ interface TabsState {
   tabs: Tab[];
   activeTabId: string | null;
   openHostTab: (host: HostView, color: TabColor | null) => string;
+  openSftpTab: (host: HostView, color: TabColor | null) => string;
   openLabTab: () => string;
   openLocalTab: () => string;
   closeTab: (id: string) => void;
@@ -47,6 +48,8 @@ export const useTabsStore = create<TabsState>()((set, get) => {
     activeTabId: null,
 
     openHostTab: (host, color) => open({ title: host.label, target: { kind: "host", host }, status: "connecting", color, size: null }),
+    openSftpTab: (host, color) =>
+      open({ title: `${host.label} · SFTP`, target: { kind: "sftp", host }, status: "connecting", color, size: null }),
     openLabTab: () => open({ title: "Connection lab", target: { kind: "lab" }, status: "idle", color: null, size: null }),
     openLocalTab: () => open({ title: "Local", target: { kind: "local" }, status: "connecting", color: null, size: null }),
 

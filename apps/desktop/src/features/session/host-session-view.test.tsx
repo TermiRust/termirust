@@ -70,6 +70,15 @@ describe("HostSessionView", () => {
     });
   });
 
+  it("offers an SFTP tab to the same host once connected", async () => {
+    commands.sessionOpenHost.mockResolvedValue(ok({ status: "opened", sessionId: 1 }));
+    const onOpenSftp = vi.fn();
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} onOpenSftp={onOpenSftp} />);
+    await user.click(await screen.findByRole("button", { name: "SFTP" }));
+    expect(onOpenSftp).toHaveBeenCalledWith(host);
+  });
+
   it("explains when the saved password was rejected", async () => {
     commands.sessionOpenHost.mockResolvedValue(ok({ status: "needsPassword", usernameRequired: false, savedPasswordRejected: true }));
     render(<HostSessionView host={host} />);

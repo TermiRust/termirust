@@ -19,6 +19,7 @@ vi.mock("@/bindings", () => ({
   },
 }));
 vi.mock("@/features/session/host-session-view", () => ({ HostSessionView: () => <div>ssh session</div> }));
+vi.mock("@/features/sftp/sftp-view", () => ({ SftpView: () => <div>sftp browser</div> }));
 vi.mock("@/features/session/local-session-view", () => ({ LocalSessionView: () => <div>local shell</div> }));
 vi.mock("@/features/connection-lab/connection-lab", () => ({
   ConnectionLab: ({ onExit }: { onExit: () => void }) => (
@@ -176,5 +177,22 @@ describe("AppShell warning border", () => {
 
     await userEvent.dblClick(screen.getByRole("button", { name: "Connect to laptop" }));
     expect(screen.getAllByRole("tabpanel", { hidden: true }).at(-1)).not.toHaveAttribute("data-warning-border");
+  });
+
+  it("opens an SFTP tab from the sidebar, framed like the host's terminal tabs", async () => {
+    const { useHostsStore } = await import("@/stores/hosts-store");
+    const prod = { id: "g1", name: "Production", parentId: null, color: null, warningBorder: true };
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null };
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useHostsStore.setState({ hosts: [], groups: [], loaded: false });
+    render(<AppShell />);
+    await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
+    act(() => useHostsStore.setState({ hosts: [api], groups: [prod] }));
+
+    await userEvent.click(await screen.findByRole("button", { name: "Open SFTP to api" }));
+    expect(screen.getByRole("tab", { name: /api · SFTP/ })).toBeInTheDocument();
+    expect(screen.getByText("sftp browser")).toBeInTheDocument();
+    expect(screen.getAllByRole("tabpanel", { hidden: true }).at(-1)).toHaveAttribute("data-warning-border", "true");
   });
 });

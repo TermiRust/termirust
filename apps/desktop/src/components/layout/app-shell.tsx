@@ -14,6 +14,7 @@ import { CommandPalette, type PaletteCommand } from "@/features/palette/command-
 import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
+import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
@@ -34,7 +35,7 @@ export function AppShell() {
   const hosts = useHostsStore((s) => s.hosts);
   const { paletteOpen, setPaletteOpen, openNewHost, setImportConfigOpen } = useDialogsStore();
   const [recentHostIds, setRecentHostIds] = useState<string[]>(loadRecentHostIds);
-  const { tabs, activeTabId, openHostTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus, setTabSize } = useTabsStore();
+  const { tabs, activeTabId, openHostTab, openSftpTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus, setTabSize } = useTabsStore();
   const showStatusBar = useSettingsStore((s) => s.terminal.showStatusBar);
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
@@ -58,6 +59,14 @@ export function AppShell() {
       openHostTab(host, resolveTabColor(host, groups.find((g) => g.id === host.groupId)));
     },
     [groups, openHostTab, setSection],
+  );
+
+  const openSftp = useCallback(
+    (host: HostView) => {
+      setSection("hosts");
+      openSftpTab(host, resolveTabColor(host, groups.find((g) => g.id === host.groupId)));
+    },
+    [groups, openSftpTab, setSection],
   );
 
   const paletteCommands = useMemo<PaletteCommand[]>(
@@ -124,7 +133,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full">
-      {sidebarVisible && <Sidebar onOpenHost={openHost} />}
+      {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
         {section === "settings" && <SettingsView />}
@@ -152,9 +161,10 @@ export function AppShell() {
             onStatusChange={setTabStatus}
             onSizeChange={setTabSize}
             onClose={closeTab}
+            onOpenSftp={openSftp}
             autoRunBenchmarks={autoRunBenchmarks}
             warningBorder={
-              tab.target.kind === "host" && tab.color !== null && groupWarns(groups, tab.target.host.groupId) ? tabColorVar[tab.color] : null
+              tab.target.kind !== "local" && tab.target.kind !== "lab" && tab.color !== null && groupWarns(groups, tab.target.host.groupId) ? tabColorVar[tab.color] : null
             }
           />
         ))}
@@ -189,6 +199,7 @@ interface TabPanelProps {
   onStatusChange: (id: string, status: TabStatus) => void;
   onSizeChange: (id: string, cols: number, rows: number) => void;
   onClose: (id: string) => void;
+  onOpenSftp: (host: HostView) => void;
   autoRunBenchmarks: boolean;
   /** CSS colour of the warning frame, or null when the host's group does not ask for one. */
   warningBorder: string | null;
@@ -199,7 +210,7 @@ function groupWarns(groups: { id: string; warningBorder: boolean }[], groupId: s
 }
 
 /** Inactive tabs stay mounted (hidden) so their SSH sessions and scrollback survive switching. */
-function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, autoRunBenchmarks, warningBorder }: TabPanelProps) {
+function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSftp, autoRunBenchmarks, warningBorder }: TabPanelProps) {
   const reportStatus = useCallback((status: TabStatus) => onStatusChange(tab.id, status), [onStatusChange, tab.id]);
   const reportSize = useCallback((size: { cols: number; rows: number }) => onSizeChange(tab.id, size.cols, size.rows), [onSizeChange, tab.id]);
   return (
@@ -212,7 +223,9 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, autoRunB
       style={warningBorder ? { boxShadow: `inset 0 0 0 2px ${warningBorder}` } : undefined}
     >
       {tab.target.kind === "host" ? (
-        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} />
+        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} onOpenSftp={onOpenSftp} />
+      ) : tab.target.kind === "sftp" ? (
+        <SftpView host={tab.target.host} onStatusChange={reportStatus} />
       ) : tab.target.kind === "local" ? (
         <LocalSessionView onStatusChange={reportStatus} onSizeChange={reportSize} />
       ) : (

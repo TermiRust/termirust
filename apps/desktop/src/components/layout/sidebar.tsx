@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -13,9 +13,10 @@ import { useLayoutStore } from "@/stores/layout-store";
 
 interface SidebarProps {
   onOpenHost: (host: HostView) => void;
+  onOpenSftp?: (host: HostView) => void;
 }
 
-export function Sidebar({ onOpenHost }: SidebarProps) {
+export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
   const section = useLayoutStore((s) => s.section);
   const setSection = useLayoutStore((s) => s.setSection);
   const hostFilter = useLayoutStore((s) => s.hostFilter);
@@ -56,11 +57,22 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
       >
         <Server size={13} className="shrink-0 text-fg-muted" />
         <span className="truncate">{host.label}</span>
+        {onOpenSftp && (
+          <button
+            type="button"
+            aria-label={`Open SFTP to ${host.label}`}
+            title="Browse files (SFTP)"
+            onClick={() => onOpenSftp(host)}
+            className="ml-auto hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block"
+          >
+            <FolderTree size={12} />
+          </button>
+        )}
         <button
           type="button"
           aria-label={`Edit ${host.label}`}
           onClick={() => openHostEditor(host)}
-          className="ml-auto hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block"
+          className={cn(onOpenSftp ? "" : "ml-auto", "hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block")}
         >
           <Pencil size={12} />
         </button>

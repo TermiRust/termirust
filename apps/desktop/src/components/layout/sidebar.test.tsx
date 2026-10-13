@@ -53,13 +53,14 @@ async function renderWith(hosts: HostView[], groups: GroupView[] = []) {
   commands.groupsList.mockResolvedValue(ok(groups));
   await useHostsStore.getState().load();
   const onOpenHost = vi.fn();
+  const onOpenSftp = vi.fn();
   render(
     <>
-      <Sidebar onOpenHost={onOpenHost} />
+      <Sidebar onOpenHost={onOpenHost} onOpenSftp={onOpenSftp} />
       <AppDialogs onConnect={onOpenHost} />
     </>,
   );
-  return { onOpenHost, user: userEvent.setup() };
+  return { onOpenHost, onOpenSftp, user: userEvent.setup() };
 }
 
 const initialHosts = useHostsStore.getState();
@@ -89,6 +90,13 @@ describe("Sidebar", () => {
     expect(groupButton).toHaveTextContent("1");
     expect(within(list).getByRole("button", { name: "Connect to api" })).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Connect to laptop" })).toBeInTheDocument();
+  });
+
+  it("opens an SFTP tab from a host row", async () => {
+    const { user, onOpenSftp, onOpenHost } = await renderWith([host("api")]);
+    await user.click(screen.getByRole("button", { name: "Open SFTP to api" }));
+    expect(onOpenSftp).toHaveBeenCalledWith(expect.objectContaining({ id: "api" }));
+    expect(onOpenHost).not.toHaveBeenCalled();
   });
 
   it("collapses and expands a group", async () => {

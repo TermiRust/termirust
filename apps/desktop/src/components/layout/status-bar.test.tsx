@@ -50,6 +50,15 @@ describe("StatusBar", () => {
     expect(screen.getByLabelText("Status: connected")).toBeInTheDocument();
   });
 
+  it("marks an SFTP tab and leaves out terminal-only facts", () => {
+    const api = host("prod-api");
+    render(<StatusBar tab={tab({ target: { kind: "sftp", host: api }, size: null })} hosts={[api]} />);
+    const bar = screen.getByRole("contentinfo", { name: "Status bar" });
+    expect(bar).toHaveTextContent("deploy@prod-api");
+    expect(bar).toHaveTextContent("SFTP");
+    expect(bar).not.toHaveTextContent("xterm-256color");
+  });
+
   it("uses the latest saved host details rather than the ones the tab opened with", () => {
     const opened = host("db", { hostname: "old.internal" });
     const edited = host("db", { hostname: "new.internal", auth: { method: "agent" } });

@@ -1,4 +1,4 @@
-import { PlugZap } from "lucide-react";
+import { FolderTree, PlugZap } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
@@ -8,7 +8,8 @@ import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
 import { ConnectionBanner } from "./connection-banner";
-import { CredentialsPrompt, type CredentialsRequest } from "./credentials-prompt";
+import { CredentialsPrompt } from "./credentials-prompt";
+import { credentialsRequestOf } from "./host-prompt";
 import { useAutoReconnect } from "./use-auto-reconnect";
 import { useHostSession, type HostSessionState } from "./use-host-session";
 
@@ -16,6 +17,8 @@ interface HostSessionViewProps {
   host: HostView;
   onStatusChange?: (status: TabStatus) => void;
   onSizeChange?: (size: TerminalSize) => void;
+  /** Opens an SFTP tab to the same host. */
+  onOpenSftp?: (host: HostView) => void;
 }
 
 const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
@@ -31,13 +34,13 @@ const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function HostSessionView({ host, onStatusChange, onSizeChange }: HostSessionViewProps) {
+export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
   const { state } = session;
   const endpoint = `${host.hostname}:${host.port}`;
-  const credentials = credentialsRequest(state);
+  const credentials = credentialsRequestOf(state);
   const waitingToRetry = session.recovering && (state.phase === "closed" || state.phase === "error");
   const auto = useAutoReconnect(waitingToRetry, state.phase === "connected", session.reconnect);
   const dimmed = session.everConnected && state.phase !== "connected";
@@ -55,6 +58,11 @@ export function HostSessionView({ host, onStatusChange, onSizeChange }: HostSess
           {endpoint}
         </span>
         <div className="ml-auto flex gap-2">
+          {state.phase === "connected" && onOpenSftp && (
+            <Button size="sm" variant="outline" title="Browse files on this host" onClick={() => onOpenSftp(host)}>
+              <FolderTree size={14} /> SFTP
+            </Button>
+          )}
           {state.phase === "connected" && (
             <Button size="sm" variant="outline" onClick={() => void session.disconnect()}>
               <PlugZap size={14} /> Disconnect
@@ -98,17 +106,4 @@ export function HostSessionView({ host, onStatusChange, onSizeChange }: HostSess
       )}
     </div>
   );
-}
-
-function credentialsRequest(state: HostSessionState): CredentialsRequest | null {
-  switch (state.phase) {
-    case "needsPassword":
-      return { kind: "password", usernameRequired: state.usernameRequired, savedPasswordRejected: state.savedPasswordRejected };
-    case "needsPassphrase":
-      return { kind: "passphrase", keyLabel: state.keyLabel, wrongPassphrase: state.wrongPassphrase, usernameRequired: state.usernameRequired };
-    case "needsUsername":
-      return { kind: "username" };
-    default:
-      return null;
-  }
 }

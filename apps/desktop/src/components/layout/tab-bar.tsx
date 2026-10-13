@@ -1,4 +1,4 @@
-import { FlaskConical, Plus, Server, SquareTerminal, X } from "lucide-react";
+import { FlaskConical, FolderTree, Plus, Server, SquareTerminal, X } from "lucide-react";
 import { useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -111,6 +111,8 @@ export function TabBar({ onRequestClose, onNewLocalTab }: TabBarProps) {
                 >
                   {tab.target.kind === "lab" ? (
                     <FlaskConical size={12} className="shrink-0" />
+                  ) : tab.target.kind === "sftp" ? (
+                    <FolderTree size={12} className="shrink-0 opacity-60" />
                   ) : tab.target.kind === "local" ? (
                     <SquareTerminal size={12} className="shrink-0 opacity-60" />
                   ) : (

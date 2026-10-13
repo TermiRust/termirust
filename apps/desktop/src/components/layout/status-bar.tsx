@@ -1,4 +1,4 @@
-import { KeyRound, Route, SquareTerminal } from "lucide-react";
+import { FolderTree, KeyRound, Route, SquareTerminal } from "lucide-react";
 
 import type { HostView } from "@/bindings";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,8 @@ export function StatusBar({ tab, hosts }: StatusBarProps) {
   if (!tab) return null;
   const parts: React.ReactNode[] = [];
 
-  if (tab.target.kind === "host") {
+  const terminal = tab.target.kind !== "sftp";
+  if (tab.target.kind === "host" || tab.target.kind === "sftp") {
     const opened = tab.target.host;
     const host = hosts.find((h) => h.id === opened.id) ?? opened;
     const jump = host.jumpHostId ? hosts.find((h) => h.id === host.jumpHostId) : undefined;
@@ -49,6 +50,13 @@ export function StatusBar({ tab, hosts }: StatusBarProps) {
         <KeyRound size={11} /> {authLabel(host)}
       </span>,
     );
+    if (!terminal) {
+      parts.push(
+        <span key="sftp" className="flex items-center gap-1">
+          <FolderTree size={11} /> SFTP
+        </span>,
+      );
+    }
   } else if (tab.target.kind === "local") {
     parts.push(
       <span key="local" className="flex items-center gap-1 text-fg-2">
@@ -68,8 +76,8 @@ export function StatusBar({ tab, hosts }: StatusBarProps) {
       <span aria-label={`Status: ${tab.status}`} className={cn("h-2 w-2 shrink-0 rounded-full", dot[tab.status])} />
       {parts}
       <span className="ml-auto flex items-center gap-3">
-        <span>UTF-8</span>
-        <span>xterm-256color</span>
+        {terminal && <span>UTF-8</span>}
+        {terminal && <span>xterm-256color</span>}
         {tab.size && (
           <span className="font-mono tabular-nums">
             {tab.size.cols} × {tab.size.rows}
