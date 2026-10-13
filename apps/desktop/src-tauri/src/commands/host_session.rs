@@ -6,8 +6,8 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use termirust_core::CoreError;
 use termirust_core::ssh::{
-    HostKeyInfo, HostKeyVerifier, JumpHop, LoginMethod, PtySize, ShellSession, SshLogin,
-    inspect_private_key,
+    HostKeyInfo, HostKeyVerifier, JumpHop, LoginMethod, PtySize, ShellSession, SshConnection,
+    SshLogin, inspect_private_key,
 };
 use termirust_core::vault::{
     Host, HostAuth, HostKeyStatus, Identity, IdentityRecord, KnownHostRecord, Secret, Vault,
@@ -318,17 +318,38 @@ fn host_key_decision(
     matches!(status, HostKeyStatus::Trusted) || confirmed == Some(offered.fingerprint.as_str())
 }
 
-#[tauri::command]
-#[specta::specta]
-pub async fn session_open_host(
-    app: AppHandle,
-    vault_state: State<'_, VaultState>,
-    sessions: State<'_, Sessions>,
-    request: OpenHostRequest,
-    on_output: Channel<RawChunk>,
-    on_closed: Channel<SessionClosed>,
-) -> Result<OpenHostOutcome, CommandError> {
-    let vault = &vault_state.vault().await?;
+/// Everything needed to log in to a saved host, shared by terminal, SFTP and port forwarding.
+#[derive(Debug, Clone)]
+pub struct HostLoginRequest {
+    pub host_id: String,
+    pub prompted: Option<PromptedLogin>,
+    pub confirmed_fingerprint: Option<String>,
+    pub remember_host_key: bool,
+}
+
+impl OpenHostRequest {
+    fn login(&self) -> HostLoginRequest {
+        HostLoginRequest {
+            host_id: self.host_id.clone(),
+            prompted: self.prompted.clone(),
+            confirmed_fingerprint: self.confirmed_fingerprint.clone(),
+            remember_host_key: self.remember_host_key,
+        }
+    }
+}
+
+pub enum HostConnection {
+    Connected(SshConnection),
+    /// The user must type something or confirm a host key before connecting.
+    NeedsInput(OpenHostOutcome),
+}
+
+/// Plans the login (vault secrets, prompts, jump host), connects, verifies host keys and
+/// remembers what was confirmed or typed — only once the server accepted it.
+pub async fn connect_host(
+    vault: &Vault,
+    request: &HostLoginRequest,
+) -> Result<HostConnection, CommandError> {
     let host_id = Uuid::parse_str(&request.host_id)
         .map_err(|_| CoreError::InvalidData(format!("invalid host id: {}", request.host_id)))?;
     let host = vault
@@ -353,22 +374,26 @@ pub async fn session_open_host(
             secret,
         } => (username, method, secret),
         LoginPlan::NeedsPassword { username_required } => {
-            return Ok(OpenHostOutcome::NeedsPassword {
+            return Ok(HostConnection::NeedsInput(OpenHostOutcome::NeedsPassword {
                 username_required,
                 saved_password_rejected: false,
-            });
+            }));
         }
         LoginPlan::NeedsPassphrase {
             key_label,
             username_required,
         } => {
-            return Ok(OpenHostOutcome::NeedsPassphrase {
-                key_label,
-                wrong_passphrase: false,
-                username_required,
-            });
+            return Ok(HostConnection::NeedsInput(
+                OpenHostOutcome::NeedsPassphrase {
+                    key_label,
+                    wrong_passphrase: false,
+                    username_required,
+                },
+            ));
         }
-        LoginPlan::NeedsUsername => return Ok(OpenHostOutcome::NeedsUsername),
+        LoginPlan::NeedsUsername => {
+            return Ok(HostConnection::NeedsInput(OpenHostOutcome::NeedsUsername));
+        }
     };
     let uses_password = matches!(method, LoginMethod::Password(_));
     let key_label = identity.map(|i| i.label.clone()).unwrap_or_default();
@@ -397,16 +422,12 @@ pub async fn session_open_host(
         username: username.clone(),
         method,
     };
-    let size = PtySize {
-        cols: request.cols,
-        rows: request.rows,
-    };
     crate::logging::log_connect_attempt(&request.host_id, &login, jump.is_some());
     let hop = jump.as_ref().map(|j| JumpHop {
         login: &j.login,
         verify_host_key: jump_verifier,
     });
-    let result = ShellSession::open_through(hop, &login, size, verifier, CONNECT_TIMEOUT).await;
+    let result = SshConnection::open(hop, &login, verifier, CONNECT_TIMEOUT).await;
 
     // The jump hop proved its key as soon as it let us through, even if the target then failed.
     if let Some(j) = &jump
@@ -416,7 +437,7 @@ pub async fn session_open_host(
         trust_if_new(vault, &j.host, &jump_offered).await?;
     }
 
-    let (shell, events) = match result {
+    let connection = match result {
         Ok(opened) => opened,
         Err(CoreError::JumpHost(inner)) if matches!(*inner, CoreError::HostKeyRejected) => {
             let jump_host = jump
@@ -424,31 +445,37 @@ pub async fn session_open_host(
                 .map(|j| server_name(&j.host))
                 .unwrap_or_default();
             return key_outcome(jump_host, &jump_offered)
+                .map(HostConnection::NeedsInput)
                 .ok_or_else(|| CoreError::HostKeyRejected.into());
         }
         Err(CoreError::HostKeyRejected) => {
             return key_outcome(server_name(&host), &offered)
+                .map(HostConnection::NeedsInput)
                 .ok_or_else(|| CoreError::HostKeyRejected.into());
         }
         Err(CoreError::AuthenticationFailed) if uses_password => {
-            return Ok(OpenHostOutcome::NeedsPassword {
+            return Ok(HostConnection::NeedsInput(OpenHostOutcome::NeedsPassword {
                 username_required: false,
                 saved_password_rejected: secret == SecretSource::Vault,
-            });
+            }));
         }
         Err(CoreError::WrongPassphrase) => {
-            return Ok(OpenHostOutcome::NeedsPassphrase {
-                key_label,
-                wrong_passphrase: true,
-                username_required: false,
-            });
+            return Ok(HostConnection::NeedsInput(
+                OpenHostOutcome::NeedsPassphrase {
+                    key_label,
+                    wrong_passphrase: true,
+                    username_required: false,
+                },
+            ));
         }
         Err(CoreError::PassphraseRequired) => {
-            return Ok(OpenHostOutcome::NeedsPassphrase {
-                key_label,
-                wrong_passphrase: false,
-                username_required: false,
-            });
+            return Ok(HostConnection::NeedsInput(
+                OpenHostOutcome::NeedsPassphrase {
+                    key_label,
+                    wrong_passphrase: false,
+                    username_required: false,
+                },
+            ));
         }
         Err(CoreError::AuthenticationFailed) => {
             return Err(CoreError::InvalidData(format!(
@@ -480,6 +507,29 @@ pub async fn session_open_host(
         .await?;
     }
 
+    Ok(HostConnection::Connected(connection))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn session_open_host(
+    app: AppHandle,
+    vault_state: State<'_, VaultState>,
+    sessions: State<'_, Sessions>,
+    request: OpenHostRequest,
+    on_output: Channel<RawChunk>,
+    on_closed: Channel<SessionClosed>,
+) -> Result<OpenHostOutcome, CommandError> {
+    let vault = vault_state.vault().await?;
+    let connection = match connect_host(&vault, &request.login()).await? {
+        HostConnection::Connected(connection) => connection,
+        HostConnection::NeedsInput(outcome) => return Ok(outcome),
+    };
+    let size = PtySize {
+        cols: request.cols,
+        rows: request.rows,
+    };
+    let (shell, events) = ShellSession::start(connection, size).await?;
     let session_id = start_session(
         app,
         &sessions,

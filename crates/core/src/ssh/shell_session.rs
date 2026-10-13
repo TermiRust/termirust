@@ -97,7 +97,7 @@ pub enum ShellEvent {
     Closed { exit_status: Option<u32> },
 }
 
-struct ClientHandler {
+pub(crate) struct ClientHandler {
     verify_host_key: HostKeyVerifier,
 }
 
@@ -115,10 +115,52 @@ impl Handler for ClientHandler {
 }
 
 /// An interactive shell on a remote host, backed by one SSH connection and PTY channel.
-pub struct ShellSession {
-    connection: Handle<ClientHandler>,
-    /// Kept alive while the session tunnels through it.
+/// An authenticated SSH connection, possibly through a jump host. Shells, SFTP and port
+/// forwards are opened on top of it.
+pub struct SshConnection {
+    handle: Handle<ClientHandler>,
+    /// Kept alive while the connection tunnels through it.
     jump: Option<Handle<ClientHandler>>,
+}
+
+impl SshConnection {
+    /// Connects (through `jump` when given) and authenticates.
+    /// Failures on the jump hop are wrapped in [`CoreError::JumpHost`].
+    pub async fn open(
+        jump: Option<JumpHop<'_>>,
+        login: &SshLogin,
+        verify_host_key: HostKeyVerifier,
+        connect_timeout: Duration,
+    ) -> Result<Self> {
+        let jump = match jump {
+            Some(hop) => Some(
+                establish(hop.login, hop.verify_host_key, connect_timeout, None)
+                    .await
+                    .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
+            ),
+            None => None,
+        };
+        let handle = establish(login, verify_host_key, connect_timeout, jump.as_ref()).await?;
+        Ok(Self { handle, jump })
+    }
+
+    pub(crate) fn handle(&self) -> &Handle<ClientHandler> {
+        &self.handle
+    }
+
+    pub async fn disconnect(&self) -> Result<()> {
+        self.handle
+            .disconnect(Disconnect::ByApplication, "", "en")
+            .await?;
+        if let Some(jump) = &self.jump {
+            let _ = jump.disconnect(Disconnect::ByApplication, "", "en").await;
+        }
+        Ok(())
+    }
+}
+
+pub struct ShellSession {
+    connection: SshConnection,
     channel: ChannelWriteHalf<client::Msg>,
 }
 
@@ -236,17 +278,16 @@ impl ShellSession {
         verify_host_key: HostKeyVerifier,
         connect_timeout: Duration,
     ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
-        let jump = match jump {
-            Some(hop) => Some(
-                establish(hop.login, hop.verify_host_key, connect_timeout, None)
-                    .await
-                    .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
-            ),
-            None => None,
-        };
-        let connection = establish(login, verify_host_key, connect_timeout, jump.as_ref()).await?;
+        let connection = SshConnection::open(jump, login, verify_host_key, connect_timeout).await?;
+        Self::start(connection, size).await
+    }
 
-        let channel = connection.channel_open_session().await?;
+    /// Starts a login shell on a PTY over an already authenticated connection.
+    pub async fn start(
+        connection: SshConnection,
+        size: PtySize,
+    ) -> Result<(Self, mpsc::Receiver<ShellEvent>)> {
+        let channel = connection.handle().channel_open_session().await?;
         channel
             .request_pty(false, TERM, size.cols, size.rows, 0, 0, &[])
             .await?;
@@ -278,7 +319,6 @@ impl ShellSession {
         Ok((
             Self {
                 connection,
-                jump,
                 channel: writer,
             },
             events_rx,
@@ -302,13 +342,7 @@ impl ShellSession {
     pub async fn close(&self) -> Result<()> {
         let _ = self.channel.eof().await;
         let _ = self.channel.close().await;
-        self.connection
-            .disconnect(Disconnect::ByApplication, "", "en")
-            .await?;
-        if let Some(jump) = &self.jump {
-            let _ = jump.disconnect(Disconnect::ByApplication, "", "en").await;
-        }
-        Ok(())
+        self.connection.disconnect().await
     }
 }
 
