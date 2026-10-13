@@ -1,3 +1,4 @@
+pub mod ai;
 mod error;
 pub mod forward;
 pub mod local_fs;

@@ -5596,6 +5596,7 @@ dependencies = [
  "getrandom 0.4.3",
  "keyring",
  "portable-pty",
+ "regex",
  "russh",
  "russh-sftp",
  "serde",
