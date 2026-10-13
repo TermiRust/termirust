@@ -11,6 +11,11 @@ vi.mock("@/bindings", () => ({
     hostsList: () => Promise.resolve({ status: "ok", data: [] }),
     groupsList: () => Promise.resolve({ status: "ok", data: [] }),
     settingsTerminalGet: () => Promise.resolve({ status: "ok", data: {} }),
+    sshConfigPreview: () =>
+      Promise.resolve({
+        status: "ok",
+        data: { path: "/home/me/.ssh/config", unsupported: [], candidates: [{ alias: "a", alreadySaved: false }, { alias: "b", alreadySaved: true }] },
+      }),
   },
 }));
 vi.mock("@/features/session/local-session-view", () => ({ LocalSessionView: () => <div>local shell</div> }));
@@ -32,10 +37,18 @@ describe("AppShell", () => {
     useTabsStore.setState(initialTabs, true);
   });
 
-  it("shows the empty workspace with the backend version", async () => {
+  it("shows the first-launch actions, the backend version and how many hosts can be imported", async () => {
     render(<AppShell />);
-    expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
+    expect(screen.getByText(/No account needed/)).toBeInTheDocument();
     expect(await screen.findByText("v0.0.1")).toBeInTheDocument();
+    expect(await screen.findByText("Found 1 host you can bring over")).toBeInTheDocument();
+    expect(screen.getByText(/encrypted on this device/)).toBeInTheDocument();
+  });
+
+  it("opens a local terminal from the first-launch card", async () => {
+    render(<AppShell />);
+    await userEvent.click(screen.getByRole("button", { name: /Open local terminal/ }));
+    expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["local"]);
   });
 
   it("hides and shows the sidebar with the platform shortcut", () => {
@@ -73,11 +86,11 @@ describe("AppShell", () => {
   it("switches between the empty workspace and the connection lab", async () => {
     const user = userEvent.setup();
     render(<AppShell />);
-    await user.click(screen.getByRole("button", { name: "Open connection lab" }));
-    expect(screen.queryByText(/No open sessions/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Connection lab" }));
+    expect(screen.queryByText(/No account needed/)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Leave lab" }));
-    expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
+    expect(screen.getByText(/No account needed/)).toBeInTheDocument();
   });
 });
 
@@ -95,7 +108,7 @@ describe("AppShell tabs", () => {
     const dialog = await screen.findByRole("dialog", { name: /Close Connection lab/ });
     await userEvent.click(within(dialog).getByRole("button", { name: "Close tab" }));
     expect(useTabsStore.getState().tabs).toEqual([]);
-    expect(screen.getByText(/No open sessions/)).toBeInTheDocument();
+    expect(screen.getByText(/No account needed/)).toBeInTheDocument();
   });
 
   it("closes a tab that is not connected without asking", async () => {

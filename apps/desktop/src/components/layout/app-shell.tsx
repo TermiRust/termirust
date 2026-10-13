@@ -15,7 +15,7 @@ import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
 import { groupTabColor } from "@/features/tabs/tab-color";
-import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
+import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useSettingsStore } from "@/stores/settings-store";
@@ -129,7 +129,19 @@ export function AppShell() {
         {section === "settings" && <SettingsView />}
         {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
         {section === "hosts" && tabs.length === 0 && (
-          <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} onOpenConnectionLab={openLabTab} />
+          <EmptyWorkspace
+            version={version}
+            shortcuts={{
+              palette: shortcutLabel("palette", onMac),
+              newHost: shortcutLabel("newHost", onMac),
+              newLocal: shortcutLabel("newLocal", onMac),
+              sidebar: shortcutLabel("sidebar", onMac),
+            }}
+            onNewHost={openNewHost}
+            onImportConfig={() => setImportConfigOpen(true)}
+            onOpenLocal={openLocalTab}
+            onOpenConnectionLab={import.meta.env.DEV ? openLabTab : undefined}
+          />
         )}
         {tabs.map((tab) => (
           <TabPanel
