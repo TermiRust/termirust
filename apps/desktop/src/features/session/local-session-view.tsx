@@ -2,7 +2,7 @@ import { RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import { TerminalView, type TerminalHandle } from "@/features/terminal/terminal-view";
+import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { useLocalSession, type LocalSessionState } from "./use-local-session";
@@ -14,7 +14,12 @@ const tabStatusOf: Record<LocalSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function LocalSessionView({ onStatusChange }: { onStatusChange?: (status: TabStatus) => void }) {
+interface LocalSessionViewProps {
+  onStatusChange?: (status: TabStatus) => void;
+  onSizeChange?: (size: TerminalSize) => void;
+}
+
+export function LocalSessionView({ onStatusChange, onSizeChange }: LocalSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useLocalSession(getTerminal);
@@ -39,7 +44,14 @@ export function LocalSessionView({ onStatusChange }: { onStatusChange?: (status:
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-hidden">
-        <TerminalView ref={terminalRef} onData={session.send} onResize={session.resize} />
+        <TerminalView
+          ref={terminalRef}
+          onData={session.send}
+          onResize={(size) => {
+            session.resize(size);
+            onSizeChange?.(size);
+          }}
+        />
       </div>
     </div>
   );

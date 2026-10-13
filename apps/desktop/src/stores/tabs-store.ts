@@ -13,6 +13,8 @@ export interface Tab {
   target: TabTarget;
   status: TabStatus;
   color: TabColor | null;
+  /** Terminal size in characters, once the terminal has measured itself. */
+  size: { cols: number; rows: number } | null;
 }
 
 interface TabsState {
@@ -25,6 +27,7 @@ interface TabsState {
   activateTab: (id: string) => void;
   activateTabAt: (index: number) => void;
   setTabStatus: (id: string, status: TabStatus) => void;
+  setTabSize: (id: string, cols: number, rows: number) => void;
   renameTab: (id: string, title: string) => void;
   moveTab: (id: string, toIndex: number) => void;
 }
@@ -43,9 +46,9 @@ export const useTabsStore = create<TabsState>()((set, get) => {
     tabs: [],
     activeTabId: null,
 
-    openHostTab: (host, color) => open({ title: host.label, target: { kind: "host", host }, status: "connecting", color }),
-    openLabTab: () => open({ title: "Connection lab", target: { kind: "lab" }, status: "idle", color: null }),
-    openLocalTab: () => open({ title: "Local", target: { kind: "local" }, status: "connecting", color: null }),
+    openHostTab: (host, color) => open({ title: host.label, target: { kind: "host", host }, status: "connecting", color, size: null }),
+    openLabTab: () => open({ title: "Connection lab", target: { kind: "lab" }, status: "idle", color: null, size: null }),
+    openLocalTab: () => open({ title: "Local", target: { kind: "local" }, status: "connecting", color: null, size: null }),
 
     /** Closing the active tab activates its right neighbour, or the left one at the end. */
     closeTab: (id) =>
@@ -73,6 +76,13 @@ export const useTabsStore = create<TabsState>()((set, get) => {
       set((s) =>
         s.tabs.some((t) => t.id === id && t.status !== status)
           ? { tabs: s.tabs.map((t) => (t.id === id ? { ...t, status } : t)) }
+          : s,
+      ),
+
+    setTabSize: (id, cols, rows) =>
+      set((s) =>
+        s.tabs.some((t) => t.id === id && (t.size?.cols !== cols || t.size?.rows !== rows))
+          ? { tabs: s.tabs.map((t) => (t.id === id ? { ...t, size: { cols, rows } } : t)) }
           : s,
       ),
 

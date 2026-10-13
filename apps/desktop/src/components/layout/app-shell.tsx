@@ -5,6 +5,7 @@ import { AppDialogs } from "@/components/layout/app-dialogs";
 import { ConfirmCloseDialog } from "@/components/layout/confirm-close-dialog";
 import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
+import { StatusBar } from "@/components/layout/status-bar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
 import { KeychainView } from "@/features/keychain/keychain-view";
@@ -33,7 +34,8 @@ export function AppShell() {
   const hosts = useHostsStore((s) => s.hosts);
   const { paletteOpen, setPaletteOpen, openNewHost, setImportConfigOpen } = useDialogsStore();
   const [recentHostIds, setRecentHostIds] = useState<string[]>(loadRecentHostIds);
-  const { tabs, activeTabId, openHostTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus } = useTabsStore();
+  const { tabs, activeTabId, openHostTab, openLabTab, openLocalTab, closeTab, activateTabAt, setTabStatus, setTabSize } = useTabsStore();
+  const showStatusBar = useSettingsStore((s) => s.terminal.showStatusBar);
   const version = useAppVersion();
   const onMac = useMemo(() => isMacPlatform(), []);
   const autoRunBenchmarks = import.meta.env.VITE_AUTORUN_BENCHMARK === "1";
@@ -130,8 +132,17 @@ export function AppShell() {
           <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} onOpenConnectionLab={openLabTab} />
         )}
         {tabs.map((tab) => (
-          <TabPanel key={tab.id} tab={tab} active={section === "hosts" && tab.id === activeTabId} onStatusChange={setTabStatus} onClose={closeTab} autoRunBenchmarks={autoRunBenchmarks} />
+          <TabPanel
+            key={tab.id}
+            tab={tab}
+            active={section === "hosts" && tab.id === activeTabId}
+            onStatusChange={setTabStatus}
+            onSizeChange={setTabSize}
+            onClose={closeTab}
+            autoRunBenchmarks={autoRunBenchmarks}
+          />
         ))}
+        {section === "hosts" && showStatusBar && <StatusBar tab={tabs.find((t) => t.id === activeTabId)} hosts={hosts} />}
       </main>
       <AppDialogs onConnect={openHost} />
       <CommandPalette
@@ -160,19 +171,21 @@ interface TabPanelProps {
   tab: Tab;
   active: boolean;
   onStatusChange: (id: string, status: TabStatus) => void;
+  onSizeChange: (id: string, cols: number, rows: number) => void;
   onClose: (id: string) => void;
   autoRunBenchmarks: boolean;
 }
 
 /** Inactive tabs stay mounted (hidden) so their SSH sessions and scrollback survive switching. */
-function TabPanel({ tab, active, onStatusChange, onClose, autoRunBenchmarks }: TabPanelProps) {
+function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, autoRunBenchmarks }: TabPanelProps) {
   const reportStatus = useCallback((status: TabStatus) => onStatusChange(tab.id, status), [onStatusChange, tab.id]);
+  const reportSize = useCallback((size: { cols: number; rows: number }) => onSizeChange(tab.id, size.cols, size.rows), [onSizeChange, tab.id]);
   return (
     <div role="tabpanel" aria-labelledby={`tab-${tab.id}`} hidden={!active} className={active ? "flex min-h-0 flex-1 flex-col" : undefined}>
       {tab.target.kind === "host" ? (
-        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} />
+        <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} />
       ) : tab.target.kind === "local" ? (
-        <LocalSessionView onStatusChange={reportStatus} />
+        <LocalSessionView onStatusChange={reportStatus} onSizeChange={reportSize} />
       ) : (
         <ConnectionLab onExit={() => onClose(tab.id)} autoRunBenchmarks={autoRunBenchmarks} />
       )}

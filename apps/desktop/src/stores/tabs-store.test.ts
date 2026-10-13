@@ -100,6 +100,16 @@ describe("tabs store", () => {
     expect(state().tabs[0]?.status).toBe("connected");
   });
 
+  it("records the terminal size and skips no-op updates", () => {
+    const id = state().openHostTab(host("a"), null);
+    expect(state().tabs[0]?.size).toBeNull();
+    state().setTabSize(id, 120, 32);
+    const tabs = state().tabs;
+    state().setTabSize(id, 120, 32);
+    expect(state().tabs).toBe(tabs);
+    expect(state().tabs[0]?.size).toEqual({ cols: 120, rows: 32 });
+  });
+
   it("renames with trimming and refuses an empty title", () => {
     const id = state().openHostTab(host("a"), null);
     state().renameTab(id, "  db shell ");

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import { TerminalView, type TerminalHandle } from "@/features/terminal/terminal-view";
+import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
@@ -15,6 +15,7 @@ import { useHostSession, type HostSessionState } from "./use-host-session";
 interface HostSessionViewProps {
   host: HostView;
   onStatusChange?: (status: TabStatus) => void;
+  onSizeChange?: (size: TerminalSize) => void;
 }
 
 const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
@@ -30,7 +31,7 @@ const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   error: "error",
 };
 
-export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) {
+export function HostSessionView({ host, onStatusChange, onSizeChange }: HostSessionViewProps) {
   const terminalRef = useRef<TerminalHandle>(null);
   const getTerminal = useCallback(() => terminalRef.current, []);
   const session = useHostSession(host, getTerminal);
@@ -64,7 +65,14 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
 
       <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <TerminalView ref={terminalRef} onData={session.send} onResize={session.resize} />
+        <TerminalView
+          ref={terminalRef}
+          onData={session.send}
+          onResize={(size) => {
+            session.resize(size);
+            onSizeChange?.(size);
+          }}
+        />
         {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
       </div>
 
