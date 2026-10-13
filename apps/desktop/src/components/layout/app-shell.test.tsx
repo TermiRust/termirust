@@ -295,7 +295,7 @@ describe("AppShell warning border", () => {
     expect(useTabsStore.getState().tabs).toHaveLength(0);
   });
 
-  it("switches the terminal theme from the palette", async () => {
+  it("switches the app theme from the palette", async () => {
     const { useSettingsStore } = await import("@/stores/settings-store");
     const update = vi.fn();
     useSettingsStore.setState({ updateTerminal: update });
@@ -308,7 +308,7 @@ describe("AppShell warning border", () => {
     const user = userEvent.setup();
     await user.type(screen.getByRole("combobox"), "theme tokyo");
     await user.keyboard("{Enter}");
-    expect(update).toHaveBeenCalledWith({ theme: "tokyo-night" });
+    expect(update).toHaveBeenCalledWith({ appTheme: "tokyo-night" });
   });
 
   it("opens the palette from the top bar search and settings from its gear", async () => {
@@ -372,5 +372,16 @@ describe("AppShell warning border", () => {
     expect(useTabsStore.getState().tabs.map((t) => t.target.kind)).toEqual(["sftp"]);
     expect(useLayoutStore.getState().section).toBe("hosts");
     expect(screen.getByText("sftp browser")).toBeInTheDocument();
+  });
+
+  it("paints the whole UI with the chosen appearance", async () => {
+    const { useSettingsStore, DEFAULT_TERMINAL_SETTINGS } = await import("@/stores/settings-store");
+    render(<AppShell />);
+    act(() => useSettingsStore.setState({ terminal: { ...DEFAULT_TERMINAL_SETTINGS, appTheme: "tokyo-night" } }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#1a1b26");
+    act(() => useSettingsStore.setState({ terminal: { ...DEFAULT_TERMINAL_SETTINGS, appTheme: "system" } }));
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("");
   });
 });

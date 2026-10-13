@@ -9,12 +9,14 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { Select } from "@/components/ui/select";
+import { MATCH_APP, effectiveTerminalTheme } from "@/lib/app-theme";
 import { allThemes, terminalTheme } from "@/lib/terminal-theme";
 import { mergeThemes, parseThemeFile } from "@/lib/theme-import";
 import { cn } from "@/lib/utils";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
 import { AiSettingsSection } from "./ai-settings-section";
+import { AppearancePicker } from "./appearance-picker";
 import { FONT_CHOICES } from "./font-choices";
 
 
@@ -33,6 +35,13 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 export function SettingsView() {
   const { terminal, error, updateTerminal } = useSettingsStore();
   const update = (patch: Partial<ResolvedTerminalSettings>) => void updateTerminal(patch);
+  /** Forgets an imported theme and stops using it anywhere it was selected. */
+  const removeTheme = (id: string) =>
+    update({
+      customThemes: terminal.customThemes.filter((t) => t.id !== id),
+      theme: terminal.theme === id ? MATCH_APP : terminal.theme,
+      appTheme: terminal.appTheme === id ? "system" : terminal.appTheme,
+    });
   const fontLabel = FONT_CHOICES.find((f) => f.stack === terminal.fontFamily)?.label ?? "Custom";
 
   return (
@@ -40,7 +49,7 @@ export function SettingsView() {
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4">
         <SettingsIcon size={16} className="text-fg-muted" />
         <h1 className="text-[15px] font-semibold">Settings</h1>
-        <span className="text-xs text-fg-muted">› Terminal</span>
+        <span className="text-xs text-fg-muted">› Appearance & terminal</span>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="mx-auto grid max-w-5xl gap-6 p-6 lg:grid-cols-[1fr_340px]">
@@ -50,6 +59,16 @@ export function SettingsView() {
                 {error}
               </p>
             )}
+            <Row label="Appearance" hint="Colours of the whole app. Import iTerm2 .itermcolors or Windows Terminal .json schemes">
+              <AppearancePicker value={terminal.appTheme} customThemes={terminal.customThemes} onChange={(appTheme) => update({ appTheme })} onRemove={removeTheme} />
+              <ThemeImport
+                onImport={(themes) => {
+                  const customThemes = mergeThemes(terminal.customThemes, themes);
+                  const last = customThemes.find((t) => t.name === themes.at(-1)?.name);
+                  update({ customThemes, appTheme: last?.id ?? terminal.appTheme });
+                }}
+              />
+            </Row>
             <Row label="Font">
               <div className="flex gap-2">
                 <Select aria-label="Font family" value={fontLabel} onChange={(e) => {
@@ -83,8 +102,21 @@ export function SettingsView() {
                 ))}
               </Select>
             </Row>
-            <Row label="Theme" hint="Import iTerm2 .itermcolors or Windows Terminal .json schemes">
-              <div role="radiogroup" aria-label="Theme" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Row label="Terminal theme" hint="Follows the app unless you pick one">
+              <div role="radiogroup" aria-label="Terminal theme" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={terminal.theme === MATCH_APP}
+                  aria-label="Match app theme"
+                  onClick={() => update({ theme: MATCH_APP })}
+                  className={cn(
+                    "grid min-h-[76px] place-items-center rounded-lg border p-2 text-center text-xs transition-colors",
+                    terminal.theme === MATCH_APP ? "border-accent ring-2 ring-accent-ring" : "border-border hover:border-border-strong",
+                  )}
+                >
+                  Match app theme
+                </button>
                 {allThemes(terminal.customThemes).map((theme) => {
                   const c = theme.colors;
                   const selected = theme.id === terminal.theme;
@@ -110,12 +142,7 @@ export function SettingsView() {
                         <button
                           type="button"
                           aria-label={`Remove ${theme.name}`}
-                          onClick={() =>
-                            update({
-                              customThemes: terminal.customThemes.filter((t) => t.id !== theme.id),
-                              theme: selected ? "termirust-dark" : terminal.theme,
-                            })
-                          }
+                          onClick={() => removeTheme(theme.id)}
                           className="absolute right-1.5 bottom-1.5 rounded p-0.5 text-fg-muted hover:bg-hover hover:text-fg"
                         >
                           <X size={12} />
@@ -125,13 +152,6 @@ export function SettingsView() {
                   );
                 })}
               </div>
-              <ThemeImport
-                onImport={(themes) => {
-                  const customThemes = mergeThemes(terminal.customThemes, themes);
-                  const last = customThemes.find((t) => t.name === themes.at(-1)?.name);
-                  update({ customThemes, theme: last?.id ?? terminal.theme });
-                }}
-              />
             </Row>
             <Row label="Cursor">
               <div className="flex flex-wrap items-center gap-4">
@@ -185,7 +205,7 @@ export function SettingsView() {
 }
 
 function TerminalPreview({ settings }: { settings: ResolvedTerminalSettings }) {
-  const c = terminalTheme(settings.theme, settings.customThemes).colors;
+  const c = terminalTheme(effectiveTerminalTheme(settings.theme, settings.appTheme), settings.customThemes).colors;
   const cursorClass = settings.cursorStyle === "block" ? "inline-block w-[0.6em]" : settings.cursorStyle === "bar" ? "inline-block w-[2px]" : "inline-block w-[0.6em] h-[2px] align-bottom";
   return (
     <figure aria-label="Preview" className="sticky top-6 self-start">

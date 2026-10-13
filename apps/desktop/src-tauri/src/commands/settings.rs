@@ -14,6 +14,11 @@ pub const THEMES: &[&str] = &[
     "tokyo-night",
 ];
 
+/// App appearances besides the colour themes: follow the OS, or force light / dark.
+pub const APP_MODES: &[&str] = &["system", "light", "dark"];
+/// Terminal theme value meaning "use the app's theme".
+pub const MATCH_APP: &str = "match-app";
+
 /// Most imported themes a user can keep; enough for any real collection.
 const MAX_CUSTOM_THEMES: usize = 50;
 
@@ -79,6 +84,8 @@ pub struct TerminalSettings {
     pub confirm_multiline_paste: bool,
     pub show_status_bar: bool,
     pub custom_themes: Vec<CustomTheme>,
+    /// The whole app's colours: "system", "light", "dark" or any terminal theme id.
+    pub app_theme: String,
 }
 
 impl Default for TerminalSettings {
@@ -87,7 +94,7 @@ impl Default for TerminalSettings {
             font_family: "\"JetBrains Mono\", Menlo, Consolas, monospace".into(),
             font_size: 13,
             line_height: 1.2,
-            theme: "termirust-dark".into(),
+            theme: MATCH_APP.into(),
             cursor_style: CursorStyle::Block,
             cursor_blink: true,
             scrollback: 10_000,
@@ -95,6 +102,7 @@ impl Default for TerminalSettings {
             confirm_multiline_paste: true,
             show_status_bar: true,
             custom_themes: Vec::new(),
+            app_theme: "system".into(),
         }
     }
 }
@@ -115,9 +123,13 @@ impl TerminalSettings {
         self.custom_themes
             .retain(|t| t.is_valid() && seen.insert(t.id.clone()));
         self.custom_themes.truncate(MAX_CUSTOM_THEMES);
-        let custom = self.custom_themes.iter().any(|t| t.id == self.theme);
-        if !THEMES.contains(&self.theme.as_str()) && !custom {
-            self.theme = defaults.theme;
+        let known =
+            |id: &str| THEMES.contains(&id) || self.custom_themes.iter().any(|t| t.id == id);
+        if self.theme != MATCH_APP && !known(&self.theme) {
+            self.theme = defaults.theme.clone();
+        }
+        if !APP_MODES.contains(&self.app_theme.as_str()) && !known(&self.app_theme) {
+            self.app_theme = defaults.app_theme.clone();
         }
         if self.font_family.trim().is_empty() {
             self.font_family = defaults.font_family;
@@ -176,7 +188,7 @@ mod tests {
         assert_eq!(wild.font_size, 32);
         assert_eq!(wild.line_height, 1.2);
         assert_eq!(wild.scrollback, 100_000);
-        assert_eq!(wild.theme, "termirust-dark");
+        assert_eq!(wild.theme, MATCH_APP);
         assert!(wild.font_family.contains("JetBrains Mono"));
 
         let small = TerminalSettings {
@@ -223,10 +235,31 @@ mod tests {
 
         let orphan = TerminalSettings {
             theme: "custom-gone".into(),
+            app_theme: "custom-gone".into(),
             ..TerminalSettings::default()
         }
         .sanitized();
-        assert_eq!(orphan.theme, "termirust-dark");
+        assert_eq!(orphan.theme, MATCH_APP);
+        assert_eq!(orphan.app_theme, "system");
+    }
+
+    #[test]
+    fn app_theme_accepts_modes_built_in_and_imported_themes() {
+        for id in ["system", "light", "dark", "dracula", "tokyo-night"] {
+            let s = TerminalSettings {
+                app_theme: id.into(),
+                ..TerminalSettings::default()
+            }
+            .sanitized();
+            assert_eq!(s.app_theme, id);
+        }
+        let with_custom = TerminalSettings {
+            app_theme: "custom-a".into(),
+            custom_themes: vec![custom("custom-a")],
+            ..TerminalSettings::default()
+        }
+        .sanitized();
+        assert_eq!(with_custom.app_theme, "custom-a");
     }
 
     #[test]
@@ -238,6 +271,8 @@ mod tests {
         assert!(parsed.confirm_multiline_paste);
         assert!(parsed.show_status_bar);
         assert!(parsed.custom_themes.is_empty());
+        // Users who picked a terminal theme before app themes existed keep it.
+        assert_eq!(parsed.app_theme, "system");
     }
 
     #[tokio::test]

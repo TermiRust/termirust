@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,15 +36,27 @@ describe("SettingsView", () => {
     expect(saved()).toMatchObject({ fontSize: 8 });
   });
 
-  it("picks a theme from the cards and updates the preview", async () => {
+  it("follows the app theme by default, or uses a terminal theme of its own", async () => {
     const user = userEvent.setup();
     render(<SettingsView />);
-    expect(screen.getByRole("radio", { name: "Termirust Dark" })).toHaveAttribute("aria-checked", "true");
-    await user.click(screen.getByRole("radio", { name: "Nord" }));
-    expect(screen.getByRole("radio", { name: "Nord" })).toHaveAttribute("aria-checked", "true");
+    const terminalThemes = within(screen.getByRole("radiogroup", { name: "Terminal theme" }));
+    expect(terminalThemes.getByRole("radio", { name: "Match app theme" })).toHaveAttribute("aria-checked", "true");
+    await user.click(terminalThemes.getByRole("radio", { name: "Nord" }));
+    expect(terminalThemes.getByRole("radio", { name: "Nord" })).toHaveAttribute("aria-checked", "true");
     expect(saved()).toMatchObject({ theme: "nord" });
     const preview = screen.getByRole("figure", { name: "Preview" }).querySelector("div")!;
     expect(preview.style.background).toBe("rgb(46, 52, 64)");
+  });
+
+  it("changes the whole app's appearance, and the terminal follows it", async () => {
+    const user = userEvent.setup();
+    render(<SettingsView />);
+    const appearance = within(screen.getByRole("radiogroup", { name: "Appearance" }));
+    expect(appearance.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+    await user.click(appearance.getByRole("radio", { name: "Dracula" }));
+    expect(saved()).toMatchObject({ appTheme: "dracula" });
+    const preview = screen.getByRole("figure", { name: "Preview" }).querySelector("div")!;
+    expect(preview.style.background).toBe("rgb(40, 42, 54)");
   });
 
   it("sets font family, line height, cursor and behaviour options", async () => {
@@ -100,12 +112,13 @@ describe("SettingsView", () => {
     const file = new File([JSON.stringify(scheme)], "campbell.json", { type: "application/json" });
     await user.upload(screen.getByLabelText("Import theme file"), file);
 
-    expect(await screen.findByRole("radio", { name: "Campbell" })).toHaveAttribute("aria-checked", "true");
-    expect(saved()).toMatchObject({ theme: "custom-campbell", customThemes: [expect.objectContaining({ id: "custom-campbell" })] });
+    const appearance = () => within(screen.getByRole("radiogroup", { name: "Appearance" }));
+    expect(await appearance().findByRole("radio", { name: "Campbell" })).toHaveAttribute("aria-checked", "true");
+    expect(saved()).toMatchObject({ appTheme: "custom-campbell", customThemes: [expect.objectContaining({ id: "custom-campbell" })] });
 
-    await user.click(screen.getByRole("button", { name: "Remove Campbell" }));
+    await user.click(appearance().getByRole("button", { name: "Remove Campbell" }));
     expect(screen.queryByRole("radio", { name: "Campbell" })).not.toBeInTheDocument();
-    expect(saved()).toMatchObject({ theme: "termirust-dark", customThemes: [] });
+    expect(saved()).toMatchObject({ appTheme: "system", customThemes: [] });
   });
 
   it("explains why a theme file could not be imported", async () => {

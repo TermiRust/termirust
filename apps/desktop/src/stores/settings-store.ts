@@ -9,7 +9,7 @@ export const DEFAULT_TERMINAL_SETTINGS: ResolvedTerminalSettings = {
   fontFamily: '"JetBrains Mono", Menlo, Consolas, monospace',
   fontSize: 13,
   lineHeight: 1.2,
-  theme: "termirust-dark",
+  theme: "match-app",
   cursorStyle: "block",
   cursorBlink: true,
   scrollback: 10_000,
@@ -17,6 +17,7 @@ export const DEFAULT_TERMINAL_SETTINGS: ResolvedTerminalSettings = {
   confirmMultilinePaste: true,
   showStatusBar: true,
   customThemes: [],
+  appTheme: "system",
 };
 
 export function resolveTerminalSettings(raw: TerminalSettings): ResolvedTerminalSettings {

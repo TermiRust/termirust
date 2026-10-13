@@ -410,6 +410,8 @@ export type TerminalSettings = {
 	confirmMultilinePaste?: boolean,
 	showStatusBar?: boolean,
 	customThemes?: CustomTheme[],
+	/**  The whole app's colours: "system", "light", "dark" or any terminal theme id. */
+	appTheme?: string,
 };
 
 export type TransferDirection = "upload" | "download";

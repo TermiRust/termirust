@@ -10,6 +10,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import { isAiShortcut, isAppChord, isFindShortcut, isMacPlatform } from "@/lib/shortcuts";
+import { effectiveTerminalTheme } from "@/lib/app-theme";
 import { terminalTheme } from "@/lib/terminal-theme";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
@@ -49,7 +50,7 @@ function applySettings(terminal: Terminal, settings: ResolvedTerminalSettings) {
   terminal.options.cursorStyle = settings.cursorStyle;
   terminal.options.cursorBlink = settings.cursorBlink;
   terminal.options.scrollback = settings.scrollback;
-  terminal.options.theme = terminalTheme(settings.theme, settings.customThemes).colors;
+  terminal.options.theme = terminalTheme(effectiveTerminalTheme(settings.theme, settings.appTheme), settings.customThemes).colors;
 }
 
 export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(function TerminalView({ onData, onResize, onAskAi, forcePasteConfirmation = false }, ref) {
@@ -176,7 +177,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     if (fitRef.current && containerRef.current) fitIfVisible(fitRef.current, containerRef.current);
   }, [settings]);
 
-  const background = terminalTheme(settings.theme, settings.customThemes).colors.background;
+  const background = terminalTheme(effectiveTerminalTheme(settings.theme, settings.appTheme), settings.customThemes).colors.background;
 
   // FitAddon measures the mount element including its padding, so padding lives on the wrapper.
   return (

@@ -23,7 +23,7 @@ import { LocalSessionView } from "@/features/session/local-session-view";
 import { SftpLauncher } from "@/features/sftp/sftp-launcher";
 import { SftpView } from "@/features/sftp/sftp-view";
 import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
-import { allThemes } from "@/lib/terminal-theme";
+import { appThemeChoices, applyAppTheme } from "@/lib/app-theme";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, paneShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { paneIds } from "@/features/panes/pane-tree";
 import { PaneLayout } from "@/components/layout/pane-layout";
@@ -121,14 +121,19 @@ export function AppShell() {
   const updateTerminal = useSettingsStore((s) => s.updateTerminal);
   const themeCommands = useMemo<PaletteCommand[]>(
     () =>
-      allThemes(terminalSettings.customThemes).map((theme) => ({
+      appThemeChoices(terminalSettings.customThemes).map((theme) => ({
         id: `theme:${theme.id}`,
-        label: `Theme: ${theme.name}${theme.id === terminalSettings.theme ? " (current)" : ""}`,
+        label: `Theme: ${theme.name}${theme.id === terminalSettings.appTheme ? " (current)" : ""}`,
         icon: paletteIcons.theme,
-        run: () => void updateTerminal({ theme: theme.id }),
+        run: () => void updateTerminal({ appTheme: theme.id }),
       })),
-    [terminalSettings.customThemes, terminalSettings.theme, updateTerminal],
+    [terminalSettings.customThemes, terminalSettings.appTheme, updateTerminal],
   );
+
+  // The whole UI follows the chosen appearance (CSS variables on <html>).
+  useEffect(() => {
+    applyAppTheme(document.documentElement, terminalSettings.appTheme, terminalSettings.customThemes);
+  }, [terminalSettings.appTheme, terminalSettings.customThemes]);
 
   const paletteCommands = useMemo<PaletteCommand[]>(
     () => [
