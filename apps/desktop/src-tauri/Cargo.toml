@@ -1,0 +1,25 @@
+[package]
+name = "termirust-desktop"
+description = "Termirust desktop app (Tauri shell)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+# Distinct lib name avoids a bin/lib name clash on Windows (cargo#8519).
+name = "termirust_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+termirust-core = { path = "../../../crates/core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde.workspace = true
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+specta-typescript = "=0.0.12"
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+serde_json.workspace = true
