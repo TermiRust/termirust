@@ -25,6 +25,7 @@ describe("hostFormValues", () => {
       tags: ["a", "b"],
       notes: "n",
       keepaliveSecs: 60,
+      color: null,
     };
     expect(hostFormValues(host)).toEqual({
       label: "db",
@@ -40,6 +41,7 @@ describe("hostFormValues", () => {
       tags: "a, b",
       notes: "n",
       keepaliveSecs: "60",
+      color: null,
     });
   });
 });
@@ -60,6 +62,7 @@ describe("hostInputFromForm", () => {
         tags: ["prod", "eu"],
         notes: "",
         keepaliveSecs: null,
+        color: null,
       },
     });
   });
@@ -96,6 +99,7 @@ describe("hostInputFromForm", () => {
       tags: [],
       notes: "",
       keepaliveSecs: null,
+    color: null,
     });
     expect([values.authMethod, values.keyId]).toEqual(["key", "k1"]);
   });
@@ -104,6 +108,11 @@ describe("hostInputFromForm", () => {
     const chosen = hostInputFromForm({ ...filled, authMethod: "key", keyId: "k1" });
     expect(chosen.ok && chosen.input.auth).toEqual({ method: "identity", identityId: "k1" });
     expect(hostInputFromForm({ ...filled, authMethod: "key", keyId: "" })).toEqual({ ok: false, errors: { keyId: "Choose a key" } });
+  });
+
+  it("carries the tab colour override", () => {
+    const result = hostInputFromForm({ ...filled, color: "violet" });
+    expect(result.ok && result.input.color).toBe("violet");
   });
 
   it("uses agent auth without any password", () => {

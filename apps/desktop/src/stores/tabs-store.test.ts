@@ -16,6 +16,7 @@ const host = (id: string): HostView => ({
   tags: [],
   notes: "",
   keepaliveSecs: null,
+color: null,
 });
 const state = () => useTabsStore.getState();
 const titles = () => state().tabs.map((t) => t.title);

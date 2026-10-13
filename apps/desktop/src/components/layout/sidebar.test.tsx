@@ -11,6 +11,8 @@ const commands = {
   hostsUpdate: vi.fn(),
   hostsDelete: vi.fn(),
   groupsCreate: vi.fn(),
+  groupsUpdate: vi.fn(),
+  groupsDelete: vi.fn(),
   keysList: vi.fn(),
   keysImport: vi.fn(),
   keysImportFile: vi.fn(),
@@ -39,9 +41,10 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   tags: [],
   notes: "",
   keepaliveSecs: null,
+  color: null,
   ...overrides,
 });
-const prod: GroupView = { id: "g1", name: "Production", parentId: null };
+const prod: GroupView = { id: "g1", name: "Production", parentId: null , color: null, warningBorder: false };
 const ok = <T,>(data: T) => ({ status: "ok", data });
 
 async function renderWith(hosts: HostView[], groups: GroupView[] = []) {
@@ -81,7 +84,7 @@ describe("Sidebar", () => {
   it("lists hosts under their group with a count, and ungrouped hosts below", async () => {
     await renderWith([host("api", { groupId: "g1" }), host("laptop")], [prod]);
     const list = screen.getByRole("list", { name: "Hosts" });
-    const groupButton = within(list).getByRole("button", { name: /Production/ });
+    const groupButton = within(list).getByRole("button", { name: /Production/, expanded: true });
     expect(groupButton).toHaveTextContent("1");
     expect(within(list).getByRole("button", { name: "Connect to api" })).toBeInTheDocument();
     expect(within(list).getByRole("button", { name: "Connect to laptop" })).toBeInTheDocument();
@@ -89,9 +92,9 @@ describe("Sidebar", () => {
 
   it("collapses and expands a group", async () => {
     const { user } = await renderWith([host("api", { groupId: "g1" })], [prod]);
-    await user.click(screen.getByRole("button", { name: /Production/ }));
+    await user.click(screen.getByRole("button", { name: /Production/, expanded: true }));
     expect(screen.queryByRole("button", { name: "Connect to api" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /Production/ }));
+    await user.click(screen.getByRole("button", { name: /Production/, expanded: false }));
     expect(screen.getByRole("button", { name: "Connect to api" })).toBeInTheDocument();
   });
 
@@ -192,14 +195,40 @@ describe("Sidebar", () => {
     expect(screen.queryByRole("button", { name: "Connect to api" })).not.toBeInTheDocument();
   });
 
+  it("edits a group's colour and warning border", async () => {
+    commands.groupsUpdate = vi.fn().mockResolvedValue(ok({ ...prod, color: "red", warningBorder: true }));
+    const { user } = await renderWith([host("api", { groupId: "g1" })], [prod]);
+    await user.click(screen.getByRole("button", { name: "Edit group Production" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit Production" });
+    await user.click(within(dialog).getByRole("radio", { name: "red" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: /Warning border/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(commands.groupsUpdate).toHaveBeenCalledWith("g1", "Production", "red", true));
+    expect(useHostsStore.getState().groups[0]).toMatchObject({ color: "red", warningBorder: true });
+  });
+
+  it("deletes a group after confirmation and reloads hosts", async () => {
+    commands.groupsDelete = vi.fn().mockResolvedValue(ok(null));
+    const { user } = await renderWith([host("api", { groupId: "g1" })], [prod]);
+    commands.hostsList.mockResolvedValue(ok([host("api")]));
+    commands.groupsList.mockResolvedValue(ok([]));
+    await user.click(screen.getByRole("button", { name: "Edit group Production" }));
+    await user.click(screen.getByRole("button", { name: "Delete group" }));
+    await user.click(screen.getByRole("button", { name: "Click again to delete" }));
+
+    await waitFor(() => expect(commands.groupsDelete).toHaveBeenCalledWith("g1"));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Production/, expanded: true })).not.toBeInTheDocument());
+  });
+
   it("creates a group", async () => {
     const { user } = await renderWith([]);
-    commands.groupsCreate.mockResolvedValue(ok({ id: "g2", name: "Staging", parentId: null }));
+    commands.groupsCreate.mockResolvedValue(ok({ id: "g2", name: "Staging", parentId: null , color: null, warningBorder: false }));
     await user.click(screen.getByRole("button", { name: "New group" }));
     await user.type(screen.getByLabelText("Name"), "Staging");
     await user.click(screen.getByRole("button", { name: "Create" }));
     expect(commands.groupsCreate).toHaveBeenCalledWith("Staging", null);
-    expect(await screen.findByRole("button", { name: /Staging/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Staging/, expanded: true })).toBeInTheDocument();
   });
 
   it("shows a load error from the vault", async () => {

@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronRight, FileInput, FolderPlus, KeyRound, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import type { HostView } from "@/bindings";
+import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
@@ -23,6 +23,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
   const { hosts, groups, loaded, error } = useHostsStore();
   const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const openHost = (host: HostView) => {
@@ -71,17 +72,27 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
     const open = filtering || !collapsed.has(node.group.id);
     return (
       <li key={node.group.id}>
-        <button
-          type="button"
-          aria-expanded={open}
-          onClick={() => toggle(node.group.id)}
-          className="flex h-7 w-full items-center gap-1 rounded-md pr-2 text-left text-xs font-semibold tracking-wide text-fg-muted uppercase hover:bg-bg-elev"
-          style={{ paddingLeft: 4 + depth * 14 }}
-        >
-          {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          <span className="truncate">{node.group.name}</span>
-          <span className="ml-auto font-normal">{countHosts(node)}</span>
-        </button>
+        <div className="group/header flex items-center">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => toggle(node.group.id)}
+            className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md pr-2 text-left text-xs font-semibold tracking-wide text-fg-muted uppercase hover:bg-hover"
+            style={{ paddingLeft: 4 + depth * 14 }}
+          >
+            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            <span className="truncate">{node.group.name}</span>
+            <span className="ml-auto font-normal">{countHosts(node)}</span>
+          </button>
+          <button
+            type="button"
+            aria-label={`Edit group ${node.group.name}`}
+            onClick={() => setEditingGroup(node.group)}
+            className="hidden rounded p-1 text-fg-muted group-hover/header:block hover:bg-hover focus-visible:block"
+          >
+            <Pencil size={11} />
+          </button>
+        </div>
         {open && (
           <ul>
             {node.children.map((c) => groupNode(c, depth + 1))}
@@ -158,6 +169,11 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
       </nav>
 
       <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
+      <GroupFormDialog
+        open={editingGroup !== null}
+        group={editingGroup ?? undefined}
+        onOpenChange={(open) => !open && setEditingGroup(null)}
+      />
     </aside>
   );
 }

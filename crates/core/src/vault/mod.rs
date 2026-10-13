@@ -10,7 +10,7 @@ mod secret;
 mod ssh_config_import;
 
 pub use groups::{Group, GroupRecord, GroupRepository};
-pub use hosts::{Host, HostAuth, HostRecord, HostRepository};
+pub use hosts::{Host, HostAuth, HostRecord, HostRepository, TAB_COLORS};
 pub use identities::{Identity, IdentityRecord, IdentityRepository};
 pub use items::{ItemKind, ItemMeta, StoredItem};
 pub use key_store::{MemoryKeyStore, OsKeychain, VaultKeyStore};

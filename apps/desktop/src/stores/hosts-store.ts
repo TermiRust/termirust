@@ -14,6 +14,8 @@ interface HostsState {
   updateHost: (id: string, input: HostInput) => Promise<Outcome<HostView>>;
   deleteHost: (id: string) => Promise<Outcome<null>>;
   createGroup: (name: string) => Promise<Outcome<GroupView>>;
+  updateGroup: (id: string, name: string, color: string | null, warningBorder: boolean) => Promise<Outcome<GroupView>>;
+  deleteGroup: (id: string) => Promise<Outcome<null>>;
 }
 
 export const useHostsStore = create<HostsState>()((set, get) => ({
@@ -52,6 +54,19 @@ export const useHostsStore = create<HostsState>()((set, get) => ({
   createGroup: async (name) => {
     const result = await commands.groupsCreate(name, null);
     if (result.status === "ok") set({ groups: [...get().groups, result.data] });
+    return result;
+  },
+
+  updateGroup: async (id, name, color, warningBorder) => {
+    const result = await commands.groupsUpdate(id, name, color, warningBorder);
+    if (result.status === "ok") set({ groups: get().groups.map((g) => (g.id === id ? result.data : g)) });
+    return result;
+  },
+
+  /** Hosts in a deleted group become ungrouped, so the host list is reloaded too. */
+  deleteGroup: async (id) => {
+    const result = await commands.groupsDelete(id);
+    if (result.status === "ok") await get().load();
     return result;
   },
 }));

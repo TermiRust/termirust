@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import type { CommandError, HostInput, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { ColorSwatches } from "@/components/ui/color-swatches";
 import { Dialog, DialogFooter } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,7 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
   }, [keysLoaded, loadKeys]);
 
   const set = <K extends keyof HostFormValues>(key: K, value: HostFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
-  const text = (key: keyof HostFormValues) => ({
+  const text = (key: TextField) => ({
     "aria-label": fieldLabels[key],
     "aria-invalid": errors[key] ? true : undefined,
     value: values[key],
@@ -211,6 +212,10 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
         <Field label={fieldLabels.tags} className="col-span-3" hint="Comma separated">
           <Input {...text("tags")} placeholder="prod, api" />
         </Field>
+        <div className="col-span-6 flex items-center gap-3">
+          <span className="text-xs font-medium text-fg-2">Tab colour</span>
+          <ColorSwatches label="Tab colour" value={values.color} onChange={(c) => set("color", c)} autoLabel="From group" />
+        </div>
       </Section>
 
       <details className="group border-t border-border pt-3" open={Boolean(errors.keepaliveSecs)}>
@@ -284,6 +289,8 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
   );
 }
 
+type TextField = { [K in keyof HostFormValues]: HostFormValues[K] extends string ? K : never }[keyof HostFormValues];
+
 const fieldLabels: Record<keyof HostFormValues, string> = {
   label: "Label",
   hostname: "Host",
@@ -298,4 +305,5 @@ const fieldLabels: Record<keyof HostFormValues, string> = {
   tags: "Tags",
   notes: "Notes",
   keepaliveSecs: "Keepalive (s)",
+  color: "Tab colour",
 };

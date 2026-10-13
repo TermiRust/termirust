@@ -48,6 +48,7 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         hosts::hosts_delete,
         hosts::groups_list,
         hosts::groups_create,
+        hosts::groups_update,
         hosts::groups_delete,
         keys::keys_list,
         keys::keys_import,

@@ -12,6 +12,12 @@ pub struct Group {
     pub parent_id: Option<Uuid>,
     #[serde(default)]
     pub sort: i32,
+    /// Tab colour for hosts in this group; `None` derives one from the name.
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Draw a warning border around terminals of this group's hosts (e.g. production).
+    #[serde(default)]
+    pub warning_border: bool,
 }
 
 impl Group {
@@ -20,6 +26,8 @@ impl Group {
             name: name.into(),
             parent_id: None,
             sort: 0,
+            color: None,
+            warning_border: false,
         }
     }
 }
@@ -97,6 +105,7 @@ impl GroupRepository<'_> {
         if group.name.is_empty() {
             return Err(CoreError::InvalidData("group name is required".into()));
         }
+        super::hosts::check_color(&group.color)?;
         if let Some(parent_id) = group.parent_id {
             if Some(parent_id) == own_id {
                 return Err(CoreError::InvalidData(
@@ -152,6 +161,35 @@ mod tests {
             .unwrap();
         assert_eq!(created.payload.name, "Production");
         assert_eq!(vault.groups().list().await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn stores_colour_and_warning_border_and_rejects_unknown_colours() {
+        let vault = vault().await;
+        let prod = Group {
+            color: Some("red".into()),
+            warning_border: true,
+            ..Group::new("Prod")
+        };
+        let saved = vault.groups().create(&prod).await.unwrap().payload;
+        assert_eq!(
+            (saved.color.as_deref(), saved.warning_border),
+            (Some("red"), true)
+        );
+        let odd = Group {
+            color: Some("gold".into()),
+            ..Group::new("X")
+        };
+        assert!(matches!(
+            vault.groups().create(&odd).await,
+            Err(CoreError::InvalidData(_))
+        ));
+    }
+
+    #[test]
+    fn groups_saved_before_these_fields_existed_still_load() {
+        let group: Group = serde_json::from_str(r#"{"name":"Old","parent_id":null}"#).unwrap();
+        assert_eq!((group.color, group.warning_border), (None, false));
     }
 
     #[tokio::test]

@@ -18,6 +18,7 @@ vi.mock("@/bindings", () => ({
       }),
   },
 }));
+vi.mock("@/features/session/host-session-view", () => ({ HostSessionView: () => <div>ssh session</div> }));
 vi.mock("@/features/session/local-session-view", () => ({ LocalSessionView: () => <div>local shell</div> }));
 vi.mock("@/features/connection-lab/connection-lab", () => ({
   ConnectionLab: ({ onExit }: { onExit: () => void }) => (
@@ -149,5 +150,31 @@ describe("AppShell command palette", () => {
     });
     const palette = await screen.findByRole("dialog", { name: "Command palette" });
     expect(within(palette).getByText("New local terminal")).toBeInTheDocument();
+  });
+});
+
+describe("AppShell warning border", () => {
+  it("frames tabs of hosts whose group asks for it, in the group's colour", async () => {
+    const { useHostsStore } = await import("@/stores/hosts-store");
+    const prod = { id: "g1", name: "Production", parentId: null, color: null, warningBorder: true };
+    const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null };
+    const laptop = { ...api, id: "h2", label: "laptop", groupId: null };
+    useTabsStore.setState({ tabs: [], activeTabId: null });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useHostsStore.setState({ hosts: [], groups: [], loaded: false });
+    const { useDialogsStore } = await import("@/stores/dialogs-store");
+    useDialogsStore.setState({ paletteOpen: false, hostEditor: null, importConfigOpen: false });
+    render(<AppShell />);
+    // The shell loads hosts on mount; seed the store only after that first load settled.
+    await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
+    act(() => useHostsStore.setState({ hosts: [api, laptop], groups: [prod] }));
+
+    await userEvent.dblClick(await screen.findByRole("button", { name: "Connect to api" }));
+    const framed = screen.getAllByRole("tabpanel", { hidden: true }).at(-1)!;
+    expect(framed).toHaveAttribute("data-warning-border", "true");
+    expect(framed.style.boxShadow).toContain("var(--tab-red)");
+
+    await userEvent.dblClick(screen.getByRole("button", { name: "Connect to laptop" }));
+    expect(screen.getAllByRole("tabpanel", { hidden: true }).at(-1)).not.toHaveAttribute("data-warning-border");
   });
 });

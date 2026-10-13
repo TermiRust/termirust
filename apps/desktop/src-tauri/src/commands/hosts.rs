@@ -22,6 +22,7 @@ pub struct HostView {
     pub tags: Vec<String>,
     pub notes: String,
     pub keepalive_secs: Option<u32>,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -51,6 +52,7 @@ pub struct HostInput {
     pub tags: Vec<String>,
     pub notes: String,
     pub keepalive_secs: Option<u32>,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -82,6 +84,8 @@ pub struct GroupView {
     pub id: String,
     pub name: String,
     pub parent_id: Option<String>,
+    pub color: Option<String>,
+    pub warning_border: bool,
 }
 
 fn parse_id(value: &str) -> Result<Uuid, CommandError> {
@@ -119,6 +123,7 @@ impl From<&HostRecord> for HostView {
             tags: host.tags.clone(),
             notes: host.notes.clone(),
             keepalive_secs: host.keepalive_secs,
+            color: host.color.clone(),
         }
     }
 }
@@ -129,6 +134,8 @@ impl From<&GroupRecord> for GroupView {
             id: record.meta.id.to_string(),
             name: record.payload.name.clone(),
             parent_id: record.payload.parent_id.map(|id| id.to_string()),
+            color: record.payload.color.clone(),
+            warning_border: record.payload.warning_border,
         }
     }
 }
@@ -162,6 +169,7 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
         tags: input.tags,
         notes: input.notes,
         keepalive_secs: input.keepalive_secs,
+        color: input.color.filter(|c| !c.is_empty()),
     })
 }
 
@@ -236,6 +244,35 @@ pub async fn groups_create(
 
 #[tauri::command]
 #[specta::specta]
+pub async fn groups_update(
+    state: State<'_, VaultState>,
+    id: String,
+    name: String,
+    color: Option<String>,
+    warning_border: bool,
+) -> Result<GroupView, CommandError> {
+    let id = parse_id(&id)?;
+    let groups = state.vault()?.groups();
+    let current = groups
+        .get(id)
+        .await?
+        .ok_or_else(|| CoreError::NotFound {
+            kind: "group",
+            id: id.to_string(),
+        })?
+        .payload;
+    let updated = Group {
+        name,
+        color: color.filter(|c| !c.is_empty()),
+        warning_border,
+        ..current
+    };
+    let record = groups.update(id, &updated).await?;
+    Ok(GroupView::from(&record))
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn groups_delete(state: State<'_, VaultState>, id: String) -> Result<(), CommandError> {
     state
         .vault()?
@@ -265,6 +302,7 @@ mod tests {
             tags: vec!["prod".into()],
             notes: String::new(),
             keepalive_secs: None,
+            color: None,
         }
     }
 
@@ -352,7 +390,7 @@ mod tests {
     fn input_json_from_the_frontend_is_accepted() {
         let json = r#"{"label":"a","hostname":"h","port":22,"username":null,
             "auth":{"method":"password","password":{"kind":"set","value":"pw"}},
-            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30}"#;
+            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30,"color":"teal"}"#;
         let parsed: HostInput = serde_json::from_str(json).unwrap();
         assert!(
             matches!(parsed.auth, AuthInput::Password { password: PasswordChange::Set(ref v) } if v == "pw")
@@ -360,6 +398,7 @@ mod tests {
 
         let keep: PasswordChange = serde_json::from_str(r#"{"kind":"keep"}"#).unwrap();
         assert!(matches!(keep, PasswordChange::Keep));
+        assert_eq!(parsed.color.as_deref(), Some("teal"));
     }
 
     #[tokio::test]

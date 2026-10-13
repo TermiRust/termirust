@@ -19,6 +19,7 @@ const host = (id: string): HostView => ({
   tags: [],
   notes: "",
   keepaliveSecs: null,
+color: null,
 });
 const initial = useTabsStore.getState();
 const store = () => useTabsStore.getState();

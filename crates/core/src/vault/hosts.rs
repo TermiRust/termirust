@@ -32,6 +32,21 @@ pub struct Host {
     #[serde(default)]
     pub notes: String,
     pub keepalive_secs: Option<u32>,
+    /// Tab colour override; `None` uses the group's colour.
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
+/// Colours a host or group may use for its tabs.
+pub const TAB_COLORS: &[&str] = &["red", "amber", "teal", "blue", "violet"];
+
+pub(crate) fn check_color(color: &Option<String>) -> Result<()> {
+    match color {
+        Some(c) if !TAB_COLORS.contains(&c.as_str()) => {
+            Err(CoreError::InvalidData(format!("unknown colour {c}")))
+        }
+        _ => Ok(()),
+    }
 }
 
 impl Host {
@@ -49,6 +64,7 @@ impl Host {
             tags: Vec::new(),
             notes: String::new(),
             keepalive_secs: None,
+            color: None,
         }
     }
 
@@ -89,6 +105,7 @@ impl Host {
         if host.label.is_empty() {
             host.label = host.hostname.clone();
         }
+        check_color(&host.color)?;
         if own_id.is_some() && host.jump_host_id == own_id {
             return Err(CoreError::InvalidData(
                 "a host cannot be its own jump host".into(),
@@ -325,6 +342,40 @@ mod tests {
 
         vault.hosts().delete(created.meta.id).await.unwrap();
         assert!(vault.hosts().list().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn accepts_known_tab_colours_only() {
+        let vault = vault().await;
+        let blue = Host {
+            color: Some("blue".into()),
+            ..Host::new("h")
+        };
+        assert_eq!(
+            vault
+                .hosts()
+                .create(&blue)
+                .await
+                .unwrap()
+                .payload
+                .color
+                .as_deref(),
+            Some("blue")
+        );
+        let pink = Host {
+            color: Some("pink".into()),
+            ..Host::new("h")
+        };
+        assert!(
+            matches!(vault.hosts().create(&pink).await, Err(CoreError::InvalidData(m)) if m.contains("pink"))
+        );
+    }
+
+    #[test]
+    fn hosts_saved_before_colours_existed_still_load() {
+        let json = r#"{"label":"a","hostname":"h","port":22,"username":null,"auth":{"method":"agent"},"group_id":null,"jump_host_id":null,"keepalive_secs":null}"#;
+        let host: Host = serde_json::from_str(json).unwrap();
+        assert_eq!(host.color, None);
     }
 
     #[test]

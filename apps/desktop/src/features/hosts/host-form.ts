@@ -1,4 +1,5 @@
 import type { AuthInput, HostInput, HostView, PasswordChange } from "@/bindings";
+import type { TabColor } from "@/features/tabs/tab-color";
 
 export type SavedPasswordAction = "keep" | "replace" | "clear";
 export type AuthChoice = "password" | "key" | "agent";
@@ -17,6 +18,7 @@ export interface HostFormValues {
   tags: string;
   notes: string;
   keepaliveSecs: string;
+  color: TabColor | null;
 }
 
 export type HostFormErrors = Partial<Record<keyof HostFormValues, string>>;
@@ -41,6 +43,7 @@ export function hostFormValues(host?: HostView): HostFormValues {
     tags: host?.tags.join(", ") ?? "",
     notes: host?.notes ?? "",
     keepaliveSecs: host?.keepaliveSecs == null ? "" : String(host.keepaliveSecs),
+    color: (host?.color as TabColor | null | undefined) ?? null,
   };
 }
 
@@ -96,6 +99,7 @@ export function hostInputFromForm(values: HostFormValues, hasSavedPassword = fal
       tags: values.tags.split(",").map((t) => t.trim()).filter(Boolean),
       notes: values.notes,
       keepaliveSecs,
+      color: values.color,
     },
   };
 }

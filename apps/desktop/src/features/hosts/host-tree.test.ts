@@ -16,9 +16,10 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   tags: [],
   notes: "",
   keepaliveSecs: null,
+  color: null,
   ...overrides,
 });
-const group = (id: string, name: string, parentId: string | null = null): GroupView => ({ id, name, parentId });
+const group = (id: string, name: string, parentId: string | null = null): GroupView => ({ id, name, parentId, color: null, warningBorder: false });
 
 describe("hostMatches", () => {
   const h = host("api", { label: "Prod API", hostname: "10.0.1.12", username: "deploy", tags: ["eu", "critical"] });

@@ -16,6 +16,19 @@ export function groupTabColor(group: { id: string; name: string } | null | undef
   return ROTATION[hash % ROTATION.length] ?? "teal";
 }
 
+const KNOWN: TabColor[] = ["red", "amber", "teal", "blue", "violet"];
+const asTabColor = (value: string | null | undefined): TabColor | null => (KNOWN as string[]).includes(value ?? "") ? (value as TabColor) : null;
+
+/** Host override first, then the group's chosen colour, then one derived from the group name. */
+export function resolveTabColor(
+  host: { color: string | null },
+  group: { id: string; name: string; color: string | null } | null | undefined,
+): TabColor | null {
+  return asTabColor(host.color) ?? asTabColor(group?.color) ?? groupTabColor(group);
+}
+
+export const TAB_COLOR_CHOICES = KNOWN;
+
 export const tabColorVar: Record<TabColor, string> = {
   red: "var(--tab-red)",
   amber: "var(--tab-amber)",

@@ -14,7 +14,7 @@ import { CommandPalette, type PaletteCommand } from "@/features/palette/command-
 import { paletteIcons } from "@/features/palette/palette-icons";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { LocalSessionView } from "@/features/session/local-session-view";
-import { groupTabColor } from "@/features/tabs/tab-color";
+import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { useAppVersion } from "@/lib/use-app-version";
 import { useDialogsStore } from "@/stores/dialogs-store";
@@ -55,7 +55,7 @@ export function AppShell() {
     (host: HostView) => {
       setSection("hosts");
       setRecentHostIds(rememberRecentHost(host.id));
-      openHostTab(host, groupTabColor(groups.find((g) => g.id === host.groupId)));
+      openHostTab(host, resolveTabColor(host, groups.find((g) => g.id === host.groupId)));
     },
     [groups, openHostTab, setSection],
   );
@@ -153,6 +153,9 @@ export function AppShell() {
             onSizeChange={setTabSize}
             onClose={closeTab}
             autoRunBenchmarks={autoRunBenchmarks}
+            warningBorder={
+              tab.target.kind === "host" && tab.color !== null && groupWarns(groups, tab.target.host.groupId) ? tabColorVar[tab.color] : null
+            }
           />
         ))}
         {section === "hosts" && showStatusBar && <StatusBar tab={tabs.find((t) => t.id === activeTabId)} hosts={hosts} />}
@@ -187,14 +190,27 @@ interface TabPanelProps {
   onSizeChange: (id: string, cols: number, rows: number) => void;
   onClose: (id: string) => void;
   autoRunBenchmarks: boolean;
+  /** CSS colour of the warning frame, or null when the host's group does not ask for one. */
+  warningBorder: string | null;
+}
+
+function groupWarns(groups: { id: string; warningBorder: boolean }[], groupId: string | null): boolean {
+  return groupId !== null && groups.some((g) => g.id === groupId && g.warningBorder);
 }
 
 /** Inactive tabs stay mounted (hidden) so their SSH sessions and scrollback survive switching. */
-function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, autoRunBenchmarks }: TabPanelProps) {
+function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, autoRunBenchmarks, warningBorder }: TabPanelProps) {
   const reportStatus = useCallback((status: TabStatus) => onStatusChange(tab.id, status), [onStatusChange, tab.id]);
   const reportSize = useCallback((size: { cols: number; rows: number }) => onSizeChange(tab.id, size.cols, size.rows), [onSizeChange, tab.id]);
   return (
-    <div role="tabpanel" aria-labelledby={`tab-${tab.id}`} hidden={!active} className={active ? "flex min-h-0 flex-1 flex-col" : undefined}>
+    <div
+      role="tabpanel"
+      aria-labelledby={`tab-${tab.id}`}
+      hidden={!active}
+      data-warning-border={warningBorder ? "true" : undefined}
+      className={active ? "flex min-h-0 flex-1 flex-col" : undefined}
+      style={warningBorder ? { boxShadow: `inset 0 0 0 2px ${warningBorder}` } : undefined}
+    >
       {tab.target.kind === "host" ? (
         <HostSessionView host={tab.target.host} onStatusChange={reportStatus} onSizeChange={reportSize} />
       ) : tab.target.kind === "local" ? (

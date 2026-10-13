@@ -18,6 +18,7 @@ const host = (id: string, label: string, overrides: Partial<HostView> = {}): Hos
   tags: [],
   notes: "",
   keepaliveSecs: null,
+  color: null,
   ...overrides,
 });
 const hosts = [host("1", "prod-api"), host("2", "prod-db", { port: 2222 }), host("3", "staging-web", { tags: ["frontend"] })];

@@ -38,6 +38,7 @@ const host: HostView = {
   tags: [],
   notes: "",
   keepaliveSecs: null,
+color: null,
 };
 const ok = (data: unknown) => ({ status: "ok", data });
 

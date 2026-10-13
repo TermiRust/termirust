@@ -26,6 +26,7 @@ export const commands = {
 	hostsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("hosts_delete", { id })),
 	groupsList: () => typedError<GroupView[], CommandError>(__TAURI_INVOKE("groups_list")),
 	groupsCreate: (name: string, parentId: string | null) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_create", { name, parentId })),
+	groupsUpdate: (id: string, name: string, color: string | null, warningBorder: boolean) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_update", { id, name, color, warningBorder })),
 	groupsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("groups_delete", { id })),
 	keysList: () => typedError<KeyView[], CommandError>(__TAURI_INVOKE("keys_list")),
 	/**  Imports pasted key text. A passphrase, if given, is verified; it is stored only when asked. */
@@ -61,6 +62,8 @@ export type GroupView = {
 	id: string,
 	name: string,
 	parentId: string | null,
+	color: string | null,
+	warningBorder: boolean,
 };
 
 export type HostInput = {
@@ -74,6 +77,7 @@ export type HostInput = {
 	tags: string[],
 	notes: string,
 	keepaliveSecs: number | null,
+	color: string | null,
 };
 
 /**  What the UI may know about a host. Saved passwords never leave Rust. */
@@ -89,6 +93,7 @@ export type HostView = {
 	tags: string[],
 	notes: string,
 	keepaliveSecs: number | null,
+	color: string | null,
 };
 
 /**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */

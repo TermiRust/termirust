@@ -18,6 +18,7 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   tags: [],
   notes: "",
   keepaliveSecs: null,
+  color: null,
   ...overrides,
 });
 const tab = (overrides: Partial<Tab>): Tab => ({
