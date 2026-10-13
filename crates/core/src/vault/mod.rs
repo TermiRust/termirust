@@ -1,3 +1,4 @@
+mod ai_settings;
 pub mod crypto;
 mod groups;
 mod hosts;
@@ -10,6 +11,7 @@ mod port_forwards;
 mod secret;
 mod ssh_config_import;
 
+pub use ai_settings::{AiSettings, AiSettingsRepository};
 pub use groups::{Group, GroupRecord, GroupRepository};
 pub use hosts::{Host, HostAuth, HostRecord, HostRepository, TAB_COLORS};
 pub use identities::{Identity, IdentityRecord, IdentityRepository};

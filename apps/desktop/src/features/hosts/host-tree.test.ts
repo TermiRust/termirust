@@ -15,11 +15,11 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null,
+  keepaliveSecs: null, aiDisabled: false,
   color: null,
   ...overrides,
 });
-const group = (id: string, name: string, parentId: string | null = null): GroupView => ({ id, name, parentId, color: null, warningBorder: false });
+const group = (id: string, name: string, parentId: string | null = null): GroupView => ({ id, name, parentId, color: null, warningBorder: false, aiDisabled: false });
 
 describe("hostMatches", () => {
   const h = host("api", { label: "Prod API", hostname: "10.0.1.12", username: "deploy", tags: ["eu", "critical"] });

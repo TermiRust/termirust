@@ -13,6 +13,7 @@ import { TERMINAL_THEMES, terminalTheme } from "@/lib/terminal-theme";
 import { cn } from "@/lib/utils";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
+import { AiSettingsSection } from "./ai-settings-section";
 import { FONT_CHOICES } from "./font-choices";
 
 
@@ -145,6 +146,7 @@ export function SettingsView() {
             </Row>
           </div>
           <TerminalPreview settings={terminal} />
+          <AiSettingsSection />
           <div className="border-t border-border pt-4 lg:col-span-2">
             <Button variant="outline" size="sm" onClick={() => void commands.logsOpenFolder()}>
               <FolderOpen size={13} /> Open log folder

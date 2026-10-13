@@ -37,6 +37,7 @@ function GroupForm({ group, onClose }: { group?: GroupView; onClose: () => void 
   const [name, setName] = useState(group?.name ?? "");
   const [color, setColor] = useState<TabColor | null>((group?.color as TabColor | null | undefined) ?? null);
   const [warningBorder, setWarningBorder] = useState(group?.warningBorder ?? false);
+  const [aiDisabled, setAiDisabled] = useState(group?.aiDisabled ?? false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +47,7 @@ function GroupForm({ group, onClose }: { group?: GroupView; onClose: () => void 
       setError("Group name is required");
       return;
     }
-    const result = group ? await updateGroup(group.id, name.trim(), color, warningBorder) : await createGroup(name.trim());
+    const result = group ? await updateGroup(group.id, name.trim(), color, warningBorder, aiDisabled) : await createGroup(name.trim());
     if (result.status === "error") setError(result.error.message);
     else onClose();
   };
@@ -78,6 +79,12 @@ function GroupForm({ group, onClose }: { group?: GroupView; onClose: () => void 
             description="A coloured frame on every tab of this group, as a reminder you are on a sensitive server."
             checked={warningBorder}
             onChange={(e) => setWarningBorder(e.target.checked)}
+          />
+          <Checkbox
+            label="Turn off AI for this group"
+            description="Hides AI help in tabs of every host in the group."
+            checked={aiDisabled}
+            onChange={(e) => setAiDisabled(e.target.checked)}
           />
         </>
       )}

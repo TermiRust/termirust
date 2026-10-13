@@ -16,7 +16,7 @@ interface HostsState {
   updateHost: (id: string, input: HostInput) => Promise<Outcome<HostView>>;
   deleteHost: (id: string) => Promise<Outcome<null>>;
   createGroup: (name: string) => Promise<Outcome<GroupView>>;
-  updateGroup: (id: string, name: string, color: string | null, warningBorder: boolean) => Promise<Outcome<GroupView>>;
+  updateGroup: (id: string, name: string, color: string | null, warningBorder: boolean, aiDisabled: boolean) => Promise<Outcome<GroupView>>;
   deleteGroup: (id: string) => Promise<Outcome<null>>;
 }
 
@@ -66,8 +66,8 @@ export const useHostsStore = create<HostsState>()((set, get) => ({
     return result;
   },
 
-  updateGroup: async (id, name, color, warningBorder) => {
-    const result = await commands.groupsUpdate(id, name, color, warningBorder);
+  updateGroup: async (id, name, color, warningBorder, aiDisabled) => {
+    const result = await commands.groupsUpdate(id, name, color, warningBorder, aiDisabled);
     if (result.status === "ok") set({ groups: get().groups.map((g) => (g.id === id ? result.data : g)) });
     return result;
   },

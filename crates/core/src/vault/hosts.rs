@@ -35,6 +35,9 @@ pub struct Host {
     /// Tab colour override; `None` uses the group's colour.
     #[serde(default)]
     pub color: Option<String>,
+    /// Hide AI help in this host's tabs (e.g. a production database).
+    #[serde(default)]
+    pub ai_disabled: bool,
 }
 
 /// Colours a host or group may use for its tabs.
@@ -65,6 +68,7 @@ impl Host {
             notes: String::new(),
             keepalive_secs: None,
             color: None,
+            ai_disabled: false,
         }
     }
 

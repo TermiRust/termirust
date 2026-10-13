@@ -18,6 +18,9 @@ pub struct Group {
     /// Draw a warning border around terminals of this group's hosts (e.g. production).
     #[serde(default)]
     pub warning_border: bool,
+    /// Hide AI help for every host in this group.
+    #[serde(default)]
+    pub ai_disabled: bool,
 }
 
 impl Group {
@@ -28,6 +31,7 @@ impl Group {
             sort: 0,
             color: None,
             warning_border: false,
+            ai_disabled: false,
         }
     }
 }

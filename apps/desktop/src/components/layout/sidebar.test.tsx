@@ -41,11 +41,11 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null,
+  keepaliveSecs: null, aiDisabled: false,
   color: null,
   ...overrides,
 });
-const prod: GroupView = { id: "g1", name: "Production", parentId: null , color: null, warningBorder: false };
+const prod: GroupView = { id: "g1", name: "Production", parentId: null , color: null, warningBorder: false, aiDisabled: false };
 const ok = <T,>(data: T) => ({ status: "ok", data });
 
 async function renderWith(hosts: HostView[], groups: GroupView[] = []) {
@@ -211,16 +211,17 @@ describe("Sidebar", () => {
     expect(screen.queryByRole("button", { name: "Connect to api" })).not.toBeInTheDocument();
   });
 
-  it("edits a group's colour and warning border", async () => {
+  it("edits a group's colour, warning border and AI switch", async () => {
     commands.groupsUpdate = vi.fn().mockResolvedValue(ok({ ...prod, color: "red", warningBorder: true }));
     const { user } = await renderWith([host("api", { groupId: "g1" })], [prod]);
     await user.click(screen.getByRole("button", { name: "Edit group Production" }));
     const dialog = screen.getByRole("dialog", { name: "Edit Production" });
     await user.click(within(dialog).getByRole("radio", { name: "red" }));
     await user.click(within(dialog).getByRole("checkbox", { name: /Warning border/ }));
+    await user.click(within(dialog).getByRole("checkbox", { name: /Turn off AI/ }));
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(commands.groupsUpdate).toHaveBeenCalledWith("g1", "Production", "red", true));
+    await waitFor(() => expect(commands.groupsUpdate).toHaveBeenCalledWith("g1", "Production", "red", true, true));
     expect(useHostsStore.getState().groups[0]).toMatchObject({ color: "red", warningBorder: true });
   });
 
@@ -239,7 +240,7 @@ describe("Sidebar", () => {
 
   it("creates a group", async () => {
     const { user } = await renderWith([]);
-    commands.groupsCreate.mockResolvedValue(ok({ id: "g2", name: "Staging", parentId: null , color: null, warningBorder: false }));
+    commands.groupsCreate.mockResolvedValue(ok({ id: "g2", name: "Staging", parentId: null , color: null, warningBorder: false, aiDisabled: false }));
     await user.click(screen.getByRole("button", { name: "New group" }));
     await user.type(screen.getByLabelText("Name"), "Staging");
     await user.click(screen.getByRole("button", { name: "Create" }));

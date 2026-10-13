@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import type { CommandError, HostInput, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ColorSwatches } from "@/components/ui/color-swatches";
 import { Dialog, DialogFooter } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
@@ -236,6 +237,13 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
           <Field label={fieldLabels.keepaliveSecs} error={errors.keepaliveSecs} className="col-span-2">
             <Input {...text("keepaliveSecs")} inputMode="numeric" placeholder="30" />
           </Field>
+          <Checkbox
+            className="col-span-6"
+            label="Turn off AI for this host"
+            description="Hides AI help in its tabs, e.g. for a production database."
+            checked={values.aiDisabled}
+            onChange={(e) => set("aiDisabled", e.target.checked)}
+          />
           <Field label={fieldLabels.notes} className="col-span-6">
             <textarea
               aria-label={fieldLabels.notes}
@@ -306,4 +314,5 @@ const fieldLabels: Record<keyof HostFormValues, string> = {
   notes: "Notes",
   keepaliveSecs: "Keepalive (s)",
   color: "Tab colour",
+  aiDisabled: "Turn off AI",
 };

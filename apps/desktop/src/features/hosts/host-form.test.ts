@@ -26,6 +26,7 @@ describe("hostFormValues", () => {
       notes: "n",
       keepaliveSecs: 60,
       color: null,
+      aiDisabled: true,
     };
     expect(hostFormValues(host)).toEqual({
       label: "db",
@@ -42,6 +43,7 @@ describe("hostFormValues", () => {
       notes: "n",
       keepaliveSecs: "60",
       color: null,
+      aiDisabled: true,
     });
   });
 });
@@ -61,7 +63,7 @@ describe("hostInputFromForm", () => {
         jumpHostId: null,
         tags: ["prod", "eu"],
         notes: "",
-        keepaliveSecs: null,
+        keepaliveSecs: null, aiDisabled: false,
         color: null,
       },
     });
@@ -98,7 +100,7 @@ describe("hostInputFromForm", () => {
       jumpHostId: null,
       tags: [],
       notes: "",
-      keepaliveSecs: null,
+      keepaliveSecs: null, aiDisabled: false,
     color: null,
     });
     expect([values.authMethod, values.keyId]).toEqual(["key", "k1"]);

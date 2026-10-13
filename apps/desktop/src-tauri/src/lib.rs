@@ -16,7 +16,7 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, session,
+    ai, benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, session,
     settings, sftp, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
@@ -85,6 +85,9 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         forwards::forwards_stop,
         forwards::forwards_status,
         forwards::forwards_auto_start,
+        ai::ai_settings_get,
+        ai::ai_settings_set,
+        ai::ai_test_connection,
     ])
 }
 

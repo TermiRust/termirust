@@ -19,6 +19,7 @@ export interface HostFormValues {
   notes: string;
   keepaliveSecs: string;
   color: TabColor | null;
+  aiDisabled: boolean;
 }
 
 export type HostFormErrors = Partial<Record<keyof HostFormValues, string>>;
@@ -44,6 +45,7 @@ export function hostFormValues(host?: HostView): HostFormValues {
     notes: host?.notes ?? "",
     keepaliveSecs: host?.keepaliveSecs == null ? "" : String(host.keepaliveSecs),
     color: (host?.color as TabColor | null | undefined) ?? null,
+    aiDisabled: host?.aiDisabled ?? false,
   };
 }
 
@@ -100,6 +102,7 @@ export function hostInputFromForm(values: HostFormValues, hasSavedPassword = fal
       notes: values.notes,
       keepaliveSecs,
       color: values.color,
+      aiDisabled: values.aiDisabled,
     },
   };
 }

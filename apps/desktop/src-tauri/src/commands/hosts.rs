@@ -23,6 +23,7 @@ pub struct HostView {
     pub notes: String,
     pub keepalive_secs: Option<u32>,
     pub color: Option<String>,
+    pub ai_disabled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -53,6 +54,7 @@ pub struct HostInput {
     pub notes: String,
     pub keepalive_secs: Option<u32>,
     pub color: Option<String>,
+    pub ai_disabled: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -86,6 +88,7 @@ pub struct GroupView {
     pub parent_id: Option<String>,
     pub color: Option<String>,
     pub warning_border: bool,
+    pub ai_disabled: bool,
 }
 
 pub(crate) fn parse_id(value: &str) -> Result<Uuid, CommandError> {
@@ -124,6 +127,7 @@ impl From<&HostRecord> for HostView {
             notes: host.notes.clone(),
             keepalive_secs: host.keepalive_secs,
             color: host.color.clone(),
+            ai_disabled: host.ai_disabled,
         }
     }
 }
@@ -136,6 +140,7 @@ impl From<&GroupRecord> for GroupView {
             parent_id: record.payload.parent_id.map(|id| id.to_string()),
             color: record.payload.color.clone(),
             warning_border: record.payload.warning_border,
+            ai_disabled: record.payload.ai_disabled,
         }
     }
 }
@@ -170,6 +175,7 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
         notes: input.notes,
         keepalive_secs: input.keepalive_secs,
         color: input.color.filter(|c| !c.is_empty()),
+        ai_disabled: input.ai_disabled,
     })
 }
 
@@ -252,6 +258,7 @@ pub async fn groups_update(
     name: String,
     color: Option<String>,
     warning_border: bool,
+    ai_disabled: bool,
 ) -> Result<GroupView, CommandError> {
     let id = parse_id(&id)?;
     let vault = state.vault().await?;
@@ -268,6 +275,7 @@ pub async fn groups_update(
         name,
         color: color.filter(|c| !c.is_empty()),
         warning_border,
+        ai_disabled,
         ..current
     };
     let record = groups.update(id, &updated).await?;
@@ -307,7 +315,31 @@ mod tests {
             notes: String::new(),
             keepalive_secs: None,
             color: None,
+            ai_disabled: false,
         }
+    }
+
+    #[test]
+    fn carries_the_ai_switch_both_ways() {
+        let host = host_from_input(
+            HostInput {
+                ai_disabled: true,
+                ..input(AuthInput::Agent)
+            },
+            None,
+        )
+        .unwrap();
+        assert!(host.ai_disabled);
+        let record = termirust_core::vault::StoredItem {
+            meta: termirust_core::vault::ItemMeta {
+                id: Uuid::now_v7(),
+                revision: 1,
+                created_at: 0,
+                updated_at: 0,
+            },
+            payload: host,
+        };
+        assert!(HostView::from(&record).ai_disabled);
     }
 
     fn password(change: PasswordChange) -> AuthInput {
@@ -394,7 +426,7 @@ mod tests {
     fn input_json_from_the_frontend_is_accepted() {
         let json = r#"{"label":"a","hostname":"h","port":22,"username":null,
             "auth":{"method":"password","password":{"kind":"set","value":"pw"}},
-            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30,"color":"teal"}"#;
+            "groupId":null,"jumpHostId":null,"tags":[],"notes":"","keepaliveSecs":30,"color":"teal","aiDisabled":false}"#;
         let parsed: HostInput = serde_json::from_str(json).unwrap();
         assert!(
             matches!(parsed.auth, AuthInput::Password { password: PasswordChange::Set(ref v) } if v == "pw")

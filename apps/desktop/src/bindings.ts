@@ -28,7 +28,7 @@ export const commands = {
 	hostsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("hosts_delete", { id })),
 	groupsList: () => typedError<GroupView[], CommandError>(__TAURI_INVOKE("groups_list")),
 	groupsCreate: (name: string, parentId: string | null) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_create", { name, parentId })),
-	groupsUpdate: (id: string, name: string, color: string | null, warningBorder: boolean) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_update", { id, name, color, warningBorder })),
+	groupsUpdate: (id: string, name: string, color: string | null, warningBorder: boolean, aiDisabled: boolean) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_update", { id, name, color, warningBorder, aiDisabled })),
 	groupsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("groups_delete", { id })),
 	keysList: () => typedError<KeyView[], CommandError>(__TAURI_INVOKE("keys_list")),
 	/**  Imports pasted key text. A passphrase, if given, is verified; it is stored only when asked. */
@@ -73,9 +73,34 @@ export const commands = {
 	 *  a typed secret fails with a hint instead of interrupting the terminal with a prompt.
 	 */
 	forwardsAutoStart: (hostId: string) => typedError<ForwardStatus[], CommandError>(__TAURI_INVOKE("forwards_auto_start", { hostId })),
+	aiSettingsGet: () => typedError<AiSettingsView, CommandError>(__TAURI_INVOKE("ai_settings_get")),
+	aiSettingsSet: (input: AiSettingsInput) => typedError<AiSettingsView, CommandError>(__TAURI_INVOKE("ai_settings_set", { input })),
+	/**  Sends a one-word prompt with the given (possibly unsaved) settings and returns the reply. */
+	aiTestConnection: (input: AiSettingsInput) => typedError<string, CommandError>(__TAURI_INVOKE("ai_test_connection", { input })),
 };
 
 /* Types */
+export type AiProviderKind = "anthropic" | "openAiCompatible";
+
+export type AiSettingsInput = {
+	enabled: boolean,
+	kind: AiProviderKind,
+	baseUrl: string,
+	model: string,
+	apiKey: ApiKeyChange,
+};
+
+/**  What the UI may know about the AI settings: whether a key is saved, never the key. */
+export type AiSettingsView = {
+	enabled: boolean,
+	kind: AiProviderKind,
+	baseUrl: string,
+	model: string,
+	hasApiKey: boolean,
+};
+
+export type ApiKeyChange = { kind: "keep" } | { kind: "set"; value: string } | { kind: "clear" };
+
 export type AuthInput = { method: "password"; password: PasswordChange } | { method: "identity"; identityId: string } | { method: "agent" };
 
 export type AuthView = { method: "password"; hasSavedPassword: boolean } | { method: "identity"; identityId: string } | { method: "agent" };
@@ -135,6 +160,7 @@ export type GroupView = {
 	parentId: string | null,
 	color: string | null,
 	warningBorder: boolean,
+	aiDisabled: boolean,
 };
 
 export type HostInput = {
@@ -149,6 +175,7 @@ export type HostInput = {
 	notes: string,
 	keepaliveSecs: number | null,
 	color: string | null,
+	aiDisabled: boolean,
 };
 
 /**  What the UI may know about a host. Saved passwords never leave Rust. */
@@ -165,6 +192,7 @@ export type HostView = {
 	notes: string,
 	keepaliveSecs: number | null,
 	color: string | null,
+	aiDisabled: boolean,
 };
 
 /**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */
