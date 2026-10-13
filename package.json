@@ -1,0 +1,10 @@
+{
+  "name": "termirust",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "packageManager": "pnpm@11.17.0",
+  "scripts": {
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}
