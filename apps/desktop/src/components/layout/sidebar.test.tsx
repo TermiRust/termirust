@@ -99,6 +99,13 @@ describe("Sidebar", () => {
     expect(onOpenHost).not.toHaveBeenCalled();
   });
 
+  it("opens the Port forwarding screen from the section list", async () => {
+    const { user } = await renderWith([host("api")]);
+    await user.click(screen.getByRole("button", { name: "Port forwarding" }));
+    expect(useLayoutStore.getState().section).toBe("forwards");
+    expect(screen.getByRole("button", { name: "Port forwarding" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("collapses and expands a group", async () => {
     const { user } = await renderWith([host("api", { groupId: "g1" })], [prod]);
     await user.click(screen.getByRole("button", { name: /Production/, expanded: true }));

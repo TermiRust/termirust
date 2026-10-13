@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
 import { TerminalView, type TerminalHandle, type TerminalSize } from "@/features/terminal/terminal-view";
+import { useForwardsStore } from "@/stores/forwards-store";
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
@@ -48,6 +49,12 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
   }, [state.phase, onStatusChange]);
+
+  // Each (re)connection starts the host's auto-start forwards that are not already running.
+  const connected = state.phase === "connected";
+  useEffect(() => {
+    if (connected) void useForwardsStore.getState().autoStart(host.id);
+  }, [connected, host.id]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

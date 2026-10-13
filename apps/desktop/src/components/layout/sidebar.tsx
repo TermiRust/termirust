@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal } from "lucide-react";
+import { ChevronDown, ChevronRight, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, Settings, SquareTerminal, Waypoints } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -172,6 +172,13 @@ export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
           onClick={() => setSection("keychain")}
         >
           <KeyRound size={15} /> Keychain
+        </Button>
+        <Button
+          className={cn("justify-start", section === "forwards" && "bg-active text-fg")}
+          aria-current={section === "forwards" ? "page" : undefined}
+          onClick={() => setSection("forwards")}
+        >
+          <Waypoints size={15} /> Port forwarding
         </Button>
         <Button className="justify-start" disabled title="Coming in M2">
           <SquareTerminal size={15} /> Snippets

@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { StatusBar } from "@/components/layout/status-bar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
+import { ForwardsView } from "@/features/forwards/forwards-view";
 import { KeychainView } from "@/features/keychain/keychain-view";
 import { SettingsView } from "@/features/settings/settings-view";
 import { CommandPalette, type PaletteCommand } from "@/features/palette/command-palette";
@@ -84,6 +85,7 @@ export function AppShell() {
       },
       { id: "import-config", label: "Import from SSH config", icon: paletteIcons.importConfig, run: () => setImportConfigOpen(true) },
       { id: "keychain", label: "Open Keychain", icon: paletteIcons.keychain, run: () => setSection("keychain") },
+      { id: "forwards", label: "Open Port forwarding", icon: paletteIcons.forwards, run: () => setSection("forwards") },
       { id: "settings", label: "Open Settings", icon: paletteIcons.settings, run: () => setSection("settings") },
       { id: "logs", label: "Open log folder", icon: paletteIcons.logs, run: () => void commands.logsOpenFolder() },
       { id: "sidebar", label: "Toggle sidebar", icon: paletteIcons.sidebar, shortcut: shortcutLabel("sidebar", onMac), run: toggleSidebar },
@@ -136,6 +138,7 @@ export function AppShell() {
       {sidebarVisible && <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />}
       <main className="flex min-w-0 flex-1 flex-col">
         {section === "keychain" && <KeychainView />}
+        {section === "forwards" && <ForwardsView />}
         {section === "settings" && <SettingsView />}
         {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} onNewLocalTab={openLocalTab} />}
         {section === "hosts" && tabs.length === 0 && (

@@ -21,6 +21,7 @@ const commands = {
   sessionResize: vi.fn(),
   sessionClose: vi.fn(),
   sessionAcknowledgeOutput: vi.fn(),
+  forwardsAutoStart: vi.fn(),
 };
 vi.mock("@/bindings", () => ({ commands }));
 
@@ -46,6 +47,7 @@ describe("HostSessionView", () => {
   beforeEach(() => {
     Object.values(commands).forEach((fn) => fn.mockReset());
     commands.sessionClose.mockResolvedValue(ok(null));
+    commands.forwardsAutoStart.mockResolvedValue(ok([]));
   });
 
   it("prompts for username and password, remembering by default", async () => {
@@ -77,6 +79,22 @@ describe("HostSessionView", () => {
     render(<HostSessionView host={host} onOpenSftp={onOpenSftp} />);
     await user.click(await screen.findByRole("button", { name: "SFTP" }));
     expect(onOpenSftp).toHaveBeenCalledWith(host);
+  });
+
+  it("starts the host's auto-start port forwards once connected, not before", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "needsPassword", usernameRequired: false, savedPasswordRejected: false }))
+      .mockResolvedValueOnce(ok({ status: "opened", sessionId: 1 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Log in to prod-api" });
+    expect(commands.forwardsAutoStart).not.toHaveBeenCalled();
+    await user.type(within(dialog).getByLabelText("Password"), "pw");
+    await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+
+    await screen.findByRole("button", { name: "Disconnect" });
+    expect(commands.forwardsAutoStart).toHaveBeenCalledExactlyOnceWith("h1");
   });
 
   it("explains when the saved password was rejected", async () => {

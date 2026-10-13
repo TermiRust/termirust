@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-export type Section = "hosts" | "keychain" | "settings";
+export type Section = "hosts" | "keychain" | "forwards" | "settings";
 
 interface LayoutState {
   section: Section;
