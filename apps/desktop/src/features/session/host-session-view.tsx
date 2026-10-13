@@ -7,7 +7,7 @@ import { TerminalView, type TerminalHandle } from "@/features/terminal/terminal-
 import type { TabStatus } from "@/stores/tabs-store";
 
 import { HostKeyDialog } from "./host-key-dialog";
-import { PasswordPrompt } from "./password-prompt";
+import { CredentialsPrompt, type CredentialsRequest } from "./credentials-prompt";
 import { useHostSession, type HostSessionState } from "./use-host-session";
 
 interface HostSessionViewProps {
@@ -18,6 +18,8 @@ interface HostSessionViewProps {
 const tabStatusOf: Record<HostSessionState["phase"], TabStatus> = {
   connecting: "connecting",
   needsPassword: "connecting",
+  needsPassphrase: "connecting",
+  needsUsername: "connecting",
   hostKeyUnknown: "connecting",
   hostKeyChanged: "connecting",
   connected: "connected",
@@ -32,6 +34,7 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
   const session = useHostSession(host, getTerminal);
   const { state } = session;
   const endpoint = `${host.hostname}:${host.port}`;
+  const credentials = credentialsRequest(state);
 
   useEffect(() => {
     onStatusChange?.(tabStatusOf[state.phase]);
@@ -63,12 +66,13 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
         <TerminalView ref={terminalRef} onData={session.send} onResize={session.resize} />
       </div>
 
-      {state.phase === "needsPassword" && (
-        <PasswordPrompt
+      {credentials && (
+        <CredentialsPrompt
+          key={state.phase}
           hostLabel={host.label}
-          usernameRequired={state.usernameRequired}
-          savedPasswordRejected={state.savedPasswordRejected}
-          onSubmit={session.submitPassword}
+          endpoint={endpoint}
+          request={credentials}
+          onSubmit={session.submitCredentials}
           onCancel={session.cancel}
         />
       )}
@@ -84,6 +88,19 @@ export function HostSessionView({ host, onStatusChange }: HostSessionViewProps) 
       )}
     </div>
   );
+}
+
+function credentialsRequest(state: HostSessionState): CredentialsRequest | null {
+  switch (state.phase) {
+    case "needsPassword":
+      return { kind: "password", usernameRequired: state.usernameRequired, savedPasswordRejected: state.savedPasswordRejected };
+    case "needsPassphrase":
+      return { kind: "passphrase", keyLabel: state.keyLabel, wrongPassphrase: state.wrongPassphrase, usernameRequired: state.usernameRequired };
+    case "needsUsername":
+      return { kind: "username" };
+    default:
+      return null;
+  }
 }
 
 function StatusText({ state }: { state: HostSessionState }) {

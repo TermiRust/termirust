@@ -13,6 +13,8 @@ export interface HostSessionTerminal {
 export type HostSessionState =
   | { phase: "connecting" }
   | { phase: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean }
+  | { phase: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean }
+  | { phase: "needsUsername" }
   | { phase: "hostKeyUnknown"; algorithm: string; fingerprint: string }
   | { phase: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string }
   | { phase: "connected"; sessionId: number }
@@ -87,6 +89,17 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
           }
           setState({ phase: "connected", sessionId: outcome.sessionId });
           break;
+        case "needsPassphrase":
+          setState({
+            phase: "needsPassphrase",
+            keyLabel: outcome.keyLabel,
+            wrongPassphrase: outcome.wrongPassphrase,
+            usernameRequired: outcome.usernameRequired,
+          });
+          break;
+        case "needsUsername":
+          setState({ phase: "needsUsername" });
+          break;
         case "needsPassword":
           setState({
             phase: "needsPassword",
@@ -131,7 +144,7 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
     void open({ ...attemptRef.current, ...patch });
   }, [open]);
 
-  const submitPassword = useCallback((prompted: PromptedLogin) => retry({ prompted }), [retry]);
+  const submitCredentials = useCallback((prompted: PromptedLogin) => retry({ prompted }), [retry]);
   const trustHostKey = useCallback((fingerprint: string) => retry({ confirmedFingerprint: fingerprint }), [retry]);
   const reconnect = useCallback(() => retry({}), [retry]);
   const cancel = useCallback(() => setState({ phase: "cancelled" }), []);
@@ -154,5 +167,5 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
     setState({ phase: "closed", exitStatus: null });
   }, []);
 
-  return { state, submitPassword, trustHostKey, reconnect, cancel, send, resize, disconnect };
+  return { state, submitCredentials, trustHostKey, reconnect, cancel, send, resize, disconnect };
 }

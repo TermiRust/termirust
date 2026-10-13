@@ -69,10 +69,10 @@ describe("useHostSession", () => {
     await waitFor(() => expect(hook.result.current.state.phase).toBe("needsPassword"));
     expect(hook.result.current.state).toMatchObject({ savedPasswordRejected: true });
 
-    await act(async () => hook.result.current.submitPassword({ username: null, password: "pw", remember: true }));
+    await act(async () => hook.result.current.submitCredentials({ username: null, password: "pw", passphrase: null, remember: true }));
     await waitFor(() => expect(hook.result.current.state.phase).toBe("connected"));
     expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({
-      prompted: { username: null, password: "pw", remember: true },
+      prompted: { username: null, password: "pw", passphrase: null, remember: true },
       confirmedFingerprint: null,
     });
   });
@@ -84,7 +84,7 @@ describe("useHostSession", () => {
       .mockResolvedValueOnce(opened(6));
     const { hook } = setup();
     await waitFor(() => expect(hook.result.current.state.phase).toBe("needsPassword"));
-    await act(async () => hook.result.current.submitPassword({ username: null, password: "pw", remember: false }));
+    await act(async () => hook.result.current.submitCredentials({ username: null, password: "pw", passphrase: null, remember: false }));
     await waitFor(() => expect(hook.result.current.state.phase).toBe("hostKeyUnknown"));
 
     await act(async () => hook.result.current.trustHostKey("SHA256:k"));
@@ -93,6 +93,18 @@ describe("useHostSession", () => {
       prompted: { password: "pw" },
       confirmedFingerprint: "SHA256:k",
     });
+  });
+
+  it("asks for a key passphrase and for a username when the outcome says so", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "needsPassphrase", keyLabel: "laptop", wrongPassphrase: false, usernameRequired: true }))
+      .mockResolvedValueOnce(ok({ status: "needsUsername" }));
+    const { hook } = setup();
+    await waitFor(() =>
+      expect(hook.result.current.state).toEqual({ phase: "needsPassphrase", keyLabel: "laptop", wrongPassphrase: false, usernameRequired: true }),
+    );
+    await act(async () => hook.result.current.submitCredentials({ username: "me", password: null, passphrase: "pp", remember: false }));
+    await waitFor(() => expect(hook.result.current.state).toEqual({ phase: "needsUsername" }));
   });
 
   it("surfaces a changed host key with both fingerprints", async () => {

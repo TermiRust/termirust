@@ -1,6 +1,10 @@
 import { create } from "zustand";
 
+export type Section = "hosts" | "keychain";
+
 interface LayoutState {
+  section: Section;
+  setSection: (section: Section) => void;
   sidebarVisible: boolean;
   hostFilter: string;
   toggleSidebar: () => void;
@@ -8,6 +12,8 @@ interface LayoutState {
 }
 
 export const useLayoutStore = create<LayoutState>()((set) => ({
+  section: "hosts",
+  setSection: (section) => set({ section }),
   sidebarVisible: true,
   hostFilter: "",
   toggleSidebar: () => set((state) => ({ sidebarVisible: !state.sidebarVisible })),

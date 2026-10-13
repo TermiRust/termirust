@@ -25,6 +25,12 @@ export const commands = {
 	groupsList: () => typedError<GroupView[], CommandError>(__TAURI_INVOKE("groups_list")),
 	groupsCreate: (name: string, parentId: string | null) => typedError<GroupView, CommandError>(__TAURI_INVOKE("groups_create", { name, parentId })),
 	groupsDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("groups_delete", { id })),
+	keysList: () => typedError<KeyView[], CommandError>(__TAURI_INVOKE("keys_list")),
+	/**  Imports pasted key text. A passphrase, if given, is verified; it is stored only when asked. */
+	keysImport: (label: string, privateKey: string, passphrase: string | null, rememberPassphrase: boolean) => typedError<KeyView, CommandError>(__TAURI_INVOKE("keys_import", { label, privateKey, passphrase, rememberPassphrase })),
+	keysImportFile: (label: string, path: string, passphrase: string | null, rememberPassphrase: boolean) => typedError<KeyView, CommandError>(__TAURI_INVOKE("keys_import_file", { label, path, passphrase, rememberPassphrase })),
+	keysGenerate: (label: string) => typedError<KeyView, CommandError>(__TAURI_INVOKE("keys_generate", { label })),
+	keysDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("keys_delete", { id })),
 };
 
 /* Types */
@@ -74,7 +80,22 @@ export type HostView = {
 	keepaliveSecs: number | null,
 };
 
-export type OpenHostOutcome = { status: "opened"; sessionId: number } | { status: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean } | { status: "hostKeyUnknown"; algorithm: string; fingerprint: string } | { status: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string };
+/**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */
+export type KeyView = {
+	id: string,
+	label: string,
+	keyType: string,
+	fingerprint: string,
+	publicKey: string,
+	encrypted: boolean,
+	hasSavedPassphrase: boolean,
+	/**  Labels of hosts that log in with this key. */
+	usedBy: string[],
+};
+
+export type OpenHostOutcome = { status: "opened"; sessionId: number } | { status: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean } | { status: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean } | 
+/**  Key and agent logins still need a username when neither the host nor the key has one. */
+{ status: "needsUsername" } | { status: "hostKeyUnknown"; algorithm: string; fingerprint: string } | { status: "hostKeyChanged"; algorithm: string; fingerprint: string; previousFingerprint: string };
 
 export type OpenHostRequest = {
 	hostId: string,
@@ -109,11 +130,12 @@ export type PasswordSessionRequest = {
 	trustedFingerprint: string | null,
 };
 
-/**  Credentials the user typed because the host had none saved (or they were rejected). */
+/**  What the user typed because the vault had nothing (or something that was rejected). */
 export type PromptedLogin = {
 	username: string | null,
-	password: string,
-	/**  Save the password (and username) into the host after a successful login. */
+	password: string | null,
+	passphrase: string | null,
+	/**  Save what was typed (password into the host, passphrase into the key) after a successful login. */
 	remember: boolean,
 };
 

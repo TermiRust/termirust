@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
 import { HostFormDialog } from "@/features/hosts/host-form-dialog";
 import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
+import { cn } from "@/lib/utils";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 
@@ -17,12 +18,19 @@ interface SidebarProps {
 type Editing = { mode: "new" } | { mode: "edit"; host: HostView } | null;
 
 export function Sidebar({ onOpenHost }: SidebarProps) {
+  const section = useLayoutStore((s) => s.section);
+  const setSection = useLayoutStore((s) => s.setSection);
   const hostFilter = useLayoutStore((s) => s.hostFilter);
   const setHostFilter = useLayoutStore((s) => s.setHostFilter);
   const { hosts, groups, loaded, error, createHost, updateHost, deleteHost } = useHostsStore();
   const [editing, setEditing] = useState<Editing>(null);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const openHost = (host: HostView) => {
+    setSection("hosts");
+    onOpenHost(host);
+  };
 
   const tree = useMemo(() => buildHostTree(hosts, groups, hostFilter), [hosts, groups, hostFilter]);
   const filtering = hostFilter.trim().length > 0;
@@ -42,8 +50,8 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         tabIndex={0}
         aria-label={`Connect to ${host.label}`}
         title={`${host.username ? `${host.username}@` : ""}${host.hostname}:${host.port} — double-click to connect`}
-        onDoubleClick={() => onOpenHost(host)}
-        onKeyDown={(e) => e.key === "Enter" && onOpenHost(host)}
+        onDoubleClick={() => openHost(host)}
+        onKeyDown={(e) => e.key === "Enter" && openHost(host)}
         className="group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent"
         style={{ paddingLeft: 8 + depth * 14 }}
       >
@@ -119,10 +127,18 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
       </div>
 
       <nav aria-label="Sections" className="flex flex-col gap-0.5 border-t border-border p-2">
-        <Button className="justify-start" aria-current="page">
+        <Button
+          className={cn("justify-start", section === "hosts" && "bg-active text-fg")}
+          aria-current={section === "hosts" ? "page" : undefined}
+          onClick={() => setSection("hosts")}
+        >
           <Server size={15} /> Hosts
         </Button>
-        <Button className="justify-start" disabled title="Coming soon">
+        <Button
+          className={cn("justify-start", section === "keychain" && "bg-active text-fg")}
+          aria-current={section === "keychain" ? "page" : undefined}
+          onClick={() => setSection("keychain")}
+        >
           <KeyRound size={15} /> Keychain
         </Button>
         <Button className="justify-start" disabled title="Coming in M2">
@@ -139,6 +155,7 @@ export function Sidebar({ onOpenHost }: SidebarProps) {
         onOpenChange={(open) => !open && setEditing(null)}
         onSave={(input) => (editing?.mode === "edit" ? updateHost(editing.host.id, input) : createHost(input))}
         onDelete={editing?.mode === "edit" ? () => deleteHost(editing.host.id) : undefined}
+        onConnect={openHost}
       />
       <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
     </aside>

@@ -7,11 +7,13 @@ use super::open::Vault;
 use super::secret::Secret;
 use crate::{CoreError, Result};
 
-/// Reusable login: a username plus a password and/or private key.
+/// Reusable credential: a private key (shown as a Keychain key) and/or a password,
+/// optionally with a default username. Hosts supply the username when this has none.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Identity {
     pub label: String,
-    pub username: String,
+    #[serde(default)]
+    pub username: Option<String>,
     pub password: Option<Secret>,
     pub private_key: Option<Secret>,
     /// Saved only when the user chose to remember it.
@@ -29,7 +31,7 @@ impl Identity {
     ) -> Self {
         Self {
             label: label.into(),
-            username: username.into(),
+            username: Some(username.into()),
             password: Some(Secret::new(password)),
             private_key: None,
             passphrase: None,
@@ -42,16 +44,20 @@ impl Identity {
     fn normalized(&self) -> Result<Self> {
         let mut identity = self.clone();
         identity.label = identity.label.trim().to_owned();
-        identity.username = identity.username.trim().to_owned();
+        identity.username = identity
+            .username
+            .map(|u| u.trim().to_owned())
+            .filter(|u| !u.is_empty());
         identity.password = identity.password.filter(|s| !s.is_empty());
         identity.private_key = identity.private_key.filter(|s| !s.is_empty());
         identity.passphrase = identity.passphrase.filter(|s| !s.is_empty());
 
-        if identity.username.is_empty() {
-            return Err(CoreError::InvalidData("username is required".into()));
-        }
         if identity.label.is_empty() {
-            identity.label = identity.username.clone();
+            identity.label = match (&identity.username, &identity.key_type) {
+                (Some(user), _) => user.clone(),
+                (None, Some(kind)) => format!("{kind} key"),
+                (None, None) => return Err(CoreError::InvalidData("a label is required".into())),
+            };
         }
         if identity.password.is_none() && identity.private_key.is_none() {
             return Err(CoreError::InvalidData(
@@ -150,7 +156,7 @@ mod tests {
     fn key_identity() -> Identity {
         Identity {
             label: "deploy key".into(),
-            username: "deploy".into(),
+            username: Some("deploy".into()),
             password: None,
             private_key: Some(Secret::new("-----BEGIN OPENSSH PRIVATE KEY-----\n...")),
             passphrase: Some(Secret::new("pp")),
@@ -180,7 +186,7 @@ mod tests {
         identity.private_key = Some(Secret::new(""));
         let saved = vault.identities().create(&identity).await.unwrap().payload;
         assert_eq!(saved.label, "root");
-        assert_eq!(saved.username, "root");
+        assert_eq!(saved.username.as_deref(), Some("root"));
         assert_eq!(saved.private_key, None);
     }
 
@@ -193,8 +199,10 @@ mod tests {
             passphrase: None,
             ..key_identity()
         };
-        let no_user = Identity {
-            username: " ".into(),
+        let no_label = Identity {
+            label: " ".into(),
+            username: None,
+            key_type: None,
             ..key_identity()
         };
         let stray_passphrase = Identity {
@@ -205,7 +213,7 @@ mod tests {
 
         for (identity, message) in [
             (no_secret, "password or a private key"),
-            (no_user, "username is required"),
+            (no_label, "a label is required"),
             (stray_passphrase, "passphrase needs a private key"),
         ] {
             let err = vault.identities().create(&identity).await.unwrap_err();
@@ -270,8 +278,29 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .payload
-                .username,
-            "ops"
+                .username
+                .as_deref(),
+            Some("ops")
         );
+    }
+
+    #[tokio::test]
+    async fn a_key_without_username_or_label_is_named_after_its_type() {
+        let vault = vault().await;
+        let key = Identity {
+            label: "".into(),
+            username: None,
+            ..key_identity()
+        };
+        let saved = vault.identities().create(&key).await.unwrap().payload;
+        assert_eq!(saved.label, "ed25519 key");
+        assert_eq!(saved.username, None);
+    }
+
+    #[test]
+    fn identities_saved_before_username_became_optional_still_load() {
+        let json = r#"{"label":"x","username":"root","password":"pw","private_key":null,"passphrase":null,"public_key":null,"key_type":null,"fingerprint":null}"#;
+        let identity: Identity = serde_json::from_str(json).unwrap();
+        assert_eq!(identity.username.as_deref(), Some("root"));
     }
 }

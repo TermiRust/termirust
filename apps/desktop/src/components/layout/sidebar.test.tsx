@@ -11,11 +11,16 @@ const commands = {
   hostsUpdate: vi.fn(),
   hostsDelete: vi.fn(),
   groupsCreate: vi.fn(),
+  keysList: vi.fn(),
+  keysImport: vi.fn(),
+  keysImportFile: vi.fn(),
 };
 vi.mock("@/bindings", () => ({ commands }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
 
 const { useHostsStore } = await import("@/stores/hosts-store");
 const { useLayoutStore } = await import("@/stores/layout-store");
+const { useKeysStore } = await import("@/stores/keys-store");
 const { Sidebar } = await import("./sidebar");
 
 const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
@@ -46,12 +51,15 @@ async function renderWith(hosts: HostView[], groups: GroupView[] = []) {
 
 const initialHosts = useHostsStore.getState();
 const initialLayout = useLayoutStore.getState();
+const initialKeys = useKeysStore.getState();
 
 describe("Sidebar", () => {
   beforeEach(() => {
     Object.values(commands).forEach((fn) => fn.mockReset());
     useHostsStore.setState(initialHosts, true);
     useLayoutStore.setState(initialLayout, true);
+    useKeysStore.setState(initialKeys, true);
+    commands.keysList.mockResolvedValue(ok([]));
   });
 
   it("shows an empty state when the vault has no hosts", async () => {
@@ -189,5 +197,65 @@ describe("Sidebar", () => {
     await useHostsStore.getState().load();
     render(<Sidebar onOpenHost={vi.fn()} />);
     expect(screen.getByRole("alert")).toHaveTextContent("keychain locked");
+  });
+
+  it("saves and connects in one step", async () => {
+    const { onOpenHost, user } = await renderWith([]);
+    commands.hostsCreate.mockImplementation(async (input) => ok(host("new", { label: input.label || input.hostname })));
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    await user.type(screen.getByRole("textbox", { name: "Host" }), "10.0.0.7");
+    await user.click(screen.getByRole("button", { name: "Save & Connect" }));
+
+    await waitFor(() => expect(onOpenHost).toHaveBeenCalledWith(expect.objectContaining({ id: "new" })));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("logs in with a key chosen from the Keychain, or one imported on the spot", async () => {
+    commands.keysList.mockResolvedValue(
+      ok([{ id: "k1", label: "laptop", keyType: "ed25519", fingerprint: "SHA256:abcdefghijklmnopqrstu", publicKey: "", encrypted: false, hasSavedPassphrase: false, usedBy: [] }]),
+    );
+    const { user } = await renderWith([]);
+    commands.hostsCreate.mockImplementation(async (input) => ok(host("k", { label: input.hostname })));
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    const dialog = screen.getByRole("dialog", { name: "New host" });
+    await user.type(within(dialog).getByRole("textbox", { name: "Host" }), "github.com");
+    await user.click(within(dialog).getByRole("radio", { name: "Key" }));
+
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(within(dialog).getByText("Choose a key")).toBeInTheDocument();
+
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Key" }), "k1");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(commands.hostsCreate).toHaveBeenCalledWith(expect.objectContaining({ auth: { method: "identity", identityId: "k1" } })),
+    );
+  });
+
+  it("selects a key imported from inside the host dialog", async () => {
+    const { user } = await renderWith([]);
+    commands.keysImport.mockResolvedValue(
+      ok({ id: "k9", label: "fresh", keyType: "ed25519", fingerprint: "SHA256:zzzzzzzzzzzzzzzzzzzzz", publicKey: "", encrypted: false, hasSavedPassphrase: false, usedBy: [] }),
+    );
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    await user.click(screen.getByRole("radio", { name: "Key" }));
+    await user.click(screen.getByRole("button", { name: "Import key" }));
+    const importDialog = screen.getByRole("dialog", { name: "Import private key" });
+    await user.click(within(importDialog).getByRole("radio", { name: "Paste text" }));
+    await user.type(within(importDialog).getByRole("textbox", { name: "Private key" }), "pem");
+    await user.click(within(importDialog).getByRole("button", { name: "Import" }));
+
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Key" })).toHaveValue("k9"));
+  });
+
+  it("uses the running ssh-agent without storing anything", async () => {
+    const { user } = await renderWith([]);
+    commands.hostsCreate.mockImplementation(async (input) => ok(host("a", { label: input.hostname })));
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    await user.type(screen.getByRole("textbox", { name: "Host" }), "box");
+    await user.click(screen.getByRole("radio", { name: "Agent" }));
+    expect(screen.getByText(/ssh-agent/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(commands.hostsCreate).toHaveBeenCalledWith(expect.objectContaining({ auth: { method: "agent" } })));
   });
 });

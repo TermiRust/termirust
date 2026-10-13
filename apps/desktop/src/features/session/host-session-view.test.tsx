@@ -63,7 +63,7 @@ describe("HostSessionView", () => {
 
     expect(await screen.findByRole("status")).toHaveTextContent("Connected");
     expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({
-      prompted: { username: "deploy", password: "pw", remember: true },
+      prompted: { username: "deploy", password: "pw", passphrase: null, remember: true },
     });
   });
 
@@ -72,6 +72,40 @@ describe("HostSessionView", () => {
     render(<HostSessionView host={host} />);
     expect(await screen.findByText(/saved password was rejected/)).toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Username" })).not.toBeInTheDocument();
+  });
+
+  it("unlocks an encrypted key and says when the passphrase was wrong", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "needsPassphrase", keyLabel: "laptop", wrongPassphrase: true, usernameRequired: false }))
+      .mockResolvedValueOnce(ok({ status: "opened", sessionId: 4 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Unlock “laptop”" });
+    expect(dialog).toHaveTextContent("That passphrase is not correct");
+    expect(within(dialog).queryByRole("textbox", { name: "Username" })).not.toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Passphrase"), "pp");
+    await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+    expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({
+      prompted: { username: null, password: null, passphrase: "pp", remember: true },
+    });
+  });
+
+  it("asks only for a username for agent and key logins", async () => {
+    commands.sessionOpenHost
+      .mockResolvedValueOnce(ok({ status: "needsUsername" }))
+      .mockResolvedValueOnce(ok({ status: "opened", sessionId: 5 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={host} />);
+
+    const dialog = await screen.findByRole("dialog", { name: "Username for prod-api" });
+    expect(within(dialog).queryByLabelText("Password")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox")).not.toBeInTheDocument();
+    await user.type(within(dialog).getByRole("textbox", { name: "Username" }), "git");
+    await user.click(within(dialog).getByRole("button", { name: "Connect" }));
+    expect(commands.sessionOpenHost.mock.calls[1]?.[0]).toMatchObject({
+      prompted: { username: "git", password: null, passphrase: null, remember: false },
+    });
   });
 
   it("asks to verify a new server key", async () => {

@@ -9,7 +9,7 @@ const filled: HostFormValues = { ...blank, label: " Prod ", hostname: " 10.0.0.1
 
 describe("hostFormValues", () => {
   it("defaults a new host to port 22 and password auth", () => {
-    expect(blank).toMatchObject({ port: "22", authMethod: "password", savedPasswordAction: "keep", keepaliveSecs: "" });
+    expect(blank).toMatchObject({ port: "22", authMethod: "password", savedPasswordAction: "keep", keyId: "", keepaliveSecs: "" });
   });
 
   it("prefills from an existing host without any password", () => {
@@ -34,6 +34,7 @@ describe("hostFormValues", () => {
       authMethod: "agent",
       password: "",
       savedPasswordAction: "keep",
+      keyId: "",
       groupId: "g",
       jumpHostId: "",
       tags: "a, b",
@@ -80,6 +81,29 @@ describe("hostInputFromForm", () => {
       password: { kind: "set", value: "new" },
     });
     expect(auth({ savedPasswordAction: "replace", password: "" })).toEqual({ password: "Enter the new password" });
+  });
+
+  it("prefills a key host with its key", () => {
+    const values = hostFormValues({
+      id: "1",
+      label: "git",
+      hostname: "github.com",
+      port: 22,
+      username: "git",
+      auth: { method: "identity", identityId: "k1" },
+      groupId: null,
+      jumpHostId: null,
+      tags: [],
+      notes: "",
+      keepaliveSecs: null,
+    });
+    expect([values.authMethod, values.keyId]).toEqual(["key", "k1"]);
+  });
+
+  it("uses the chosen key and requires one", () => {
+    const chosen = hostInputFromForm({ ...filled, authMethod: "key", keyId: "k1" });
+    expect(chosen.ok && chosen.input.auth).toEqual({ method: "identity", identityId: "k1" });
+    expect(hostInputFromForm({ ...filled, authMethod: "key", keyId: "" })).toEqual({ ok: false, errors: { keyId: "Choose a key" } });
   });
 
   it("uses agent auth without any password", () => {

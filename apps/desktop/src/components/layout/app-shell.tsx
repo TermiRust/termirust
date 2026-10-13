@@ -6,6 +6,7 @@ import { EmptyWorkspace } from "@/components/layout/empty-workspace";
 import { Sidebar } from "@/components/layout/sidebar";
 import { TabBar } from "@/components/layout/tab-bar";
 import { ConnectionLab } from "@/features/connection-lab/connection-lab";
+import { KeychainView } from "@/features/keychain/keychain-view";
 import { HostSessionView } from "@/features/session/host-session-view";
 import { groupTabColor } from "@/features/tabs/tab-color";
 import { isMacPlatform, isToggleSidebarShortcut, tabShortcut, toggleSidebarLabel } from "@/lib/shortcuts";
@@ -17,6 +18,7 @@ import { useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 export function AppShell() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
   const toggleSidebar = useLayoutStore((s) => s.toggleSidebar);
+  const section = useLayoutStore((s) => s.section);
   const loadHosts = useHostsStore((s) => s.load);
   const groups = useHostsStore((s) => s.groups);
   const { tabs, activeTabId, openHostTab, openLabTab, closeTab, activateTabAt, setTabStatus } = useTabsStore();
@@ -72,12 +74,13 @@ export function AppShell() {
     <div className="flex h-full">
       {sidebarVisible && <Sidebar onOpenHost={openHost} />}
       <main className="flex min-w-0 flex-1 flex-col">
-        {tabs.length > 0 && <TabBar onRequestClose={requestClose} />}
-        {tabs.length === 0 && (
+        {section === "keychain" && <KeychainView />}
+        {section === "hosts" && tabs.length > 0 && <TabBar onRequestClose={requestClose} />}
+        {section === "hosts" && tabs.length === 0 && (
           <EmptyWorkspace version={version} sidebarShortcut={toggleSidebarLabel(onMac)} onOpenConnectionLab={openLabTab} />
         )}
         {tabs.map((tab) => (
-          <TabPanel key={tab.id} tab={tab} active={tab.id === activeTabId} onStatusChange={setTabStatus} onClose={closeTab} autoRunBenchmarks={autoRunBenchmarks} />
+          <TabPanel key={tab.id} tab={tab} active={section === "hosts" && tab.id === activeTabId} onStatusChange={setTabStatus} onClose={closeTab} autoRunBenchmarks={autoRunBenchmarks} />
         ))}
       </main>
       {closing && (
