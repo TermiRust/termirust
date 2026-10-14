@@ -11,6 +11,8 @@ interface TerminalAiOptions {
   allowed: boolean;
   target: AiTarget;
   hostId: string | null;
+  /** Shown in History, and kept there if the server is later deleted. */
+  hostLabel: string;
   /** Types text on the prompt line; never adds Enter. */
   insert: (text: string) => void;
   focusTerminal: () => void;
@@ -21,15 +23,20 @@ export const lineLabel = (e: TerminalExcerpt) => (e.startLine === e.endLine ? `L
 const toQuote = (e: TerminalExcerpt): ChatQuote => ({ label: lineLabel(e), text: e.text });
 
 /** The AI side panel of a terminal tab, plus the right-click menu that quotes into it. */
-export function useTerminalAi({ allowed, target, hostId, insert, focusTerminal, readScreen }: TerminalAiOptions) {
-  const chat = useAiChat(target, hostId);
+export function useTerminalAi({ allowed, target, hostId, hostLabel, insert, focusTerminal, readScreen }: TerminalAiOptions) {
+  const chat = useAiChat(target, hostId, hostLabel);
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<ChatQuote[]>([]);
   const [menu, setMenu] = useState<{ x: number; y: number; excerpt: TerminalExcerpt } | null>(null);
 
+  const show = () => {
+    setOpen(true);
+    void chat.resume();
+  };
+
   const quote = (excerpt: TerminalExcerpt | null) => {
     if (excerpt) setPending((list) => (list.some((q) => q.label === lineLabel(excerpt)) ? list : [...list, toQuote(excerpt)]));
-    setOpen(true);
+    show();
   };
 
   /** The AI shortcut: opens the panel, quoting the selection if there is one. */
@@ -80,5 +87,5 @@ export function useTerminalAi({ allowed, target, hostId, insert, focusTerminal, 
     />
   );
 
-  return { onAskAi, openPanel: () => setOpen(true), onContextMenu, panel, contextMenu };
+  return { onAskAi, openPanel: show, onContextMenu, panel, contextMenu };
 }

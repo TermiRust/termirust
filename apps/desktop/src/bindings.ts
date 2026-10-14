@@ -90,6 +90,12 @@ export const commands = {
 	/**  Starts a streamed answer and returns its id for [`ai_cancel`]. */
 	aiAsk: (ask: AiAsk, onEvent: Channel<AiEvent>) => typedError<number, CommandError>(__TAURI_INVOKE("ai_ask", { ask, onEvent })),
 	aiCancel: (requestId: number) => typedError<boolean, CommandError>(__TAURI_INVOKE("ai_cancel", { requestId })),
+	/**  Saved conversations, newest first. `host_id` narrows to one server; `local` to local terminals. */
+	aiChatsList: (hostId: string | null, local: boolean) => typedError<AiChatSummary[], CommandError>(__TAURI_INVOKE("ai_chats_list", { hostId, local })),
+	aiChatGet: (id: string) => typedError<AiChatView, CommandError>(__TAURI_INVOKE("ai_chat_get", { id })),
+	/**  Creates the conversation on first save, then replaces it; returns its summary (with the id). */
+	aiChatSave: (input: AiChatInput) => typedError<AiChatSummary, CommandError>(__TAURI_INVOKE("ai_chat_save", { input })),
+	aiChatDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("ai_chat_delete", { id })),
 	snippetsList: () => typedError<SnippetView[], CommandError>(__TAURI_INVOKE("snippets_list")),
 	snippetsCreate: (input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_create", { input })),
 	snippetsUpdate: (id: string, input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_update", { id, input })),
@@ -109,6 +115,45 @@ export type AiAsk = {
 	quotes: AiQuote[],
 	/**  The visible terminal text, only when the user switched that on. */
 	screen: string | null,
+};
+
+export type AiChatInput = {
+	/**  Absent for a new conversation. */
+	id: string | null,
+	hostId: string | null,
+	hostLabel: string,
+	title: string,
+	messages: AiChatMessageDto[],
+};
+
+export type AiChatMessageDto = {
+	role: AiRole,
+	text: string,
+	quotes: AiChatQuoteDto[],
+};
+
+export type AiChatQuoteDto = {
+	label: string,
+	text: string,
+};
+
+/**  A saved conversation as listed in History (messages left out). */
+export type AiChatSummary = {
+	id: string,
+	hostId: string | null,
+	hostLabel: string,
+	title: string,
+	/**  Milliseconds since the Unix epoch. */
+	updatedAt: number | null,
+	messageCount: number,
+};
+
+export type AiChatView = {
+	id: string,
+	hostId: string | null,
+	hostLabel: string,
+	title: string,
+	messages: AiChatMessageDto[],
 };
 
 export type AiEvent = { kind: "text"; text: string } | 

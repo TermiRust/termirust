@@ -1,10 +1,11 @@
-import { RotateCcw, Sparkles, Square, X } from "lucide-react";
+import { History, Plus, Sparkles, Square, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import { AiPreviewPanel } from "./ai-preview-panel";
+import { relativeTime } from "./chat-history";
 import { MarkdownReply } from "./markdown-reply";
 import { QuoteChip } from "./quote-chip";
 import type { ChatQuote, useAiChat } from "./use-ai-chat";
@@ -25,6 +26,8 @@ interface AiPanelProps {
 export function AiPanel({ chat, pending, onRemovePending, onSent, readScreen, onInsert, onClose }: AiPanelProps) {
   const [message, setMessage] = useState("");
   const [withScreen, setWithScreen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const lastText = chat.entries.at(-1)?.text;
@@ -59,14 +62,78 @@ export function AiPanel({ chat, pending, onRemovePending, onSent, readScreen, on
       <header className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-3">
         <Sparkles size={14} className="text-accent" />
         <span className="text-[13px] font-medium">AI</span>
-        <Button size="icon" className="ml-auto" aria-label="New conversation" title="New conversation" onClick={chat.clear} disabled={chat.entries.length === 0}>
-          <RotateCcw size={13} />
+        <Button
+          size="icon"
+          className="ml-auto"
+          aria-label="History"
+          aria-pressed={showHistory}
+          title="Past conversations with this server"
+          onClick={() => {
+            if (!showHistory) void chat.refreshHistory();
+            setShowHistory((v) => !v);
+          }}
+        >
+          <History size={13} />
+        </Button>
+        <Button
+          size="icon"
+          aria-label="New conversation"
+          title="New conversation"
+          onClick={() => {
+            chat.clear();
+            setShowHistory(false);
+          }}
+          disabled={chat.entries.length === 0 && !showHistory}
+        >
+          <Plus size={14} />
         </Button>
         <Button size="icon" aria-label="Close AI panel" onClick={onClose}>
           <X size={14} />
         </Button>
       </header>
 
+      {showHistory ? (
+        <div role="region" aria-label="Past conversations" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-2">
+          {chat.historyError && (
+            <p role="alert" className="p-1 text-xs text-danger">
+              {chat.historyError}
+            </p>
+          )}
+          {chat.history.length === 0 && !chat.historyError && <p className="p-2 text-[13px] text-fg-muted">No saved conversations with this server yet.</p>}
+          {chat.history.map((item) => (
+            <div key={item.id} className={`group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-hover ${item.id === chat.chatId ? "bg-active" : ""}`}>
+              <button
+                type="button"
+                aria-label={`Open conversation: ${item.title}`}
+                onClick={() => {
+                  void chat.openChat(item.id);
+                  setShowHistory(false);
+                }}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="block truncate text-[13px]">{item.title}</span>
+                <span className="block text-[11px] text-fg-muted">
+                  {relativeTime(item.updatedAt ?? 0)} · {item.messageCount} messages
+                </span>
+              </button>
+              <button
+                type="button"
+                aria-label={confirmDelete === item.id ? `Confirm delete ${item.title}` : `Delete ${item.title}`}
+                title={confirmDelete === item.id ? "Click again to delete" : "Delete"}
+                onClick={() => {
+                  if (confirmDelete === item.id) {
+                    setConfirmDelete(null);
+                    void chat.deleteChat(item.id);
+                  } else setConfirmDelete(item.id);
+                }}
+                className={`rounded p-1 hover:bg-active ${confirmDelete === item.id ? "text-danger" : "text-fg-muted opacity-0 group-hover:opacity-100 focus-visible:opacity-100"}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
       <div aria-label="Conversation" className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
         {chat.entries.length === 0 && !chat.preview && (
           <p className="text-[13px] text-fg-muted">
@@ -97,6 +164,7 @@ export function AiPanel({ chat, pending, onRemovePending, onSent, readScreen, on
         {chat.preview && <AiPreviewPanel preview={chat.preview} onSend={chat.confirmPreview} onCancel={chat.dismissPreview} />}
         <div ref={endRef} />
       </div>
+      )}
 
       <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2.5">
         {pending.length > 0 && (

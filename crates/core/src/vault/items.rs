@@ -19,6 +19,7 @@ pub enum ItemKind {
     PortForward,
     AiSettings,
     Snippet,
+    AiChat,
 }
 
 impl ItemKind {
@@ -31,6 +32,7 @@ impl ItemKind {
             ItemKind::PortForward => "port_forward",
             ItemKind::AiSettings => "ai_settings",
             ItemKind::Snippet => "snippet",
+            ItemKind::AiChat => "ai_chat",
         }
     }
 }

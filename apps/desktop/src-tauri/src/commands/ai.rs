@@ -11,7 +11,9 @@ use termirust_core::ai::prompts::{
     PreparedRequest, Quote, ShellContext, chat_request, code_blocks,
 };
 use termirust_core::ai::provider::{AiClient, ChatMessage, ChatRequest, ProviderKind, Role};
-use termirust_core::vault::{AiSettings, Secret, Vault};
+use termirust_core::vault::{
+    AiChat, AiChatRecord, AiSettings, ChatMessageRecord, ChatQuoteRecord, ChatRole, Secret, Vault,
+};
 use termirust_core::{CancelFlag, CoreError};
 
 use super::hosts::parse_id;
@@ -168,7 +170,7 @@ pub enum AiTarget {
     Remote,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(rename_all = "camelCase")]
 pub enum AiRole {
     User,
@@ -422,6 +424,194 @@ pub async fn ai_cancel(
     request_id: u32,
 ) -> Result<bool, CommandError> {
     Ok(requests.cancel(request_id))
+}
+
+/// A saved conversation as listed in History (messages left out).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatSummary {
+    pub id: String,
+    pub host_id: Option<String>,
+    pub host_label: String,
+    pub title: String,
+    /// Milliseconds since the Unix epoch.
+    #[specta(type = f64)]
+    pub updated_at: i64,
+    pub message_count: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatQuoteDto {
+    pub label: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatMessageDto {
+    pub role: AiRole,
+    pub text: String,
+    pub quotes: Vec<AiChatQuoteDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatView {
+    pub id: String,
+    pub host_id: Option<String>,
+    pub host_label: String,
+    pub title: String,
+    pub messages: Vec<AiChatMessageDto>,
+}
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatInput {
+    /// Absent for a new conversation.
+    pub id: Option<String>,
+    pub host_id: Option<String>,
+    pub host_label: String,
+    pub title: String,
+    pub messages: Vec<AiChatMessageDto>,
+}
+
+fn summary(record: &AiChatRecord) -> AiChatSummary {
+    let chat = &record.payload;
+    AiChatSummary {
+        id: record.meta.id.to_string(),
+        host_id: chat.host_id.map(|id| id.to_string()),
+        host_label: chat.host_label.clone(),
+        title: chat.title.clone(),
+        updated_at: record.meta.updated_at,
+        message_count: u32::try_from(chat.messages.len()).unwrap_or(u32::MAX),
+    }
+}
+
+fn to_record(input: AiChatInput) -> Result<AiChat, CommandError> {
+    Ok(AiChat {
+        host_id: input.host_id.as_deref().map(parse_id).transpose()?,
+        host_label: input.host_label,
+        title: input.title,
+        messages: input
+            .messages
+            .into_iter()
+            .map(|m| ChatMessageRecord {
+                role: match m.role {
+                    AiRole::User => ChatRole::User,
+                    AiRole::Assistant => ChatRole::Assistant,
+                },
+                text: m.text,
+                quotes: m
+                    .quotes
+                    .into_iter()
+                    .map(|q| ChatQuoteRecord {
+                        label: q.label,
+                        text: q.text,
+                    })
+                    .collect(),
+            })
+            .collect(),
+    })
+}
+
+fn to_view(record: &AiChatRecord) -> AiChatView {
+    let chat = &record.payload;
+    AiChatView {
+        id: record.meta.id.to_string(),
+        host_id: chat.host_id.map(|id| id.to_string()),
+        host_label: chat.host_label.clone(),
+        title: chat.title.clone(),
+        messages: chat
+            .messages
+            .iter()
+            .map(|m| AiChatMessageDto {
+                role: match m.role {
+                    ChatRole::User => AiRole::User,
+                    ChatRole::Assistant => AiRole::Assistant,
+                },
+                text: m.text.clone(),
+                quotes: m
+                    .quotes
+                    .iter()
+                    .map(|q| AiChatQuoteDto {
+                        label: q.label.clone(),
+                        text: q.text.clone(),
+                    })
+                    .collect(),
+            })
+            .collect(),
+    }
+}
+
+/// Saved conversations, newest first. `host_id` narrows to one server; `local` to local terminals.
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_chats_list(
+    state: State<'_, VaultState>,
+    host_id: Option<String>,
+    local: bool,
+) -> Result<Vec<AiChatSummary>, CommandError> {
+    let chats = state.vault().await?.ai_chats().list().await?;
+    Ok(chats
+        .iter()
+        .filter(|c| match (&host_id, local) {
+            (_, true) => c.payload.host_id.is_none(),
+            (Some(id), false) => {
+                c.payload.host_id.map(|h| h.to_string()).as_deref() == Some(id.as_str())
+            }
+            (None, false) => true,
+        })
+        .map(summary)
+        .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_chat_get(
+    state: State<'_, VaultState>,
+    id: String,
+) -> Result<AiChatView, CommandError> {
+    let record = state
+        .vault()
+        .await?
+        .ai_chats()
+        .get(parse_id(&id)?)
+        .await?
+        .ok_or(CoreError::NotFound { kind: "chat", id })?;
+    Ok(to_view(&record))
+}
+
+/// Creates the conversation on first save, then replaces it; returns its summary (with the id).
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_chat_save(
+    state: State<'_, VaultState>,
+    input: AiChatInput,
+) -> Result<AiChatSummary, CommandError> {
+    let vault = state.vault().await?;
+    save_chat(&vault, input).await
+}
+
+async fn save_chat(vault: &Vault, input: AiChatInput) -> Result<AiChatSummary, CommandError> {
+    let id = input.id.as_deref().map(parse_id).transpose()?;
+    let chat = to_record(input)?;
+    let record = match id {
+        Some(id) => vault.ai_chats().update(id, &chat).await?,
+        None => vault.ai_chats().create(&chat).await?,
+    };
+    Ok(summary(&record))
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn ai_chat_delete(state: State<'_, VaultState>, id: String) -> Result<(), CommandError> {
+    Ok(state
+        .vault()
+        .await?
+        .ai_chats()
+        .delete(parse_id(&id)?)
+        .await?)
 }
 
 #[cfg(test)]
@@ -720,5 +910,79 @@ mod tests {
         assert!(flag.is_cancelled());
         requests.finish(id);
         assert!(!requests.cancel(id));
+    }
+
+    fn chat_input(id: Option<String>, host_id: Option<String>, text: &str) -> AiChatInput {
+        AiChatInput {
+            id,
+            host_id,
+            host_label: "prod-db".into(),
+            title: "slow queries".into(),
+            messages: vec![
+                AiChatMessageDto {
+                    role: AiRole::User,
+                    text: text.into(),
+                    quotes: vec![AiChatQuoteDto {
+                        label: "L3–L4".into(),
+                        text: "ERROR".into(),
+                    }],
+                },
+                AiChatMessageDto {
+                    role: AiRole::Assistant,
+                    text: "Check `pg_stat_activity`.".into(),
+                    quotes: vec![],
+                },
+            ],
+        }
+    }
+
+    #[tokio::test]
+    async fn saves_a_conversation_then_updates_the_same_one() {
+        let vault = vault().await;
+        let host = vault
+            .hosts()
+            .create(&termirust_core::vault::Host::new("db"))
+            .await
+            .unwrap()
+            .meta
+            .id
+            .to_string();
+        let first = save_chat(&vault, chat_input(None, Some(host.clone()), "why slow?"))
+            .await
+            .unwrap();
+        assert_eq!(
+            (first.message_count, first.host_id.as_deref()),
+            (2, Some(host.as_str()))
+        );
+
+        let mut more = chat_input(Some(first.id.clone()), Some(host.clone()), "why slow?");
+        more.messages.push(AiChatMessageDto {
+            role: AiRole::User,
+            text: "and now?".into(),
+            quotes: vec![],
+        });
+        let second = save_chat(&vault, more).await.unwrap();
+        assert_eq!(second.id, first.id);
+        assert_eq!(second.message_count, 3);
+
+        let record = vault
+            .ai_chats()
+            .get(parse_id(&first.id).unwrap())
+            .await
+            .unwrap()
+            .unwrap();
+        let view = to_view(&record);
+        assert_eq!(view.messages[0].quotes[0].label, "L3–L4");
+        assert_eq!(view.messages.len(), 3);
+    }
+
+    #[test]
+    fn chat_input_from_the_panel_is_accepted() {
+        let parsed: AiChatInput = serde_json::from_str(
+            r#"{"id":null,"hostId":null,"hostLabel":"Local","title":"t","messages":[{"role":"user","text":"hi","quotes":[]}]}"#,
+        )
+        .unwrap();
+        assert!(parsed.id.is_none() && parsed.host_id.is_none());
+        assert!(to_record(parsed).is_ok());
     }
 }

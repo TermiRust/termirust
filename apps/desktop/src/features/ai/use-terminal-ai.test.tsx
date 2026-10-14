@@ -6,12 +6,12 @@ import type { TerminalExcerpt } from "@/features/terminal/terminal-view";
 
 vi.mock("@tauri-apps/api/core", async () => ({ Channel: (await import("@/test/tauri-channel-mock")).FakeChannel }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-vi.mock("@/bindings", () => ({ commands: {} }));
+vi.mock("@/bindings", () => ({ commands: { aiChatsList: async () => ({ status: "ok", data: [] }) } }));
 
 const { useTerminalAi, lineLabel } = await import("./use-terminal-ai");
 
 function Harness({ allowed, excerpt }: { allowed: boolean; excerpt: TerminalExcerpt | null }) {
-  const ai = useTerminalAi({ allowed, target: "local", hostId: null, insert: vi.fn(), focusTerminal: vi.fn(), readScreen: () => null });
+  const ai = useTerminalAi({ allowed, target: "local", hostId: null, hostLabel: "Local", insert: vi.fn(), focusTerminal: vi.fn(), readScreen: () => null });
   return (
     <div>
       <div data-testid="terminal" onContextMenu={(e) => ai.onContextMenu(e, excerpt)} />

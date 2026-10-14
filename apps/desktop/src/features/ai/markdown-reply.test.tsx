@@ -82,4 +82,12 @@ describe("MarkdownReply", () => {
     await user.click(screen.getByRole("button", { name: `Insert into terminal: ${long}` }));
     expect(onInsert).toHaveBeenCalledWith(long);
   });
+
+  it("keeps code blocks mounted when the reply re-renders", () => {
+    const text = "```sh\nls\n```";
+    const { rerender } = render(<MarkdownReply text={text} commands={[{ command: "ls", danger: null }]} onInsert={vi.fn()} />);
+    const before = screen.getByTestId("code-block");
+    rerender(<MarkdownReply text={text} commands={[{ command: "ls", danger: null }]} onInsert={vi.fn()} />);
+    expect(screen.getByTestId("code-block")).toBe(before);
+  });
 });

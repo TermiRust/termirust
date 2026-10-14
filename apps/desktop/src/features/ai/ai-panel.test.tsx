@@ -7,7 +7,16 @@ import { FakeChannel } from "@/test/tauri-channel-mock";
 
 vi.mock("@tauri-apps/api/core", async () => ({ Channel: (await import("@/test/tauri-channel-mock")).FakeChannel }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: vi.fn() }));
-const commands = { aiPreview: vi.fn(), aiAsk: vi.fn(), aiCancel: vi.fn() };
+const commands = {
+  aiPreview: vi.fn(),
+  aiAsk: vi.fn(),
+  aiCancel: vi.fn(),
+  aiChatsList: vi.fn(),
+  aiChatSave: vi.fn(),
+  aiChatGet: vi.fn(),
+  aiChatDelete: vi.fn(),
+  commandDanger: vi.fn(async () => null),
+};
 vi.mock("@/bindings", () => ({ commands }));
 
 const { useTerminalAi } = await import("./use-terminal-ai");
@@ -22,6 +31,7 @@ function Harness({ onInsert = vi.fn() }: { onInsert?: (c: string) => void }) {
     allowed: true,
     target: "remote",
     hostId: "h1",
+    hostLabel: "prod-api",
     insert: onInsert,
     focusTerminal: vi.fn(),
     readScreen: () => ({ text: "$ systemctl status nginx\nfailed", startLine: 120, endLine: 121 }),
@@ -47,6 +57,12 @@ describe("AI panel", () => {
     commands.aiAsk.mockResolvedValue(ok(9));
     commands.aiPreview.mockResolvedValue(ok(preview));
     commands.aiCancel.mockResolvedValue(ok(true));
+    commands.aiChatsList.mockResolvedValue(ok([]));
+    commands.aiChatSave.mockImplementation(async (input: { title: string; messages: unknown[] }) =>
+      ok({ id: "c1", hostId: "h1", hostLabel: "prod-api", title: input.title, updatedAt: Date.now(), messageCount: input.messages.length }),
+    );
+    commands.aiChatDelete.mockResolvedValue(ok(null));
+    commands.commandDanger.mockResolvedValue(null);
   });
 
   it("sends a quoted selection, streams a Markdown answer and inserts a suggested command", async () => {
@@ -117,5 +133,91 @@ describe("AI panel", () => {
 
     await user.click(panel.getByRole("button", { name: "New conversation" }));
     expect(panel.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  describe("history", () => {
+    const saved = {
+      id: "c9",
+      hostId: "h1",
+      hostLabel: "prod-api",
+      title: "why is nginx down?",
+      messages: [
+        { role: "user", text: "why is nginx down?", quotes: [{ label: "L3–L4", text: "failed" }] },
+        { role: "assistant", text: "Restart it:\n```sh\nsudo systemctl restart nginx\n```", quotes: [] },
+      ],
+    };
+
+    it("saves each finished answer to the server's history, then keeps updating the same chat", async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole("button", { name: "open" }));
+      const panel = within(screen.getByRole("complementary", { name: "AI assistant" }));
+      await user.type(panel.getByRole("textbox", { name: "Ask the AI" }), "disk full?{Enter}");
+      emit({ kind: "done", reply: "Check `df -h`.", commands: [] });
+      await vi.waitFor(() => expect(commands.aiChatSave).toHaveBeenCalledOnce());
+      expect(commands.aiChatSave.mock.calls[0]?.[0]).toEqual({
+        id: null,
+        hostId: "h1",
+        hostLabel: "prod-api",
+        title: "disk full?",
+        messages: [
+          { role: "user", text: "disk full?", quotes: [] },
+          { role: "assistant", text: "Check `df -h`.", quotes: [] },
+        ],
+      });
+
+      await user.type(panel.getByRole("textbox", { name: "Ask the AI" }), "and inodes?{Enter}");
+      emit({ kind: "done", reply: "`df -i`", commands: [] });
+      await vi.waitFor(() => expect(commands.aiChatSave).toHaveBeenCalledTimes(2));
+      expect(commands.aiChatSave.mock.calls[1]?.[0]).toMatchObject({ id: "c1" });
+
+      await user.click(panel.getByRole("button", { name: "New conversation" }));
+      await user.type(panel.getByRole("textbox", { name: "Ask the AI" }), "fresh{Enter}");
+      emit({ kind: "done", reply: "ok", commands: [] });
+      await vi.waitFor(() => expect(commands.aiChatSave).toHaveBeenCalledTimes(3));
+      expect(commands.aiChatSave.mock.calls[2]?.[0]).toMatchObject({ id: null, title: "fresh" });
+    });
+
+    it("reopens the server's latest conversation, with Insert buttons, when the panel first opens", async () => {
+      commands.aiChatsList.mockResolvedValue(ok([{ id: "c9", hostId: "h1", hostLabel: "prod-api", title: saved.title, updatedAt: Date.now(), messageCount: 2 }]));
+      commands.aiChatGet.mockResolvedValue(ok(saved));
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole("button", { name: "open" }));
+      const panel = within(screen.getByRole("complementary", { name: "AI assistant" }));
+      expect(await panel.findByText("why is nginx down?")).toBeInTheDocument();
+      expect(panel.getByRole("button", { name: "Quoted L3–L4" })).toBeInTheDocument();
+      expect(await panel.findByRole("button", { name: "Insert into terminal: sudo systemctl restart nginx" })).toBeInTheDocument();
+      expect(commands.aiChatsList).toHaveBeenCalledWith("h1", false);
+    });
+
+    it("lists past conversations, opens one and deletes another after confirmation", async () => {
+      commands.aiChatsList.mockResolvedValue(
+        ok([
+          { id: "c9", hostId: "h1", hostLabel: "prod-api", title: saved.title, updatedAt: Date.now() - 3_600_000, messageCount: 2 },
+          { id: "c8", hostId: "h1", hostLabel: "prod-api", title: "old question", updatedAt: Date.now() - 86_400_000, messageCount: 4 },
+        ]),
+      );
+      commands.aiChatGet.mockResolvedValue(ok(saved));
+      const user = userEvent.setup();
+      render(<Harness />);
+      await user.click(screen.getByRole("button", { name: "open" }));
+      const panel = within(screen.getByRole("complementary", { name: "AI assistant" }));
+      await panel.findByText("why is nginx down?");
+
+      await user.click(panel.getByRole("button", { name: "History" }));
+      const list = within(panel.getByRole("region", { name: "Past conversations" }));
+      expect(list.getByText("old question")).toBeInTheDocument();
+      expect(list.getByText(/4 messages/)).toBeInTheDocument();
+
+      await user.click(list.getByRole("button", { name: "Delete old question" }));
+      expect(commands.aiChatDelete).not.toHaveBeenCalled();
+      await user.click(list.getByRole("button", { name: "Confirm delete old question" }));
+      expect(commands.aiChatDelete).toHaveBeenCalledWith("c8");
+
+      await user.click(list.getByRole("button", { name: `Open conversation: ${saved.title}` }));
+      expect(panel.queryByRole("region", { name: "Past conversations" })).not.toBeInTheDocument();
+      expect(commands.aiChatGet).toHaveBeenLastCalledWith("c9");
+    });
   });
 });

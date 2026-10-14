@@ -68,6 +68,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
     allowed: aiAllowed,
     target: "remote",
     hostId: host.id,
+    hostLabel: host.label,
     insert: session.send,
     focusTerminal: () => terminalRef.current?.focus(),
     readScreen: () => terminalRef.current?.screenExcerpt() ?? null,

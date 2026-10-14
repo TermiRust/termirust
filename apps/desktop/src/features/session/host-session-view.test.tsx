@@ -22,6 +22,7 @@ const commands = {
   sessionClose: vi.fn(),
   sessionAcknowledgeOutput: vi.fn(),
   forwardsAutoStart: vi.fn(),
+  aiChatsList: vi.fn(async () => ({ status: "ok", data: [] })),
 };
 vi.mock("@/bindings", () => ({ commands }));
 

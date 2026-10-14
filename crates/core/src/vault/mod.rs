@@ -1,3 +1,4 @@
+mod ai_chats;
 mod ai_settings;
 pub mod crypto;
 mod groups;
@@ -12,6 +13,10 @@ mod secret;
 mod snippets;
 mod ssh_config_import;
 
+pub use ai_chats::{
+    AiChat, AiChatRecord, AiChatRepository, ChatMessageRecord, ChatQuoteRecord, ChatRole,
+    MAX_CHAT_MESSAGES,
+};
 pub use ai_settings::{AiSettings, AiSettingsRepository};
 pub use groups::{Group, GroupRecord, GroupRepository};
 pub use hosts::{Host, HostAuth, HostEnvironment, HostRecord, HostRepository, TAB_COLORS};
