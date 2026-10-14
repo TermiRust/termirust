@@ -1,4 +1,4 @@
-import { Clock, Cpu, HardDrive, KeyRound, MemoryStick, RefreshCw, X } from "lucide-react";
+import { Clock, Cpu, Loader2, HardDrive, KeyRound, MemoryStick, RefreshCw, X } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { HostView } from "@/bindings";
@@ -89,7 +89,11 @@ export function MonitorCard({ host, onRemove }: MonitorCardProps) {
         </Button>
       </header>
 
-      {state.phase === "loading" && <p className="py-6 text-center text-[12px] text-fg-muted">Connecting…</p>}
+      {state.phase === "loading" && (
+        <p role="status" className="flex items-center justify-center gap-1.5 py-6 text-[12px] text-fg-muted">
+          <Loader2 size={14} className="animate-spin text-accent" aria-hidden /> Connecting…
+        </p>
+      )}
       {state.phase === "error" && (
         <div role="alert" className="flex flex-col items-center gap-2 py-4 text-center text-[12px] text-danger">
           <span className="line-clamp-3 break-words">{state.message}</span>

@@ -1,6 +1,8 @@
 use std::path::Path;
 
+use termirust_core::CoreError;
 use termirust_core::local_fs;
+use termirust_core::sftp::{MAX_EDIT_BYTES, editable_text};
 
 use super::sftp::FileEntry;
 use crate::command_error::CommandError;
@@ -38,6 +40,32 @@ pub async fn local_remove(path: String) -> Result<(), CommandError> {
     Ok(local_fs::remove(Path::new(&path))?)
 }
 
+/// A text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused.
+#[tauri::command]
+#[specta::specta]
+pub async fn local_read_text(path: String) -> Result<String, CommandError> {
+    let size = std::fs::metadata(&path)
+        .map_err(|e| CoreError::InvalidData(format!("cannot read {path}: {e}")))?
+        .len();
+    if size > MAX_EDIT_BYTES {
+        return Err(CoreError::InvalidData(
+            "file is larger than 2 MB; open it in another editor".into(),
+        )
+        .into());
+    }
+    let bytes = std::fs::read(&path)
+        .map_err(|e| CoreError::InvalidData(format!("cannot read {path}: {e}")))?;
+    Ok(editable_text(bytes)?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn local_write_text(path: String, text: String) -> Result<(), CommandError> {
+    std::fs::write(&path, text)
+        .map_err(|e| CoreError::InvalidData(format!("cannot save {path}: {e}")))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,5 +95,25 @@ mod tests {
     #[tokio::test]
     async fn home_is_never_empty() {
         assert!(!local_home().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn edits_a_text_file_and_refuses_binary() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("hosts").to_string_lossy().into_owned();
+        local_write_text(file.clone(), "127.0.0.1 localhost\n".into())
+            .await
+            .unwrap();
+        assert_eq!(
+            local_read_text(file.clone()).await.unwrap(),
+            "127.0.0.1 localhost\n"
+        );
+
+        let binary = dir.path().join("a.out");
+        std::fs::write(&binary, [0x7f, b'E', 0, 1]).unwrap();
+        let err = local_read_text(binary.to_string_lossy().into_owned())
+            .await
+            .unwrap_err();
+        assert!(err.message.contains("binary"), "{}", err.message);
     }
 }

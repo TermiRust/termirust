@@ -292,3 +292,27 @@ async fn reads_a_health_snapshot_of_the_test_server() {
     assert!(stats.uptime_secs.is_some());
     connection.disconnect().await.unwrap();
 }
+
+#[tokio::test]
+async fn edits_a_text_file_in_place() {
+    let sftp = client().await;
+    let dir = scratch(&sftp, "edit").await;
+    let path = join_remote(&dir, "nginx.conf");
+    sftp.write_file(&path, b"worker_processes 1;\n")
+        .await
+        .unwrap();
+    sftp.write_file(&path, b"worker_processes 4;\n")
+        .await
+        .unwrap();
+    assert_eq!(
+        sftp.read_file(&path).await.unwrap(),
+        b"worker_processes 4;\n"
+    );
+    sftp.write_file(&path, b"").await.unwrap();
+    assert!(
+        sftp.read_file(&path).await.unwrap().is_empty(),
+        "shorter content truncates"
+    );
+    sftp.remove(&dir).await.unwrap();
+    sftp.close().await.unwrap();
+}

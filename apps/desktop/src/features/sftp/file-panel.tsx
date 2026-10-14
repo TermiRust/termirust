@@ -1,5 +1,5 @@
-import { ArrowUp, ChevronDown, ChevronUp, File, Folder, FolderPlus, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
-import { useMemo, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { ArrowLeft, ArrowRight, ArrowUp, ChevronDown, ChevronUp, File, FilePen, Folder, FolderOpen, FolderPlus, Link2, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { useMemo, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 import type { FileEntry } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ export interface FilePanelProps {
   onDelete: (entries: FileEntry[]) => void;
   /** Double-click or Enter on a file: send it to the other side. */
   onOpenFile: (entry: FileEntry) => void;
+  /** Opens a text file in the built-in editor. */
+  onEdit: (entry: FileEntry) => void;
   onRowPointerDown: (event: PointerEvent, entry: FileEntry) => void;
 }
 
@@ -37,6 +39,7 @@ export function FilePanel(props: FilePanelProps) {
   const { side, title, path, loading, error, selected, dropTarget, isMac } = props;
   const [anchor, setAnchor] = useState<string | null>(null);
   const [sort, setSort] = useState<SortOrder>(DEFAULT_SORT);
+  const [menu, setMenu] = useState<{ x: number; y: number; entry: FileEntry } | null>(null);
   const entries = useMemo(() => sortEntries(props.entries, sort), [props.entries, sort]);
   const paths = entries.map((e) => e.path);
   const selectedEntries = entries.filter((e) => selected.includes(e.path));
@@ -71,6 +74,10 @@ export function FilePanel(props: FilePanelProps) {
       case "F2":
         if (only) props.onRename(only);
         break;
+      case "e":
+        if (only?.kind === "file" && (event.metaKey || event.ctrlKey)) props.onEdit(only);
+        else return;
+        break;
       default:
         return;
     }
@@ -96,6 +103,15 @@ export function FilePanel(props: FilePanelProps) {
         </Button>
         <Button size="icon" aria-label={`New folder (${title})`} title="New folder" onClick={props.onNewFolder} disabled={path === null}>
           <FolderPlus size={14} />
+        </Button>
+        <Button
+          size="icon"
+          aria-label={`Edit file (${title})`}
+          title={`Edit file (${isMac ? "⌘E" : "Ctrl+E"})`}
+          onClick={() => selectedEntries[0] && props.onEdit(selectedEntries[0])}
+          disabled={selectedEntries.length !== 1 || selectedEntries[0]?.kind !== "file"}
+        >
+          <FilePen size={13} />
         </Button>
         <Button
           size="icon"
@@ -153,6 +169,14 @@ export function FilePanel(props: FilePanelProps) {
                   if (!e.shiftKey) setAnchor(entry.path);
                 }}
                 onDoubleClick={() => open(entry)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  if (!isSelected) {
+                    props.onSelect([entry.path]);
+                    setAnchor(entry.path);
+                  }
+                  setMenu({ x: e.clientX, y: e.clientY, entry });
+                }}
                 className={cn(
                   "grid h-7 cursor-default grid-cols-[1fr_88px_160px] items-center gap-3 px-3 text-[13.5px] even:bg-bg-sunk/50",
                   isSelected ? "bg-accent/15 text-fg even:bg-accent/15" : "hover:bg-hover",
@@ -171,10 +195,85 @@ export function FilePanel(props: FilePanelProps) {
           })}
         </ul>
       )}
+      {menu && (
+        <RowMenu
+          x={menu.x}
+          y={menu.y}
+          entry={menu.entry}
+          count={selected.includes(menu.entry.path) ? Math.max(selectedEntries.length, 1) : 1}
+          sendLabel={side === "local" ? "Upload to server" : "Download to this computer"}
+          sendIcon={side === "local" ? <ArrowRight size={13} /> : <ArrowLeft size={13} />}
+          onClose={() => setMenu(null)}
+          onOpen={() => props.onNavigate(menu.entry.path)}
+          onEdit={() => props.onEdit(menu.entry)}
+          onSend={() => props.onOpenFile(menu.entry)}
+          onRename={() => props.onRename(menu.entry)}
+          onDelete={() => props.onDelete(selected.includes(menu.entry.path) && selectedEntries.length > 0 ? selectedEntries : [menu.entry])}
+        />
+      )}
       <div className="flex h-6 shrink-0 items-center border-t border-border px-3 text-[11px] text-fg-muted">
         {selectedEntries.length > 0 ? `${selectedEntries.length} of ${entries.length} selected` : `${entries.length} items`}
       </div>
     </section>
+  );
+}
+
+interface RowMenuProps {
+  x: number;
+  y: number;
+  entry: FileEntry;
+  count: number;
+  sendLabel: string;
+  sendIcon: ReactNode;
+  onClose: () => void;
+  onOpen: () => void;
+  onEdit: () => void;
+  onSend: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}
+
+/** Right-click menu on a file or folder row. */
+function RowMenu({ x, y, entry, count, sendLabel, sendIcon, onClose, onOpen, onEdit, onSend, onRename, onDelete }: RowMenuProps) {
+  const item = "flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[13px] hover:bg-hover focus-visible:bg-hover focus-visible:outline-none";
+  const run = (action: () => void) => () => {
+    onClose();
+    action();
+  };
+  const isDir = entry.kind === "directory" || entry.kind === "symlink";
+  return (
+    <>
+      <div aria-hidden className="fixed inset-0 z-30" onMouseDown={onClose} onContextMenu={(e) => (e.preventDefault(), onClose())} />
+      <div
+        role="menu"
+        aria-label={`Actions for ${entry.name}`}
+        className="motion-pop fixed z-40 min-w-52 rounded-md border border-border bg-bg p-1 shadow-dialog"
+        style={{ left: Math.min(x, window.innerWidth - 220), top: Math.min(y, window.innerHeight - 200) }}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+      >
+        {isDir ? (
+          <button type="button" role="menuitem" autoFocus className={item} onClick={run(onOpen)}>
+            <FolderOpen size={13} className="text-fg-muted" /> Open
+          </button>
+        ) : (
+          entry.kind === "file" && (
+            <button type="button" role="menuitem" autoFocus className={item} onClick={run(onEdit)}>
+              <FilePen size={13} className="text-fg-muted" /> Edit
+            </button>
+          )
+        )}
+        <button type="button" role="menuitem" className={item} onClick={run(onSend)}>
+          <span className="text-fg-muted">{sendIcon}</span> {sendLabel}
+        </button>
+        <button type="button" role="menuitem" className={item} onClick={run(onRename)}>
+          <Pencil size={13} className="text-fg-muted" /> Rename
+        </button>
+        <div className="my-1 h-px bg-border" />
+        <button type="button" role="menuitem" className={`${item} text-danger`} onClick={run(onDelete)}>
+          <Trash2 size={13} /> {count > 1 ? `Delete ${count} items` : "Delete"}
+        </button>
+      </div>
+    </>
   );
 }
 

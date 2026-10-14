@@ -34,6 +34,10 @@ const commands = {
   localCreateDir: vi.fn(),
   localRename: vi.fn(),
   localRemove: vi.fn(),
+  sftpReadText: vi.fn(),
+  sftpWriteText: vi.fn(),
+  localReadText: vi.fn(),
+  localWriteText: vi.fn(),
 };
 vi.mock("@/bindings", () => ({ commands }));
 
@@ -117,6 +121,65 @@ describe("SftpView", () => {
 
     unmount();
     expect(commands.sftpClose).toHaveBeenCalledWith(4);
+  });
+
+  it("offers Edit, Rename and Delete on right-click", async () => {
+    await renderConnected();
+    fireEvent.contextMenu(row("prod-api", "report.pdf"));
+    const menu = within(screen.getByRole("menu", { name: "Actions for report.pdf" }));
+    expect(menu.getAllByRole("menuitem").map((m) => m.textContent?.trim())).toEqual(["Edit", "Download to this computer", "Rename", "Delete"]);
+    expect(row("prod-api", "report.pdf")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(menu.getByRole("menuitem", { name: "Rename" }));
+    expect(screen.getByRole("dialog", { name: "Rename report.pdf" })).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
+
+    fireEvent.contextMenu(row("prod-api", "logs"));
+    const dirMenu = within(screen.getByRole("menu", { name: "Actions for logs" }));
+    expect(dirMenu.getByRole("menuitem", { name: "Open" })).toBeInTheDocument();
+    fireEvent.click(dirMenu.getByRole("menuitem", { name: "Delete" }));
+    expect(screen.getByRole("dialog", { name: "Delete logs?" })).toBeInTheDocument();
+  });
+
+  it("edits a remote text file in place and asks before discarding changes", async () => {
+    commands.sftpReadText.mockResolvedValue(ok("worker_processes 1;\n"));
+    commands.sftpWriteText.mockResolvedValue(ok(null));
+    const user = userEvent.setup();
+    await renderConnected();
+    fireEvent.contextMenu(row("prod-api", "report.pdf"));
+    await user.click(screen.getByRole("menuitem", { name: "Edit" }));
+    const editor = await screen.findByRole("textbox", { name: "Contents of report.pdf" });
+    expect(commands.sftpReadText).toHaveBeenCalledWith(4, "/home/deploy/report.pdf");
+    expect(editor).toHaveValue("worker_processes 1;\n");
+
+    await user.clear(editor);
+    await user.type(editor, "worker_processes 4;");
+    await user.keyboard("{Meta>}s{/Meta}");
+    expect(commands.sftpWriteText).toHaveBeenCalledWith(4, "/home/deploy/report.pdf", "worker_processes 4;");
+    expect(screen.getByText("Saved")).toBeInTheDocument();
+
+    await user.type(editor, "!");
+    await user.click(screen.getAllByRole("button", { name: "Close" }).at(-1) as HTMLElement);
+    expect(screen.getByText("Discard unsaved changes?")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Discard" }));
+    expect(screen.queryByRole("textbox", { name: "Contents of report.pdf" })).not.toBeInTheDocument();
+  });
+
+  it("explains why a file cannot be edited", async () => {
+    commands.sftpReadText.mockResolvedValue({ status: "error", error: { kind: "invalidData", message: "this looks like a binary file; download it instead" } });
+    await renderConnected();
+    fireEvent.click(row("prod-api", "report.pdf"));
+    fireEvent.click(screen.getByRole("button", { name: "Edit file (prod-api)" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("binary file");
+  });
+
+  it("covers the server panel with a loading state while logging in", async () => {
+    let finish: (v: unknown) => void = () => {};
+    commands.sftpOpen.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    render(<SftpView host={host} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Connecting to prod-api…");
+    await act(async () => finish(ok({ status: "opened", sftpId: 4, home: "/home/deploy" })));
+    await screen.findByRole("option", { name: /logs/ });
+    expect(screen.queryByText("Connecting to prod-api…")).not.toBeInTheDocument();
   });
 
   it("asks for a password the same way a terminal tab does", async () => {

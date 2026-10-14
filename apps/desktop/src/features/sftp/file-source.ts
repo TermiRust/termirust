@@ -10,6 +10,9 @@ export interface FileSource {
   createDir: (path: string) => Promise<void>;
   rename: (from: string, to: string) => Promise<void>;
   remove: (path: string) => Promise<void>;
+  /** Whole text file for the built-in editor (refused when binary or over 2 MB). */
+  readText: (path: string) => Promise<string>;
+  writeText: (path: string, text: string) => Promise<void>;
 }
 
 type Result<T> = { status: "ok"; data: T } | { status: "error"; error: CommandError };
@@ -32,6 +35,8 @@ export function localSource(sep: PathStyle): FileSource {
     createDir: (path) => done(commands.localCreateDir(path)),
     rename: (from, to) => done(commands.localRename(from, to)),
     remove: (path) => done(commands.localRemove(path)),
+    readText: (path) => unwrap(commands.localReadText(path)),
+    writeText: (path, text) => done(commands.localWriteText(path, text)),
   };
 }
 
@@ -43,6 +48,8 @@ export function remoteSource(sftpId: number): FileSource {
     createDir: (path) => done(commands.sftpCreateDir(sftpId, path)),
     rename: (from, to) => done(commands.sftpRename(sftpId, from, to)),
     remove: (path) => done(commands.sftpRemove(sftpId, path)),
+    readText: (path) => unwrap(commands.sftpReadText(sftpId, path)),
+    writeText: (path, text) => done(commands.sftpWriteText(sftpId, path, text)),
   };
 }
 

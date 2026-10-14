@@ -53,6 +53,12 @@ export const commands = {
 	/**  Opens the folder holding Termirust's log files in the system file manager. */
 	logsOpenFolder: () => typedError<null, CommandError>(__TAURI_INVOKE("logs_open_folder")),
 	sftpOpen: (request: OpenSftpRequest) => typedError<OpenSftpOutcome, CommandError>(__TAURI_INVOKE("sftp_open", { request })),
+	/**  A remote text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused. */
+	sftpReadText: (sftpId: number, path: string) => typedError<string, CommandError>(__TAURI_INVOKE("sftp_read_text", { sftpId, path })),
+	sftpWriteText: (sftpId: number, path: string, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_write_text", { sftpId, path, text })),
+	/**  A text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused. */
+	localReadText: (path: string) => typedError<string, CommandError>(__TAURI_INVOKE("local_read_text", { path })),
+	localWriteText: (path: string, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_write_text", { path, text })),
 	sftpList: (sftpId: number, path: string) => typedError<FileEntry[], CommandError>(__TAURI_INVOKE("sftp_list", { sftpId, path })),
 	sftpCreateDir: (sftpId: number, path: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_create_dir", { sftpId, path })),
 	sftpRename: (sftpId: number, from: string, to: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_rename", { sftpId, from, to })),

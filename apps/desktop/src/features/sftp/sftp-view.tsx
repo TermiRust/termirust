@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, FolderTree, RotateCw } from "lucide-react";
+import { ArrowLeft, ArrowRight, FolderTree, Loader2, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -12,6 +12,7 @@ import type { TabStatus } from "@/stores/tabs-store";
 import { useTransfersStore } from "@/stores/transfers-store";
 
 import { ConfirmDialog, NameDialog } from "./file-dialogs";
+import { FileEditor } from "./file-editor";
 import { FilePanel } from "./file-panel";
 import { join, localSource, parent, remoteSource, type FileSource } from "./file-source";
 import { baseName, pathStyleOf } from "./paths";
@@ -43,6 +44,7 @@ type Pending =
   | { kind: "newFolder"; side: Side }
   | { kind: "rename"; side: Side; entry: FileEntry }
   | { kind: "delete"; side: Side; entries: FileEntry[] }
+  | { kind: "edit"; side: Side; path: string }
   | { kind: "replace"; from: Side; sources: string[]; conflicts: string[] };
 
 interface Drag {
@@ -216,6 +218,7 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
         onRename={(entry) => setPending({ kind: "rename", side, entry })}
         onDelete={(entries) => entries.length > 0 && setPending({ kind: "delete", side, entries })}
         onOpenFile={(entry) => transfer(side, [entry.path])}
+        onEdit={(entry) => setPending({ kind: "edit", side, path: entry.path })}
         onRowPointerDown={onRowPointerDown(side, s.selected)}
       />
     );
@@ -227,7 +230,11 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
         <FolderTree size={14} className="text-fg-muted" />
         <span className="font-medium">{host.label}</span>
         <span className="font-mono text-xs text-fg-muted">SFTP · {endpoint}</span>
-        {state.phase === "connecting" && <span className="text-xs text-fg-muted">Connecting…</span>}
+        {state.phase === "connecting" && (
+          <span className="flex items-center gap-1 text-xs text-fg-muted">
+            <Loader2 size={12} className="animate-spin" aria-hidden /> Connecting…
+          </span>
+        )}
         {(state.phase === "error" || state.phase === "cancelled") && (
           <span role="alert" className="flex items-center gap-2 text-xs text-danger">
             {state.phase === "error" ? state.message : "Not connected"}
@@ -268,11 +275,30 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
             <ArrowLeft size={14} />
           </Button>
         </div>
-        {panel("remote", host.label)}
+        <div className="relative flex min-w-0 flex-1">
+          {panel("remote", host.label)}
+          {state.phase === "connecting" && (
+            // Logging in can take seconds (DNS, jump host, slow servers); show it is working.
+            <div role="status" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-bg/80 backdrop-blur-[1px]">
+              <Loader2 size={26} className="animate-spin text-accent" aria-hidden />
+              <span className="text-[13px] font-medium">Connecting to {host.label}…</span>
+              <span className="font-mono text-[11px] text-fg-muted">{endpoint}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {sftpId !== null && <TransferQueuePanel sftpId={sftpId} />}
 
+      {pending?.kind === "edit" && sides[pending.side].source && (
+        <FileEditor
+          source={sides[pending.side].source as FileSource}
+          path={pending.path}
+          where={pending.side === "local" ? "This computer" : host.label}
+          onClose={() => setPending(null)}
+          onSaved={sides[pending.side].refresh}
+        />
+      )}
       {pending?.kind === "newFolder" && (
         <NameDialog
           title="New folder"

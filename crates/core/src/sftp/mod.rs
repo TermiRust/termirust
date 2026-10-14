@@ -9,6 +9,30 @@ use crate::{CoreError, Result};
 
 const CHUNK: usize = 256 * 1024;
 
+/// Largest file the built-in editor opens; bigger files are downloaded instead.
+pub const MAX_EDIT_BYTES: u64 = 2 * 1024 * 1024;
+
+fn too_large_to_edit() -> CoreError {
+    CoreError::InvalidData(format!(
+        "file is larger than {} MB; download it to edit",
+        MAX_EDIT_BYTES / (1024 * 1024)
+    ))
+}
+
+/// Text the editor can show, or why not: too large, binary (contains NUL) or not UTF-8.
+pub fn editable_text(bytes: Vec<u8>) -> Result<String> {
+    if bytes.len() as u64 > MAX_EDIT_BYTES {
+        return Err(too_large_to_edit());
+    }
+    if bytes.contains(&0) {
+        return Err(CoreError::InvalidData(
+            "this looks like a binary file; download it instead".into(),
+        ));
+    }
+    String::from_utf8(bytes)
+        .map_err(|_| CoreError::InvalidData("file is not UTF-8 text; download it instead".into()))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EntryKind {
     Directory,
@@ -189,6 +213,41 @@ impl SftpClient {
             let _ = self.sftp.remove_file(remote).await;
         }
         copied
+    }
+
+    /// Reads a whole file for the editor, refusing anything over [`MAX_EDIT_BYTES`].
+    pub async fn read_file(&self, path: &str) -> Result<Vec<u8>> {
+        let size = self
+            .sftp
+            .metadata(path)
+            .await
+            .map_err(sftp_error)?
+            .size
+            .unwrap_or(0);
+        if size > MAX_EDIT_BYTES {
+            return Err(too_large_to_edit());
+        }
+        let file = self.sftp.open(path).await.map_err(sftp_error)?;
+        let mut bytes = Vec::with_capacity(size as usize);
+        file.take(MAX_EDIT_BYTES + 1)
+            .read_to_end(&mut bytes)
+            .await
+            .map_err(sftp_error)?;
+        Ok(bytes)
+    }
+
+    /// Replaces a file's contents (keeping its permissions), creating it when missing.
+    pub async fn write_file(&self, path: &str, contents: &[u8]) -> Result<()> {
+        let mut file = self
+            .sftp
+            .open_with_flags(
+                path,
+                OpenFlags::CREATE | OpenFlags::TRUNCATE | OpenFlags::WRITE,
+            )
+            .await
+            .map_err(sftp_error)?;
+        file.write_all(contents).await.map_err(sftp_error)?;
+        file.shutdown().await.map_err(sftp_error)
     }
 
     pub async fn close(&self) -> Result<()> {
@@ -417,6 +476,33 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn opens_only_utf8_text_for_editing() {
+        assert_eq!(
+            editable_text(b"server {\n}\n".to_vec()).unwrap(),
+            "server {\n}\n"
+        );
+        assert!(
+            editable_text(vec![0x7f, b'E', b'L', b'F', 0, 1])
+                .unwrap_err()
+                .to_string()
+                .contains("binary")
+        );
+        assert!(
+            editable_text(vec![0xff, 0xfe, b'a'])
+                .unwrap_err()
+                .to_string()
+                .contains("UTF-8")
+        );
+        let big = vec![b'a'; (MAX_EDIT_BYTES + 1) as usize];
+        assert!(
+            editable_text(big)
+                .unwrap_err()
+                .to_string()
+                .contains("larger than 2 MB")
+        );
+    }
 
     fn entry(name: &str, kind: EntryKind) -> RemoteEntry {
         RemoteEntry {

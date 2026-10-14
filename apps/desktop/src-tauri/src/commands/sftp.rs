@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::ipc::Channel;
-use termirust_core::sftp::{EntryKind, RemoteEntry, SftpClient};
+use termirust_core::sftp::{EntryKind, RemoteEntry, SftpClient, editable_text};
 
 use super::host_session::{
     HostConnection, HostLoginRequest, OpenHostOutcome, PromptedLogin, connect_host,
@@ -174,6 +174,34 @@ pub async fn sftp_remove(
     path: String,
 ) -> Result<(), CommandError> {
     Ok(client(&sessions, sftp_id).await?.remove(&path).await?)
+}
+
+/// A remote text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused.
+#[tauri::command]
+#[specta::specta]
+pub async fn sftp_read_text(
+    sessions: State<'_, SftpSessions>,
+    sftp_id: u32,
+    path: String,
+) -> Result<String, CommandError> {
+    let bytes = client(&sessions, sftp_id).await?.read_file(&path).await?;
+    Ok(editable_text(bytes)?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn sftp_write_text(
+    sessions: State<'_, SftpSessions>,
+    sftp_id: u32,
+    path: String,
+    text: String,
+) -> Result<(), CommandError> {
+    client(&sessions, sftp_id)
+        .await?
+        .write_file(&path, text.as_bytes())
+        .await?;
+    tracing::info!(sftp_id, "remote file saved");
+    Ok(())
 }
 
 #[tauri::command]
