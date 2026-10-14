@@ -45,7 +45,7 @@ describe("AppShell", () => {
   it("shows the first-launch actions, the backend version and how many hosts can be imported", async () => {
     render(<AppShell />);
     expect(screen.getByText(/No account needed/)).toBeInTheDocument();
-    expect(await screen.findByText("v0.0.1")).toBeInTheDocument();
+    expect(await screen.findByText(/^v0\.0\.1 · \S+$/)).toBeInTheDocument();
     expect(await screen.findByText("Found 1 host you can bring over")).toBeInTheDocument();
     expect(screen.getByText(/encrypted on this device/)).toBeInTheDocument();
   });

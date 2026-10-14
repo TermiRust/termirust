@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const commands = {
   settingsTerminalSet: vi.fn(),
   logsOpenFolder: vi.fn(),
+  appVersion: vi.fn(async () => "0.0.1"),
   aiSettingsGet: vi.fn(async () => ({
     status: "ok",
     data: { enabled: false, kind: "anthropic", baseUrl: "https://api.anthropic.com", model: "claude-sonnet-5-5", hasApiKey: false },

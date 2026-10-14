@@ -1,6 +1,7 @@
 import { FileInput, FlaskConical, Lock, Plus, SquareTerminal } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
+import { versionLabel } from "@/lib/build-info";
 import { commands } from "@/bindings";
 import { Kbd } from "@/components/ui/kbd";
 
@@ -85,7 +86,7 @@ export function EmptyWorkspace({ version, shortcuts, onNewHost, onImportConfig, 
         <Lock size={12} /> Hosts, keys and passwords are encrypted on this device. Nothing leaves it.
       </p>
       <p className="flex items-center gap-3 text-[11px] text-fg-faint">
-        {version && <span>v{version}</span>}
+        {version && <span>{versionLabel(version)}</span>}
         {onOpenConnectionLab && (
           <button type="button" onClick={onOpenConnectionLab} className="flex items-center gap-1 hover:text-fg-muted">
             <FlaskConical size={11} /> Connection lab
