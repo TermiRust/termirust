@@ -9,14 +9,6 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { dotForStatus } from "@/features/hosts/host-status";
 import { splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
-const statusDot: Record<TabStatus, string> = {
-  connecting: "bg-warn animate-pulse",
-  connected: "bg-ok",
-  disconnected: "bg-fg-faint",
-  error: "bg-danger",
-  idle: "bg-fg-faint",
-};
-
 const statusLabel: Record<TabStatus, string> = {
   connecting: "connecting",
   connected: "connected",
@@ -88,7 +80,6 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
                 <span aria-hidden className="absolute top-1.5 bottom-1.5 left-1 w-0.5 rounded" style={{ background: tabColorVar[tab.color] }} />
               )}
               {active && <span aria-hidden className="absolute right-0 bottom-0 left-0 h-0.5 bg-accent" />}
-              <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", statusDot[tab.status])} />
               {renaming === tab.id ? (
                 <input
                   aria-label="Tab name"

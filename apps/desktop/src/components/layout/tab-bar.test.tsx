@@ -115,4 +115,17 @@ describe("TabBar", () => {
     act(() => store().setTabStatus(id, "disconnected"));
     expect(screen.getByLabelText("Disconnected")).toBeInTheDocument();
   });
+
+  // Regression: an older status dot was left next to the new one, so host tabs showed two.
+  it("shows exactly one status mark per host tab and none on local tabs", () => {
+    const hostTab = store().openHostTab(host("a"), "red");
+    store().openLocalTab();
+    act(() => store().setTabStatus(hostTab, "connected"));
+    render(<TabBar onRequestClose={vi.fn()} onNewLocalTab={vi.fn()} />);
+    const [hostEl, localEl] = screen.getAllByRole("tab");
+    const dots = (el: HTMLElement) => el.closest('[role="presentation"], div')!.querySelectorAll(".rounded-full");
+    expect(dots(hostEl!)).toHaveLength(1);
+    expect(within(hostEl!).getByRole("img", { name: "Connected" })).toBeInTheDocument();
+    expect(dots(localEl!)).toHaveLength(0);
+  });
 });
