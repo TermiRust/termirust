@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HostView } from "@/bindings";
 import { useTabsStore } from "@/stores/tabs-store";
@@ -127,5 +127,52 @@ describe("TabBar", () => {
     expect(dots(hostEl!)).toHaveLength(1);
     expect(within(hostEl!).getByRole("img", { name: "Connected" })).toBeInTheDocument();
     expect(dots(localEl!)).toHaveLength(0);
+  });
+
+  describe("when tabs no longer fit", () => {
+    let resize: () => void = () => {};
+    beforeEach(() => {
+      vi.stubGlobal(
+        "ResizeObserver",
+        class {
+          constructor(callback: () => void) {
+            resize = callback;
+          }
+          observe() {
+            resize();
+          }
+          disconnect() {}
+        },
+      );
+      // Room for three tabs at the 96px minimum.
+      vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it("shrinks tabs, hides the rest behind a +N button, and keeps the active tab visible", () => {
+      for (const id of ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"]) store().openHostTab(host(id), null);
+      render(<TabBar onRequestClose={vi.fn()} onNewLocalTab={vi.fn()} />);
+      const names = screen.getAllByRole("tab").map((t) => t.getAttribute("aria-label"));
+      expect(names).toEqual(["alpha (connecting)", "bravo (connecting)", "foxtrot (connecting)"]);
+      expect(screen.getByRole("button", { name: "3 more tabs" })).toHaveTextContent("+3");
+    });
+
+    it("lists every tab in a searchable switcher and activates the chosen one", async () => {
+      for (const id of ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"]) store().openHostTab(host(id), null);
+      render(<TabBar onRequestClose={vi.fn()} onNewLocalTab={vi.fn()} />);
+      const user = userEvent.setup();
+      await user.click(screen.getByRole("button", { name: "3 more tabs" }));
+      const dialog = within(await screen.findByRole("dialog", { name: "Open tabs" }));
+      expect(dialog.getAllByRole("option")).toHaveLength(6);
+
+      await user.type(dialog.getByRole("combobox", { name: "Search open tabs" }), "char");
+      expect(dialog.getAllByRole("option")).toHaveLength(1);
+      await user.keyboard("{Enter}");
+      expect(store().tabs.find((t) => t.id === store().activeTabId)?.title).toBe("charlie");
+      expect(screen.queryByRole("dialog", { name: "Open tabs" })).not.toBeInTheDocument();
+    });
   });
 });

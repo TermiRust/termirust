@@ -1,5 +1,5 @@
-import { Columns2, FlaskConical, FolderTree, Plus, SquareTerminal, WifiOff, X } from "lucide-react";
-import { useState, type DragEvent, type KeyboardEvent } from "react";
+import { ChevronDown, Columns2, FlaskConical, FolderTree, Plus, SquareTerminal, WifiOff, X } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { tabColorVar } from "@/features/tabs/tab-color";
@@ -7,6 +7,8 @@ import { isMacPlatform } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { StatusDot } from "@/components/ui/status-dot";
 import { dotForStatus } from "@/features/hosts/host-status";
+import { splitVisibleTabs, tabCapacity } from "@/features/tabs/tab-overflow";
+import { TabSwitcher } from "@/features/tabs/tab-switcher";
 import { splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 const statusLabel: Record<TabStatus, string> = {
@@ -32,6 +34,19 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [width, setWidth] = useState(0);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // Tabs shrink to MIN_TAB_WIDTH; past that the rest go behind the overflow button.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setWidth(list.clientWidth));
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
+  const { shown, hidden } = splitVisibleTabs(tabs, activeTabId, tabCapacity(width));
 
   const onDrop = (event: DragEvent, index: number) => {
     event.preventDefault();
@@ -55,8 +70,9 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
 
   return (
     <div className="flex h-10 shrink-0 items-end gap-0.5 border-b border-border bg-bg-sunk px-2">
-      <div role="tablist" aria-label="Sessions" className="flex min-w-0 items-end gap-0.5 overflow-x-auto">
-        {tabs.map((tab, index) => {
+      <div ref={listRef} role="tablist" aria-label="Sessions" className="flex min-w-0 shrink items-end gap-0.5 overflow-hidden">
+        {shown.map((tab) => {
+          const index = tabs.indexOf(tab);
           const active = tab.id === activeTabId;
           const dim = tab.status === "disconnected" || tab.status === "error";
           return (
@@ -71,7 +87,7 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
               onDrop={(e) => onDrop(e, index)}
               onDragEnd={() => setDragging(null)}
               className={cn(
-                "group relative flex h-8 max-w-56 min-w-32 items-center gap-2 rounded-t-md border border-b-0 pr-1 pl-3 text-[13px]",
+                "group relative flex h-8 w-56 min-w-24 shrink items-center gap-2 rounded-t-md border border-b-0 pr-1 pl-3 text-[13px]",
                 active ? "border-border bg-bg text-fg" : "border-transparent text-fg-muted hover:bg-hover",
                 dragging === tab.id && "opacity-50",
               )}
@@ -136,6 +152,17 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
           );
         })}
       </div>
+      {hidden.length > 0 && (
+        <Button
+          size="sm"
+          aria-label={`${hidden.length} more tab${hidden.length === 1 ? "" : "s"}`}
+          title="All open tabs"
+          onClick={() => setSwitcherOpen(true)}
+          className="mb-1 shrink-0 gap-0.5 px-1.5 font-mono text-xs"
+        >
+          <ChevronDown size={14} />+{hidden.length}
+        </Button>
+      )}
       <Button size="icon" aria-label="New local terminal" title="New local terminal" onClick={onNewLocalTab} className="mb-1">
         <Plus size={15} />
       </Button>
@@ -149,6 +176,7 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
       >
         <Columns2 size={15} />
       </Button>
+      <TabSwitcher open={switcherOpen} onOpenChange={setSwitcherOpen} tabs={tabs} activeTabId={activeTabId} onSelect={activateTab} />
     </div>
   );
 }
