@@ -70,6 +70,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
     hostId: host.id,
     insert: session.send,
     focusTerminal: () => terminalRef.current?.focus(),
+    readScreen: () => terminalRef.current?.screenExcerpt() ?? null,
   });
 
   useEffect(() => {
@@ -115,7 +116,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
         </span>
         <div className="ml-auto flex gap-2">
           {state.phase === "connected" && aiAllowed && (
-            <Button size="sm" variant="outline" title={`Ask AI for a command (${aiShortcutLabel(isMacPlatform())})`} onClick={ai.openCommandBar}>
+            <Button size="sm" variant="outline" title={`Ask AI (${aiShortcutLabel(isMacPlatform())})`} onClick={ai.openPanel}>
               <Sparkles size={14} /> AI
             </Button>
           )}
@@ -134,12 +135,12 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
 
       <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selection() ?? "")}>
+        <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selectionExcerpt() ?? null)}>
           <TerminalView
             ref={terminalRef}
             onData={sendTyped}
             forcePasteConfirmation={broadcast}
-            onAskAi={ai.onAskAi}
+            onAskAi={ai.onAskAi && (() => ai.onAskAi?.(terminalRef.current?.selectionExcerpt() ?? null))}
             onResize={(size) => {
               session.resize(size);
               onSizeChange?.(size);
@@ -147,9 +148,8 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
           />
           <EnvironmentWatermark environment={latestHost.environment} />
           {dimmed && <div aria-hidden className="pointer-events-none absolute inset-0 bg-bg/45" />}
-          {ai.commandBar}
         </div>
-        {ai.explainPanel}
+        {ai.panel}
       </div>
       {ai.contextMenu}
 

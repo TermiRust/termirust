@@ -111,7 +111,7 @@ describe("HostSessionView", () => {
     const user = userEvent.setup();
     const second = render(<HostSessionView host={host} />);
     await user.click(await screen.findByRole("button", { name: "AI" }));
-    expect(screen.getByRole("dialog", { name: "Ask AI for a command" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "AI assistant" })).toBeInTheDocument();
     second.unmount();
 
     render(<HostSessionView host={{ ...host, aiDisabled: true }} />);

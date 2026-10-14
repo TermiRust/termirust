@@ -43,6 +43,7 @@ export function LocalSessionView({ onStatusChange, onSizeChange, tabId, paneId, 
     hostId: null,
     insert: session.send,
     focusTerminal: () => terminalRef.current?.focus(),
+    readScreen: () => terminalRef.current?.screenExcerpt() ?? null,
   });
 
   useEffect(() => {
@@ -81,20 +82,19 @@ export function LocalSessionView({ onStatusChange, onSizeChange, tabId, paneId, 
         </div>
       )}
       <div className="flex min-h-0 flex-1">
-        <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selection() ?? "")}>
+        <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selectionExcerpt() ?? null)}>
           <TerminalView
             ref={terminalRef}
             onData={sendTyped}
             forcePasteConfirmation={broadcast}
-            onAskAi={ai.onAskAi}
+            onAskAi={ai.onAskAi && (() => ai.onAskAi?.(terminalRef.current?.selectionExcerpt() ?? null))}
             onResize={(size) => {
               session.resize(size);
               onSizeChange?.(size);
             }}
           />
-          {ai.commandBar}
         </div>
-        {ai.explainPanel}
+        {ai.panel}
       </div>
       {ai.contextMenu}
     </div>

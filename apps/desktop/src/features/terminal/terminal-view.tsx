@@ -24,12 +24,23 @@ export interface TerminalSize {
   rows: number;
 }
 
+/** Terminal text with the 1-based buffer lines it spans, for labels like "L35–L55". */
+export interface TerminalExcerpt {
+  text: string;
+  startLine: number;
+  endLine: number;
+}
+
 export interface TerminalHandle {
   write: (data: Uint8Array | string, onWritten?: () => void) => void;
   clear: () => void;
   focus: () => void;
   size: () => TerminalSize;
   selection: () => string;
+  /** The selected text and where it sits in the scrollback, or null when nothing is selected. */
+  selectionExcerpt: () => TerminalExcerpt | null;
+  /** What is visible on screen right now, trailing blank lines dropped. */
+  screenExcerpt: () => TerminalExcerpt | null;
 }
 
 export const RESIZE_SETTLE_MS = 120;
@@ -37,8 +48,8 @@ export const RESIZE_SETTLE_MS = 120;
 interface TerminalViewProps {
   onData?: (data: string) => void;
   onResize?: (size: TerminalSize) => void;
-  /** ⌘I / Ctrl+Shift+I, with whatever text is selected (often empty). */
-  onAskAi?: (selection: string) => void;
+  /** ⌘I / Ctrl+Shift+I; the caller reads the selection through the handle. */
+  onAskAi?: () => void;
   /** Always confirm multi-line pastes, whatever the setting (e.g. while broadcasting). */
   forcePasteConfirmation?: boolean;
 }
@@ -81,6 +92,23 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
     focus: () => terminalRef.current?.focus(),
     size: () => ({ cols: terminalRef.current?.cols ?? 80, rows: terminalRef.current?.rows ?? 24 }),
     selection: () => terminalRef.current?.getSelection() ?? "",
+    selectionExcerpt: () => {
+      const terminal = terminalRef.current;
+      const range = terminal?.getSelectionPosition();
+      const text = terminal?.getSelection() ?? "";
+      if (!terminal || !range || !text.trim()) return null;
+      return { text, startLine: range.start.y, endLine: range.end.y };
+    },
+    screenExcerpt: () => {
+      const terminal = terminalRef.current;
+      if (!terminal) return null;
+      const buffer = terminal.buffer.active;
+      const lines: string[] = [];
+      for (let y = buffer.viewportY; y < buffer.viewportY + terminal.rows; y++) lines.push(buffer.getLine(y)?.translateToString(true) ?? "");
+      while (lines.length > 0 && !lines[lines.length - 1]?.trim()) lines.pop();
+      if (lines.length === 0) return null;
+      return { text: lines.join("\n"), startLine: buffer.viewportY + 1, endLine: buffer.viewportY + lines.length };
+    },
   }));
 
   useEffect(() => {
@@ -115,7 +143,7 @@ export const TerminalView = forwardRef<TerminalHandle, TerminalViewProps>(functi
       // Let app chords bubble to the window without the shell also receiving them.
       if (event.type === "keydown" && isAppChord(event, onMac)) return false;
       if (event.type === "keydown" && onAskAiRef.current && isAiShortcut(event, onMac)) {
-        onAskAiRef.current(terminal.getSelection());
+        onAskAiRef.current();
         return false;
       }
       return true;

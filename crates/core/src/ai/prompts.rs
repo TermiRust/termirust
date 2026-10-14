@@ -47,75 +47,104 @@ pub struct PreparedRequest {
     pub masked: usize,
 }
 
-const COMMAND_SYSTEM: &str = "You turn a request into one shell command for the user's terminal. \
-Reply with the command only, on a single line, without code fences or commentary. \
-Prefer standard, widely available tools. If the request cannot be done safely in one command, \
-reply with a line starting with '# ' that explains why.";
+/// A piece of terminal output the user attached, labelled with where it came from (e.g. "L35–L55").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Quote {
+    pub label: String,
+    pub text: String,
+}
 
-const EXPLAIN_SYSTEM: &str = "You explain terminal output, errors and commands to a developer. \
-Be brief and concrete: what it means, the likely cause, and how to fix it. \
-Put any command the user could run in its own ```sh code block. \
+const CHAT_SYSTEM: &str = "You are the assistant inside an SSH client, helping a developer at the terminal. \
+Answer in GitHub-flavored Markdown and keep it concise. \
+Put every command the user could run in its own ```sh code block, one command per block when you can, \
+and never assume a command was run. \
 Parts shown as [REDACTED:…] were masked on purpose; do not ask for them.";
 
-pub fn command_request(request: &str, context: &ShellContext) -> PreparedRequest {
-    let masked = redact(request.trim());
-    PreparedRequest {
-        chat: ChatRequest {
-            system: format!(
-                "{COMMAND_SYSTEM}\nThe command will run on {}.",
-                context.environment
-            ),
-            messages: vec![ChatMessage {
-                role: Role::User,
-                content: masked.text,
-            }],
-            max_tokens: 300,
-        },
-        masked: masked.count,
+/// Older turns kept, so long conversations do not grow without bound.
+const MAX_HISTORY_TURNS: usize = 8;
+const MAX_QUOTE_CHARS: usize = 12_000;
+const MAX_SCREEN_CHARS: usize = 8_000;
+
+/// Keeps the end of long text (the newest output matters most) and says it was cut.
+fn tail(text: &str, max: usize) -> String {
+    if text.chars().count() <= max {
+        return text.to_owned();
     }
+    let kept: String = text
+        .chars()
+        .rev()
+        .take(max)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("[… earlier lines cut]\n{kept}")
 }
 
-/// `question` is optional; without one the model explains the selection.
-pub fn explain_request(selection: &str, question: &str, context: &ShellContext) -> PreparedRequest {
-    let selection = redact(selection.trim_end());
-    let question = redact(question.trim());
-    let ask = if question.text.is_empty() {
-        "Explain this.".to_owned()
-    } else {
-        question.text
+/// One turn of a conversation; history and the new message are all masked before sending.
+pub fn chat_request(
+    history: &[ChatMessage],
+    message: &str,
+    quotes: &[Quote],
+    screen: Option<&str>,
+    context: &ShellContext,
+) -> PreparedRequest {
+    let mut masked = 0;
+    let mut clean = |text: &str| {
+        let r = redact(text);
+        masked += r.count;
+        r.text
     };
+
+    let skip = history.len().saturating_sub(MAX_HISTORY_TURNS);
+    let mut messages: Vec<ChatMessage> = history[skip..]
+        .iter()
+        .map(|m| ChatMessage {
+            role: m.role,
+            content: clean(&m.content),
+        })
+        .collect();
+
+    let mut content = String::new();
+    let question = message.trim();
+    content.push_str(if question.is_empty() {
+        "Explain this."
+    } else {
+        question
+    });
+    let mut quote_budget = MAX_QUOTE_CHARS;
+    for quote in quotes {
+        let text = tail(quote.text.trim_end(), quote_budget);
+        quote_budget = quote_budget.saturating_sub(text.chars().count());
+        content.push_str(&format!(
+            "\n\nQuoted from the terminal ({}):\n```\n{}\n```",
+            quote.label,
+            clean(&text)
+        ));
+    }
+    if let Some(screen) = screen.map(str::trim_end).filter(|s| !s.is_empty()) {
+        let text = tail(screen, MAX_SCREEN_CHARS);
+        content.push_str(&format!(
+            "\n\nCurrent terminal screen:\n```\n{}\n```",
+            clean(&text)
+        ));
+    }
+    messages.push(ChatMessage {
+        role: Role::User,
+        content,
+    });
+
     PreparedRequest {
         chat: ChatRequest {
             system: format!(
-                "{EXPLAIN_SYSTEM}\nThe terminal is connected to {}.",
+                "{CHAT_SYSTEM}\nThe terminal is connected to {}.",
                 context.environment
             ),
-            messages: vec![ChatMessage {
-                role: Role::User,
-                content: format!("{ask}\n\n```\n{}\n```", selection.text),
-            }],
-            max_tokens: 1200,
+            messages,
+            max_tokens: 1500,
         },
-        masked: selection.count + question.count,
+        masked,
     }
-}
-
-/// The command in a reply, tolerating code fences or a leading "$ "; `None` when the model
-/// declined (a "# " line) or said nothing usable.
-pub fn extract_command(reply: &str) -> Option<String> {
-    let line = reply
-        .lines()
-        .map(str::trim)
-        .find(|l| !l.is_empty() && !l.starts_with("```"))?;
-    if line.starts_with('#') {
-        return None;
-    }
-    let line = line
-        .strip_prefix("$ ")
-        .unwrap_or(line)
-        .trim_matches('`')
-        .trim();
-    (!line.is_empty()).then(|| line.to_owned())
 }
 
 /// Commands inside ```sh / ```bash / plain ``` blocks of an explanation.
@@ -152,29 +181,86 @@ pub fn code_blocks(reply: &str) -> Vec<String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn command_requests_carry_only_the_environment_and_masked_text() {
-        let prepared = command_request(
-            "connect with password=hunter2 and list dbs",
-            &ShellContext::remote(),
-        );
-        assert_eq!(prepared.masked, 1);
-        let user = &prepared.chat.messages[0].content;
-        assert!(user.contains("password=[REDACTED:secret]"));
-        assert!(!user.contains("hunter2"));
-        assert!(prepared.chat.system.contains("remote Unix-like server"));
+    fn turn(role: Role, content: &str) -> ChatMessage {
+        ChatMessage {
+            role,
+            content: content.into(),
+        }
     }
 
     #[test]
-    fn explain_requests_mask_the_selection_and_default_the_question() {
-        let prepared = explain_request(
-            "Error: AKIAIOSFODNN7EXAMPLE denied\n",
-            "",
+    fn asks_for_markdown_and_names_only_the_environment() {
+        let prepared = chat_request(
+            &[],
+            "why is nginx down?",
+            &[],
+            None,
             &ShellContext::remote(),
         );
-        assert_eq!(prepared.masked, 1);
+        assert!(prepared.chat.system.contains("GitHub-flavored Markdown"));
+        assert!(prepared.chat.system.contains("remote Unix-like server"));
+        assert_eq!(
+            prepared.chat.messages,
+            vec![turn(Role::User, "why is nginx down?")]
+        );
+    }
+
+    #[test]
+    fn attaches_labelled_quotes_and_the_screen_with_secrets_masked() {
+        let quotes = [Quote {
+            label: "L35–L55".into(),
+            text: "Error: DB_PASSWORD=hunter2 rejected\n".into(),
+        }];
+        let prepared = chat_request(
+            &[],
+            "",
+            &quotes,
+            Some("$ export API_TOKEN=abc\n$ "),
+            &ShellContext::remote(),
+        );
         let user = &prepared.chat.messages[0].content;
-        assert!(user.starts_with("Explain this.\n\n```\nError: [REDACTED:aws-key] denied\n```"));
+        assert!(user.starts_with("Explain this."));
+        assert!(user.contains("Quoted from the terminal (L35–L55):\n```\nError: DB_PASSWORD=[REDACTED:secret] rejected\n```"));
+        assert!(user.contains(
+            "Current terminal screen:\n```\n$ export API_TOKEN=[REDACTED:secret]\n$\n```"
+        ));
+        assert!(!user.contains("hunter2") && !user.contains("=abc"));
+        assert_eq!(prepared.masked, 2);
+    }
+
+    #[test]
+    fn keeps_recent_history_masked_and_bounded() {
+        let mut history: Vec<ChatMessage> = (0..20)
+            .map(|i| {
+                turn(
+                    if i % 2 == 0 {
+                        Role::User
+                    } else {
+                        Role::Assistant
+                    },
+                    &format!("turn {i}"),
+                )
+            })
+            .collect();
+        history[19] = turn(Role::Assistant, "use password=s3cret");
+        let prepared = chat_request(&history, "and now?", &[], None, &ShellContext::remote());
+        assert_eq!(prepared.chat.messages.len(), MAX_HISTORY_TURNS + 1);
+        assert_eq!(prepared.chat.messages[0].content, "turn 12");
+        assert!(
+            prepared.chat.messages[MAX_HISTORY_TURNS - 1]
+                .content
+                .contains("[REDACTED:secret]")
+        );
+    }
+
+    #[test]
+    fn cuts_huge_output_from_the_start_keeping_the_newest_lines() {
+        let screen = format!("{}\nLAST LINE", "x".repeat(20_000));
+        let prepared = chat_request(&[], "?", &[], Some(&screen), &ShellContext::remote());
+        let user = &prepared.chat.messages[0].content;
+        assert!(user.contains("[… earlier lines cut]"));
+        assert!(user.contains("LAST LINE"));
+        assert!(user.len() < 9_000);
     }
 
     #[test]
@@ -185,19 +271,6 @@ mod tests {
             "{}",
             context.environment
         );
-    }
-
-    #[test]
-    fn extracts_the_command_from_common_reply_shapes() {
-        assert_eq!(extract_command("ls -la\n"), Some("ls -la".into()));
-        assert_eq!(
-            extract_command("```sh\ndu -sh *\n```"),
-            Some("du -sh *".into())
-        );
-        assert_eq!(extract_command("$ df -h"), Some("df -h".into()));
-        assert_eq!(extract_command("`uptime`"), Some("uptime".into()));
-        assert_eq!(extract_command("# That would delete your data."), None);
-        assert_eq!(extract_command("  \n"), None);
     }
 
     #[test]

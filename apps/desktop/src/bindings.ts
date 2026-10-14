@@ -103,12 +103,17 @@ export type AiAsk = {
 	target: AiTarget,
 	/**  The saved host of the tab, so its AI opt-out is enforced here too. */
 	hostId: string | null,
-	question: AiQuestion,
+	history: AiTurn[],
+	/**  May be empty when quotes are attached ("explain this"). */
+	message: string,
+	quotes: AiQuote[],
+	/**  The visible terminal text, only when the user switched that on. */
+	screen: string | null,
 };
 
 export type AiEvent = { kind: "text"; text: string } | 
-/**  `command` is set in command mode; `commands` lists code blocks in explanations. */
-{ kind: "done"; reply: string; command: string | null; danger: string | null; commands: SuggestedCommand[] } | { kind: "failed"; message: string } | { kind: "cancelled" };
+/**  `commands` lists the shell blocks of the reply, each with its danger note. */
+{ kind: "done"; reply: string; commands: SuggestedCommand[] } | { kind: "failed"; message: string } | { kind: "cancelled" };
 
 /**  Exactly what would be sent, after masking. */
 export type AiPreview = {
@@ -120,11 +125,13 @@ export type AiPreview = {
 
 export type AiProviderKind = "anthropic" | "openAiCompatible";
 
-export type AiQuestion = 
-/**  ⌘I: describe a task, get one command back. */
-{ mode: "command"; prompt: string } | 
-/**  Ask about selected output; `question` may be empty. */
-{ mode: "explain"; selection: string; question: string };
+/**  Terminal output the user attached; `label` says where it came from, e.g. "L35–L55". */
+export type AiQuote = {
+	label: string,
+	text: string,
+};
+
+export type AiRole = "user" | "assistant";
 
 export type AiSettingsInput = {
 	enabled: boolean,
@@ -145,6 +152,12 @@ export type AiSettingsView = {
 
 /**  Where the terminal runs; decides the environment the model is told about. */
 export type AiTarget = "local" | "remote";
+
+/**  An earlier message of the conversation, as shown in the panel. */
+export type AiTurn = {
+	role: AiRole,
+	content: string,
+};
 
 export type ApiKeyChange = { kind: "keep" } | { kind: "set"; value: string } | { kind: "clear" };
 

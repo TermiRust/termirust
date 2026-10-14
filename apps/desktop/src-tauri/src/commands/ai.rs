@@ -8,7 +8,7 @@ use tauri::ipc::Channel;
 use tauri::{Manager, State};
 use termirust_core::ai::danger::danger;
 use termirust_core::ai::prompts::{
-    PreparedRequest, ShellContext, code_blocks, command_request, explain_request, extract_command,
+    PreparedRequest, Quote, ShellContext, chat_request, code_blocks,
 };
 use termirust_core::ai::provider::{AiClient, ChatMessage, ChatRequest, ProviderKind, Role};
 use termirust_core::vault::{AiSettings, Secret, Vault};
@@ -168,13 +168,27 @@ pub enum AiTarget {
     Remote,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub enum AiRole {
+    User,
+    Assistant,
+}
+
+/// An earlier message of the conversation, as shown in the panel.
 #[derive(Debug, Clone, Deserialize, specta::Type)]
-#[serde(tag = "mode", rename_all = "camelCase")]
-pub enum AiQuestion {
-    /// ⌘I: describe a task, get one command back.
-    Command { prompt: String },
-    /// Ask about selected output; `question` may be empty.
-    Explain { selection: String, question: String },
+#[serde(rename_all = "camelCase")]
+pub struct AiTurn {
+    pub role: AiRole,
+    pub content: String,
+}
+
+/// Terminal output the user attached; `label` says where it came from, e.g. "L35–L55".
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AiQuote {
+    pub label: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -183,7 +197,12 @@ pub struct AiAsk {
     pub target: AiTarget,
     /// The saved host of the tab, so its AI opt-out is enforced here too.
     pub host_id: Option<String>,
-    pub question: AiQuestion,
+    pub history: Vec<AiTurn>,
+    /// May be empty when quotes are attached ("explain this").
+    pub message: String,
+    pub quotes: Vec<AiQuote>,
+    /// The visible terminal text, only when the user switched that on.
+    pub screen: Option<String>,
 }
 
 /// Exactly what would be sent, after masking.
@@ -202,12 +221,10 @@ pub enum AiEvent {
     Text {
         text: String,
     },
-    /// `command` is set in command mode; `commands` lists code blocks in explanations.
+    /// `commands` lists the shell blocks of the reply, each with its danger note.
     #[serde(rename_all = "camelCase")]
     Done {
         reply: String,
-        command: Option<String>,
-        danger: Option<String>,
         commands: Vec<SuggestedCommand>,
     },
     Failed {
@@ -252,18 +269,37 @@ impl AiRequests {
     }
 }
 
-fn prepare(question: &AiQuestion, target: AiTarget) -> PreparedRequest {
-    let context = match target {
+fn prepare(ask: &AiAsk) -> PreparedRequest {
+    let context = match ask.target {
         AiTarget::Local => ShellContext::local(),
         AiTarget::Remote => ShellContext::remote(),
     };
-    match question {
-        AiQuestion::Command { prompt } => command_request(prompt, &context),
-        AiQuestion::Explain {
-            selection,
-            question,
-        } => explain_request(selection, question, &context),
-    }
+    let history: Vec<ChatMessage> = ask
+        .history
+        .iter()
+        .map(|t| ChatMessage {
+            role: match t.role {
+                AiRole::User => Role::User,
+                AiRole::Assistant => Role::Assistant,
+            },
+            content: t.content.clone(),
+        })
+        .collect();
+    let quotes: Vec<Quote> = ask
+        .quotes
+        .iter()
+        .map(|q| Quote {
+            label: q.label.clone(),
+            text: q.text.clone(),
+        })
+        .collect();
+    chat_request(
+        &history,
+        &ask.message,
+        &quotes,
+        ask.screen.as_deref(),
+        &context,
+    )
 }
 
 /// Refuses when AI is off, or turned off for the tab's host or its group.
@@ -308,17 +344,16 @@ pub async fn ai_preview(
 ) -> Result<AiPreview, CommandError> {
     let vault = state.vault().await?;
     let settings = usable_settings(&vault, ask.host_id.as_deref()).await?;
-    let prepared = prepare(&ask.question, ask.target);
+    let prepared = prepare(&ask);
     Ok(AiPreview {
         provider: provider_label(&settings),
         system: prepared.chat.system,
         user: prepared
             .chat
             .messages
-            .into_iter()
-            .map(|m| m.content)
-            .collect::<Vec<_>>()
-            .join("\n\n"),
+            .last()
+            .map(|m| m.content.clone())
+            .unwrap_or_default(),
         masked: u32::try_from(prepared.masked).unwrap_or(u32::MAX),
     })
 }
@@ -336,11 +371,10 @@ pub async fn ai_ask(
     let vault = state.vault().await?;
     let settings = usable_settings(&vault, ask.host_id.as_deref()).await?;
     let client = AiClient::new(settings.provider_config())?;
-    let prepared = prepare(&ask.question, ask.target);
-    let command_mode = matches!(ask.question, AiQuestion::Command { .. });
+    let prepared = prepare(&ask);
     let (id, cancel) = requests.begin();
     tauri::async_runtime::spawn(async move {
-        let outcome = run_ask(&client, prepared, command_mode, &cancel, |event| {
+        let outcome = run_ask(&client, prepared, &cancel, |event| {
             let _ = on_event.send(event);
         })
         .await;
@@ -353,7 +387,6 @@ pub async fn ai_ask(
 async fn run_ask(
     client: &AiClient,
     prepared: PreparedRequest,
-    command_mode: bool,
     cancel: &CancelFlag,
     mut emit: impl FnMut(AiEvent) + Send,
 ) -> AiEvent {
@@ -366,29 +399,14 @@ async fn run_ask(
         .await
     {
         Ok(reply) => {
-            let command = if command_mode {
-                extract_command(&reply)
-            } else {
-                None
-            };
-            let commands: Vec<SuggestedCommand> = if command_mode {
-                Vec::new()
-            } else {
-                code_blocks(&reply)
-                    .into_iter()
-                    .map(|command| SuggestedCommand {
-                        danger: danger(&command).map(str::to_owned),
-                        command,
-                    })
-                    .collect()
-            };
-            let danger = command.as_deref().and_then(danger).map(str::to_owned);
-            AiEvent::Done {
-                reply,
-                command,
-                danger,
-                commands,
-            }
+            let commands = code_blocks(&reply)
+                .into_iter()
+                .map(|command| SuggestedCommand {
+                    danger: danger(&command).map(str::to_owned),
+                    command,
+                })
+                .collect();
+            AiEvent::Done { reply, commands }
         }
         Err(CoreError::Cancelled) => AiEvent::Cancelled,
         Err(e) => AiEvent::Failed {
@@ -580,17 +598,48 @@ mod tests {
         );
     }
 
+    fn ask(message: &str, quotes: Vec<AiQuote>, screen: Option<&str>) -> AiAsk {
+        AiAsk {
+            target: AiTarget::Remote,
+            host_id: None,
+            history: vec![AiTurn {
+                role: AiRole::User,
+                content: "hi".into(),
+            }],
+            message: message.into(),
+            quotes,
+            screen: screen.map(Into::into),
+        }
+    }
+
     #[test]
     fn previews_are_built_by_the_same_code_that_sends() {
-        let prepared = prepare(
-            &AiQuestion::Explain {
-                selection: "DB_PASSWORD=hunter2 failed".into(),
-                question: String::new(),
-            },
-            AiTarget::Remote,
+        let prepared = prepare(&ask(
+            "",
+            vec![AiQuote {
+                label: "L3–L4".into(),
+                text: "DB_PASSWORD=hunter2 failed".into(),
+            }],
+            Some("TOKEN=abc"),
+        ));
+        assert_eq!(prepared.masked, 2);
+        assert_eq!(
+            prepared.chat.messages.len(),
+            2,
+            "history plus the new message"
         );
-        assert_eq!(prepared.masked, 1);
-        assert!(!prepared.chat.messages[0].content.contains("hunter2"));
+        let last = &prepared.chat.messages[1].content;
+        assert!(last.contains("(L3–L4)") && !last.contains("hunter2") && !last.contains("=abc"));
+    }
+
+    #[test]
+    fn requests_from_the_panel_are_accepted() {
+        let parsed: AiAsk = serde_json::from_str(
+            r#"{"target":"local","hostId":null,"history":[{"role":"assistant","content":"x"}],"message":"why?","quotes":[{"label":"L1–L2","text":"err"}],"screen":null}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.history[0].role, AiRole::Assistant);
+        assert_eq!(parsed.quotes[0].label, "L1–L2");
     }
 
     async fn one_reply_server(body: &'static str) -> String {
@@ -606,9 +655,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn command_answers_carry_the_command_and_its_danger() {
+    async fn answers_stream_and_list_their_commands_with_danger_notes() {
         let url = one_reply_server(
-            "HTTP/1.1 200 OK\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"rm -rf ./build\"}}]}\n\ndata: [DONE]\n\n",
+            "HTTP/1.1 200 OK\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"Clean it:\\n```sh\\nrm -rf ./build\\n```\\nThen:\\n```sh\\nls\\n```\"}}]}\n\ndata: [DONE]\n\n",
         )
         .await;
         let vault = vault().await;
@@ -618,60 +667,32 @@ mod tests {
         let mut streamed = Vec::new();
         let done = run_ask(
             &client,
-            prepare(
-                &AiQuestion::Command {
-                    prompt: "clean the build".into(),
-                },
-                AiTarget::Local,
-            ),
-            true,
+            prepare(&ask("clean the build", vec![], None)),
             &CancelFlag::default(),
             |e| streamed.push(e),
         )
         .await;
-        assert_eq!(
-            streamed,
-            [AiEvent::Text {
-                text: "rm -rf ./build".into()
-            }]
-        );
+        assert_eq!(streamed.len(), 1);
         assert_eq!(
             done,
             AiEvent::Done {
-                reply: "rm -rf ./build".into(),
-                command: Some("rm -rf ./build".into()),
-                danger: Some("deletes files recursively without asking".into()),
-                commands: vec![],
+                reply: "Clean it:\n```sh\nrm -rf ./build\n```\nThen:\n```sh\nls\n```".into(),
+                commands: vec![
+                    SuggestedCommand {
+                        command: "rm -rf ./build".into(),
+                        danger: Some("deletes files recursively without asking".into()),
+                    },
+                    SuggestedCommand {
+                        command: "ls".into(),
+                        danger: None,
+                    },
+                ],
             }
         );
     }
 
     #[tokio::test]
-    async fn explanations_list_their_commands_and_failures_say_why() {
-        let url = one_reply_server(
-            "HTTP/1.1 200 OK\r\nconnection: close\r\n\r\ndata: {\"choices\":[{\"delta\":{\"content\":\"Port busy.\\n```sh\\nlsof -i :80\\n```\"}}]}\n\ndata: [DONE]\n\n",
-        )
-        .await;
-        let vault = vault().await;
-        enable(&vault, url).await;
-        let client =
-            AiClient::new(vault.ai_settings().get().await.unwrap().provider_config()).unwrap();
-        let question = AiQuestion::Explain {
-            selection: "bind: address already in use".into(),
-            question: String::new(),
-        };
-        let done = run_ask(
-            &client,
-            prepare(&question, AiTarget::Remote),
-            false,
-            &CancelFlag::default(),
-            |_| {},
-        )
-        .await;
-        assert!(
-            matches!(done, AiEvent::Done { ref commands, command: None, danger: None, .. } if commands == &vec![SuggestedCommand { command: "lsof -i :80".into(), danger: None }])
-        );
-
+    async fn failures_say_why() {
         let dead = AiClient::new(termirust_core::ai::provider::ProviderConfig {
             kind: ProviderKind::OpenAiCompatible,
             base_url: "http://127.0.0.1:1".into(),
@@ -681,8 +702,7 @@ mod tests {
         .unwrap();
         let failed = run_ask(
             &dead,
-            prepare(&question, AiTarget::Remote),
-            false,
+            prepare(&ask("?", vec![], None)),
             &CancelFlag::default(),
             |_| {},
         )

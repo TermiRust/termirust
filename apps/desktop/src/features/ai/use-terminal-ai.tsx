@@ -1,12 +1,11 @@
 import { useState, type MouseEvent, type ReactNode } from "react";
 
 import type { AiTarget } from "@/bindings";
+import type { TerminalExcerpt } from "@/features/terminal/terminal-view";
 
-import { AiCommandBar } from "./ai-command-bar";
-import { AiExplainPanel } from "./ai-explain-panel";
+import { AiPanel } from "./ai-panel";
 import { SelectionMenu } from "./selection-menu";
-
-type Mode = { kind: "command" } | { kind: "explain"; selection: string } | null;
+import { useAiChat, type ChatQuote } from "./use-ai-chat";
 
 interface TerminalAiOptions {
   allowed: boolean;
@@ -15,46 +14,71 @@ interface TerminalAiOptions {
   /** Types text on the prompt line; never adds Enter. */
   insert: (text: string) => void;
   focusTerminal: () => void;
+  readScreen: () => TerminalExcerpt | null;
 }
 
-/** The AI entry points of a terminal tab: ⌘I bar, "Ask AI" panel, and the selection menu. */
-export function useTerminalAi({ allowed, target, hostId, insert, focusTerminal }: TerminalAiOptions) {
-  const [mode, setMode] = useState<Mode>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; selection: string } | null>(null);
-  const close = () => {
-    setMode(null);
-    focusTerminal();
+export const lineLabel = (e: TerminalExcerpt) => (e.startLine === e.endLine ? `L${e.startLine}` : `L${e.startLine}–L${e.endLine}`);
+const toQuote = (e: TerminalExcerpt): ChatQuote => ({ label: lineLabel(e), text: e.text });
+
+/** The AI side panel of a terminal tab, plus the right-click menu that quotes into it. */
+export function useTerminalAi({ allowed, target, hostId, insert, focusTerminal, readScreen }: TerminalAiOptions) {
+  const chat = useAiChat(target, hostId);
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<ChatQuote[]>([]);
+  const [menu, setMenu] = useState<{ x: number; y: number; excerpt: TerminalExcerpt } | null>(null);
+
+  const quote = (excerpt: TerminalExcerpt | null) => {
+    if (excerpt) setPending((list) => (list.some((q) => q.label === lineLabel(excerpt)) ? list : [...list, toQuote(excerpt)]));
+    setOpen(true);
   };
 
-  const onAskAi = allowed ? (selection: string) => setMode(selection.trim() ? { kind: "explain", selection } : { kind: "command" }) : undefined;
+  /** The AI shortcut: opens the panel, quoting the selection if there is one. */
+  const onAskAi = allowed ? (excerpt: TerminalExcerpt | null) => quote(excerpt) : undefined;
 
-  const onContextMenu = (event: MouseEvent, selection: string) => {
-    if (!allowed || !selection.trim()) return;
+  const onContextMenu = (event: MouseEvent, excerpt: TerminalExcerpt | null) => {
+    if (!allowed || !excerpt) return;
     event.preventDefault();
-    setMenu({ x: event.clientX, y: event.clientY, selection });
+    setMenu({ x: event.clientX, y: event.clientY, excerpt });
   };
 
-  let commandBar: ReactNode = null;
-  let explainPanel: ReactNode = null;
-  if (allowed && mode?.kind === "command") commandBar = <AiCommandBar target={target} hostId={hostId} onInsert={insert} onClose={close} />;
-  if (allowed && mode?.kind === "explain")
-    explainPanel = <AiExplainPanel key={mode.selection} target={target} hostId={hostId} selection={mode.selection} onInsert={insert} onClose={close} />;
+  let panel: ReactNode = null;
+  if (allowed && open)
+    panel = (
+      <AiPanel
+        chat={chat}
+        pending={pending}
+        onRemovePending={(i) => setPending((list) => list.filter((_, index) => index !== i))}
+        onSent={() => setPending([])}
+        readScreen={() => {
+          const screen = readScreen();
+          return screen ? { label: `Screen ${lineLabel(screen)}`, text: screen.text } : null;
+        }}
+        onInsert={(command) => {
+          insert(command);
+          focusTerminal();
+        }}
+        onClose={() => {
+          setOpen(false);
+          focusTerminal();
+        }}
+      />
+    );
 
   const contextMenu = menu && (
     <SelectionMenu
       x={menu.x}
       y={menu.y}
       onAsk={() => {
-        setMode({ kind: "explain", selection: menu.selection });
+        quote(menu.excerpt);
         setMenu(null);
       }}
       onCopy={() => {
-        void navigator.clipboard?.writeText(menu.selection);
+        void navigator.clipboard?.writeText(menu.excerpt.text);
         setMenu(null);
       }}
       onClose={() => setMenu(null)}
     />
   );
 
-  return { onAskAi, openCommandBar: () => setMode({ kind: "command" }), onContextMenu, commandBar, explainPanel, contextMenu };
+  return { onAskAi, openPanel: () => setOpen(true), onContextMenu, panel, contextMenu };
 }
