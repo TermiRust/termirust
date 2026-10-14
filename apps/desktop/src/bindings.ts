@@ -96,6 +96,10 @@ export const commands = {
 	/**  Creates the conversation on first save, then replaces it; returns its summary (with the id). */
 	aiChatSave: (input: AiChatInput) => typedError<AiChatSummary, CommandError>(__TAURI_INVOKE("ai_chat_save", { input })),
 	aiChatDelete: (id: string) => typedError<null, CommandError>(__TAURI_INVOKE("ai_chat_delete", { id })),
+	/**  Logs in on first use (or after the connection dropped), then reads a snapshot. */
+	monitorProbe: (request: MonitorProbeRequest) => typedError<MonitorProbeOutcome, CommandError>(__TAURI_INVOKE("monitor_probe", { request })),
+	/**  Closes the host's monitor connection when its card leaves the screen. */
+	monitorForget: (hostId: string) => typedError<null, CommandError>(__TAURI_INVOKE("monitor_forget", { hostId })),
 	snippetsList: () => typedError<SnippetView[], CommandError>(__TAURI_INVOKE("snippets_list")),
 	snippetsCreate: (input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_create", { input })),
 	snippetsUpdate: (id: string, input: SnippetInput) => typedError<SnippetView, CommandError>(__TAURI_INVOKE("snippets_update", { id, input })),
@@ -299,6 +303,27 @@ export type HostInput = {
 	environment: EnvironmentView | null,
 };
 
+/**  Sizes are KiB as f64 so they stay plain numbers in TypeScript. */
+export type HostStatsDto = {
+	osId: string | null,
+	osName: string | null,
+	kernel: string | null,
+	hostname: string | null,
+	uptimeSecs: number | null,
+	load: (number | null)[] | null,
+	cpuCount: number | null,
+	cpuPercent: number | null,
+	memTotalKb: number | null,
+	memAvailableKb: number | null,
+	swapTotalKb: number | null,
+	swapFreeKb: number | null,
+	diskTotalKb: number | null,
+	diskUsedKb: number | null,
+	diskMount: string | null,
+	addresses: string[],
+	topProcesses: ProcessDto[],
+};
+
 /**  What the UI may know about a host. Saved passwords never leave Rust. */
 export type HostView = {
 	id: string,
@@ -329,6 +354,17 @@ export type KeyView = {
 	hasSavedPassphrase: boolean,
 	/**  Labels of hosts that log in with this key. */
 	usedBy: string[],
+};
+
+export type MonitorProbeOutcome = { status: "stats"; stats: HostStatsDto } | 
+/**  Same prompts as a terminal tab: password, passphrase, username or host key. */
+{ status: "needsInput"; prompt: OpenHostOutcome };
+
+export type MonitorProbeRequest = {
+	hostId: string,
+	prompted: PromptedLogin | null,
+	confirmedFingerprint: string | null,
+	rememberHostKey: boolean,
 };
 
 export type OpenHostOutcome = { status: "opened"; sessionId: number } | { status: "needsPassword"; usernameRequired: boolean; savedPasswordRejected: boolean } | { status: "needsPassphrase"; keyLabel: string; wrongPassphrase: boolean; usernameRequired: boolean } | 
@@ -381,6 +417,12 @@ export type PasswordSessionRequest = {
 	rows: number,
 	/**  Fingerprint the user has already confirmed for this host, if any. */
 	trustedFingerprint: string | null,
+};
+
+export type ProcessDto = {
+	cpuPercent: number | null,
+	memPercent: number | null,
+	command: string,
 };
 
 /**  What the user typed because the vault had nothing (or something that was rejected). */

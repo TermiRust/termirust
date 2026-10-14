@@ -7,6 +7,7 @@ pub mod keys;
 pub mod local_files;
 pub mod local_session;
 pub mod logs;
+pub mod monitor;
 pub mod session;
 pub mod settings;
 pub mod sftp;

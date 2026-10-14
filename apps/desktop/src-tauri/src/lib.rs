@@ -16,8 +16,8 @@ use tauri::Manager;
 use termirust_core::vault::OsKeychain;
 
 use crate::commands::{
-    ai, benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, session,
-    settings, sftp, snippets, ssh_config, vault,
+    ai, benchmark, forwards, host_session, hosts, keys, local_files, local_session, logs, monitor,
+    session, settings, sftp, snippets, ssh_config, vault,
 };
 use crate::vault_state::{KEYCHAIN_SERVICE, VaultState};
 
@@ -98,6 +98,8 @@ pub fn command_registry() -> Builder<tauri::Wry> {
         ai::ai_chat_get,
         ai::ai_chat_save,
         ai::ai_chat_delete,
+        monitor::monitor_probe,
+        monitor::monitor_forget,
         snippets::snippets_list,
         snippets::snippets_create,
         snippets::snippets_update,
@@ -131,6 +133,7 @@ pub fn run() {
         .manage(transfer_queue::TransferQueue::default())
         .manage(forwards::RunningForwards::default())
         .manage(ai::AiRequests::default())
+        .manage(monitor::MonitorConnections::default())
         .invoke_handler(registry.invoke_handler())
         .setup(move |app| {
             registry.mount_events(app);

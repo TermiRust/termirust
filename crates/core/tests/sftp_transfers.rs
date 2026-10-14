@@ -274,3 +274,21 @@ async fn detects_the_test_servers_operating_system_without_a_terminal() {
     assert_eq!(connection.detect_os().await.as_deref(), Some("alpine"));
     connection.disconnect().await.unwrap();
 }
+
+#[tokio::test]
+async fn reads_a_health_snapshot_of_the_test_server() {
+    let connection = SshConnection::open(None, &key_login(), Arc::new(|_| true), TIMEOUT)
+        .await
+        .unwrap();
+    let stats = connection.host_stats().await.unwrap();
+    assert_eq!(stats.os_id.as_deref(), Some("alpine"));
+    assert!(stats.cpu_count.unwrap_or(0) >= 1);
+    assert!(stats.mem_available_kb <= stats.mem_total_kb && stats.mem_total_kb.is_some());
+    assert!(
+        stats.cpu_percent.is_some(),
+        "two /proc/stat samples were read"
+    );
+    assert!(stats.disk_total_kb.unwrap_or(0) > 0);
+    assert!(stats.uptime_secs.is_some());
+    connection.disconnect().await.unwrap();
+}
