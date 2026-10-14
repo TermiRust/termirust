@@ -61,13 +61,13 @@ describe("AppShell", () => {
     render(<AppShell />);
     const slot = screen.getByTestId("sidebar-slot");
     expect(slot.className).toMatch(/(^|\s)flex(\s|$)/);
-    const sidebar = screen.getByRole("complementary", { name: "Hosts sidebar" });
+    const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
     expect(sidebar.className).not.toMatch(/\bh-(fit|auto|min)\b/);
   });
 
   it("hides and shows the sidebar with the platform shortcut", () => {
     render(<AppShell />);
-    expect(screen.getByRole("complementary", { name: "Hosts sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
 
     const onMac = /Mac/i.test(navigator.userAgent);
     const chord = onMac ? { metaKey: true } : { ctrlKey: true, shiftKey: true };
@@ -75,7 +75,7 @@ describe("AppShell", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "b", ...chord });
     });
-    expect(screen.queryByRole("complementary", { name: "Hosts sidebar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Sidebar" })).not.toBeInTheDocument();
     // Still mounted so it can slide closed, but out of reach for keyboard and screen readers.
     expect(screen.getByTestId("sidebar-slot")).toHaveAttribute("inert");
     expect(screen.getByTestId("sidebar-slot").className).toMatch(/\bw-0\b/);
@@ -83,7 +83,7 @@ describe("AppShell", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "b", ...chord });
     });
-    expect(screen.getByRole("complementary", { name: "Hosts sidebar" })).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
   });
 
   it("does not toggle the sidebar on a plain Ctrl+B meant for the shell", () => {
@@ -91,13 +91,7 @@ describe("AppShell", () => {
     act(() => {
       fireEvent.keyDown(window, { key: "b", ctrlKey: true });
     });
-    expect(screen.getByRole("complementary", { name: "Hosts sidebar" })).toBeInTheDocument();
-  });
-
-  it("writes the host filter into the layout store", async () => {
-    render(<AppShell />);
-    await userEvent.type(screen.getByRole("searchbox", { name: "Filter hosts" }), "prod");
-    expect(useLayoutStore.getState().hostFilter).toBe("prod");
+    expect(screen.getByRole("complementary", { name: "Sidebar" })).toBeInTheDocument();
   });
 
   it("switches between the empty workspace and the connection lab", async () => {
@@ -176,7 +170,7 @@ describe("AppShell warning border", () => {
     const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, os: null, environment: null, color: null };
     const laptop = { ...api, id: "h2", label: "laptop", groupId: null };
     useTabsStore.setState({ tabs: [], activeTabId: null });
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "library", sidebarVisible: true });
     useHostsStore.setState({ hosts: [], groups: [], loaded: false });
     const { useDialogsStore } = await import("@/stores/dialogs-store");
     useDialogsStore.setState({ paletteOpen: false, hostEditor: null, importConfigOpen: false });
@@ -185,21 +179,22 @@ describe("AppShell warning border", () => {
     await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
     act(() => useHostsStore.setState({ hosts: [api, laptop], groups: [prod] }));
 
-    await userEvent.dblClick(await screen.findByRole("button", { name: "Connect to api" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Connect to api" }));
     const framed = screen.getAllByRole("tabpanel", { hidden: true }).at(-1)!;
     expect(framed).toHaveAttribute("data-warning-border", "true");
     expect(framed.style.boxShadow).toContain("var(--tab-red)");
 
-    await userEvent.dblClick(screen.getByRole("button", { name: "Connect to laptop" }));
+    act(() => useLayoutStore.setState({ section: "library" }));
+    await userEvent.click(screen.getByRole("button", { name: "Connect to laptop" }));
     expect(screen.getAllByRole("tabpanel", { hidden: true }).at(-1)).not.toHaveAttribute("data-warning-border");
   });
 
-  it("opens an SFTP tab from the sidebar, framed like the host's terminal tabs", async () => {
+  it("opens an SFTP tab from the host library, framed like the host's terminal tabs", async () => {
     const { useHostsStore } = await import("@/stores/hosts-store");
     const prod = { id: "g1", name: "Production", parentId: null, color: null, warningBorder: true, aiDisabled: false };
     const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: "g1", jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, aiDisabled: false, os: null, environment: null, color: null };
     useTabsStore.setState({ tabs: [], activeTabId: null });
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "library", sidebarVisible: true });
     useHostsStore.setState({ hosts: [], groups: [], loaded: false });
     render(<AppShell />);
     await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
@@ -214,7 +209,7 @@ describe("AppShell warning border", () => {
   it("runs a snippet from the palette in the active connected terminal", async () => {
     const { registerTerminalInput } = await import("@/stores/terminal-inputs");
     const { useSnippetsStore } = await import("@/stores/snippets-store");
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null, layout: { kind: "pane", id: "p1" }, focusedPaneId: "p1", paneStatus: {}, broadcast: false }], activeTabId: "t1" });
     const send = vi.fn();
     const unregister = registerTerminalInput("t1", send);
@@ -240,7 +235,7 @@ describe("AppShell warning border", () => {
     const api = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false, os: null, environment: null };
     const db = { ...api, id: "h2", label: "db" };
     useTabsStore.setState({ tabs: [], activeTabId: null });
-    useLayoutStore.setState({ section: "snippets", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "snippets", sidebarVisible: true });
     useHostsStore.setState({ hosts: [], groups: [], loaded: false });
     render(<AppShell />);
     await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));
@@ -262,7 +257,7 @@ describe("AppShell warning border", () => {
   });
 
   it("splits the active terminal, moves focus, and closes the focused pane before the tab", () => {
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     useTabsStore.setState({ tabs: [], activeTabId: null });
     render(<AppShell />);
     act(() => {
@@ -299,7 +294,7 @@ describe("AppShell warning border", () => {
     const { useSettingsStore } = await import("@/stores/settings-store");
     const update = vi.fn();
     useSettingsStore.setState({ updateTerminal: update });
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     render(<AppShell />);
     const onMac = /Mac/i.test(navigator.userAgent);
     act(() => {
@@ -312,7 +307,7 @@ describe("AppShell warning border", () => {
   });
 
   it("opens the palette from the top bar search and settings from its gear", async () => {
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     const user = userEvent.setup();
     render(<AppShell />);
     await user.click(screen.getByRole("button", { name: "Search hosts and commands" }));
@@ -325,7 +320,7 @@ describe("AppShell warning border", () => {
   });
 
   it("splits the active terminal from the tab bar button, and disables it for SFTP tabs", async () => {
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     useTabsStore.setState({ tabs: [], activeTabId: null });
     render(<AppShell />);
     act(() => {
@@ -343,7 +338,7 @@ describe("AppShell warning border", () => {
   });
 
   it("gives every icon-only button an accessible name", () => {
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     useTabsStore.setState({ tabs: [], activeTabId: null });
     render(<AppShell />);
     act(() => {
@@ -359,7 +354,7 @@ describe("AppShell warning border", () => {
   it("opens SFTP from the menu by picking a host, without a terminal first", async () => {
     const { useHostsStore } = await import("@/stores/hosts-store");
     useTabsStore.setState({ tabs: [], activeTabId: null });
-    useLayoutStore.setState({ section: "hosts", sidebarVisible: true, hostFilter: "" });
+    useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     useHostsStore.setState({ hosts: [], groups: [], loaded: false });
     render(<AppShell />);
     await vi.waitFor(() => expect(useHostsStore.getState().loaded).toBe(true));

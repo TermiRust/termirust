@@ -1,254 +1,67 @@
-import { ChevronDown, ChevronRight, Search, FileInput, FolderPlus, FolderTree, KeyRound, Lock, Pencil, Plus, Server, SquareCode, SquareTerminal, Waypoints } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Activity, FolderTree, KeyRound, Lock, Plus, Server, SquareCode, SquareTerminal, Waypoints, type LucideIcon } from "lucide-react";
 
-import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
-import { EnvironmentBadge } from "@/components/ui/environment-badge";
 import { Kbd } from "@/components/ui/kbd";
-import { resolveTabColor, tabColorVar } from "@/features/tabs/tab-color";
 import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts";
-import { Input } from "@/components/ui/input";
-import { GroupFormDialog } from "@/features/hosts/group-form-dialog";
-import { buildHostTree, countHosts, type GroupNode } from "@/features/hosts/host-tree";
 import { cn } from "@/lib/utils";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
-import { useLayoutStore } from "@/stores/layout-store";
+import { useLayoutStore, type Section } from "@/stores/layout-store";
 import { useTabsStore } from "@/stores/tabs-store";
-import { StatusDot } from "@/components/ui/status-dot";
-import { hostDot } from "@/features/hosts/host-status";
-import { DROP_ATTR, useHostDrag } from "@/features/hosts/use-host-drag";
 
-interface SidebarProps {
-  onOpenHost: (host: HostView) => void;
-  onOpenSftp?: (host: HostView) => void;
-}
+const ITEMS: { section: Section; label: string; icon: LucideIcon }[] = [
+  { section: "library", label: "Hosts", icon: Server },
+  { section: "hosts", label: "Terminals", icon: SquareTerminal },
+  { section: "sftp", label: "SFTP", icon: FolderTree },
+  { section: "monitor", label: "Monitor", icon: Activity },
+  { section: "snippets", label: "Snippets", icon: SquareCode },
+  { section: "forwards", label: "Port forwarding", icon: Waypoints },
+  { section: "keychain", label: "Keychain", icon: KeyRound },
+];
 
-export function Sidebar({ onOpenHost, onOpenSftp }: SidebarProps) {
+/** The app's sections. Hosts and groups are managed on the Hosts screen. */
+export function Sidebar() {
   const section = useLayoutStore((s) => s.section);
   const setSection = useLayoutStore((s) => s.setSection);
-  const hostFilter = useLayoutStore((s) => s.hostFilter);
-  const setHostFilter = useLayoutStore((s) => s.setHostFilter);
-  const { hosts, groups, loaded, error, retryVault } = useHostsStore();
-  const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
-  const tabs = useTabsStore((s) => s.tabs);
-  const drag = useHostDrag((hostId, groupId) => void useHostsStore.getState().moveHost(hostId, groupId));
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-
-  const openHost = (host: HostView) => {
-    setSection("hosts");
-    onOpenHost(host);
-  };
-
-  const tree = useMemo(() => buildHostTree(hosts, groups, hostFilter), [hosts, groups, hostFilter]);
-  const filtering = hostFilter.trim().length > 0;
-
-  const toggle = (id: string) =>
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const row = (host: HostView, depth: number) => (
-    <li key={host.id}>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={`Connect to ${host.label}`}
-        title={`${host.username ? `${host.username}@` : ""}${host.hostname}:${host.port} — double-click to connect`}
-        onDoubleClick={() => openHost(host)}
-        onPointerDown={(e) => drag.onPointerDown(e, host)}
-        onKeyDown={(e) => e.key === "Enter" && openHost(host)}
-        className={cn("group flex h-7 cursor-default items-center gap-2 rounded-md pr-1 text-sm hover:bg-bg-elev focus-visible:outline-2 focus-visible:outline-accent", drag.draggingId === host.id && "opacity-50")}
-        style={{ paddingLeft: 8 + depth * 14 }}
-      >
-        <StatusDot state={hostDot(host.id, tabs)} />
-        <span className="flex-1 truncate">{host.label}</span>
-        <EnvironmentBadge environment={host.environment} className="group-hover:hidden" />
-        {!host.environment && host.tags[0] && <span className="shrink-0 rounded border border-border-strong px-1 text-[10.5px] leading-4 text-fg-muted group-hover:hidden">{host.tags[0]}</span>}
-        {onOpenSftp && (
-          <button
-            type="button"
-            aria-label={`Open SFTP to ${host.label}`}
-            title="Browse files (SFTP)"
-            onClick={() => onOpenSftp(host)}
-            className="ml-auto hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block"
-          >
-            <FolderTree size={12} />
-          </button>
-        )}
-        <button
-          type="button"
-          aria-label={`Edit ${host.label}`}
-          onClick={() => openHostEditor(host)}
-          className={cn(onOpenSftp ? "" : "ml-auto", "hidden rounded p-1 text-fg-muted group-hover:block hover:bg-bg-sunk focus-visible:block")}
-        >
-          <Pencil size={12} />
-        </button>
-      </div>
-    </li>
-  );
-
-  const groupNode = (node: GroupNode, depth: number) => {
-    const open = filtering || !collapsed.has(node.group.id);
-    return (
-      <li
-        key={node.group.id}
-        {...{ [DROP_ATTR]: node.group.id }}
-        className={cn("rounded-md", drag.dropTarget === node.group.id && "bg-accent/10 ring-1 ring-accent")}
-      >
-        <div className="group/header flex items-center">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => toggle(node.group.id)}
-            className="flex h-7 min-w-0 flex-1 items-center gap-1 rounded-md pr-2 text-left text-xs font-semibold tracking-wide text-fg-muted uppercase hover:bg-hover"
-            style={{ paddingLeft: 4 + depth * 14 }}
-          >
-            {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            <GroupSwatch group={node.group} />
-            <span className="truncate">{node.group.name}</span>
-            <span className="ml-auto font-normal">{countHosts(node)}</span>
-          </button>
-          <button
-            type="button"
-            aria-label={`Edit group ${node.group.name}`}
-            onClick={() => setEditingGroup(node.group)}
-            className="hidden rounded p-1 text-fg-muted group-hover/header:block hover:bg-hover focus-visible:block"
-          >
-            <Pencil size={11} />
-          </button>
-        </div>
-        {open && (
-          <ul>
-            {node.children.map((c) => groupNode(c, depth + 1))}
-            {node.hosts.map((h) => row(h, depth + 1))}
-          </ul>
-        )}
-      </li>
-    );
-  };
-
-  const empty = loaded && hosts.length === 0;
-  const noMatch = loaded && hosts.length > 0 && filtering && tree.groups.length === 0 && tree.ungrouped.length === 0;
+  const { loaded, error, retryVault } = useHostsStore();
+  const openNewHost = useDialogsStore((s) => s.openNewHost);
+  const tabCount = useTabsStore((s) => s.tabs.length);
 
   return (
-    <aside aria-label="Hosts sidebar" className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-sunk">
-      <div className="flex items-center gap-1 p-3">
-        <div className="relative min-w-0 flex-1">
-          <Search size={13} aria-hidden className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-muted" />
-          <Input
-            type="search"
-            aria-label="Filter hosts"
-            placeholder="Filter hosts…"
-            value={hostFilter}
-            onChange={(e) => setHostFilter(e.target.value)}
-            className="pl-7"
-          />
-        </div>
-        <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportConfigOpen(true)}>
-          <FileInput size={15} />
-        </Button>
-        <Button size="icon" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}>
-          <FolderPlus size={15} />
-        </Button>
-      </div>
+    <aside aria-label="Sidebar" className="flex w-64 shrink-0 flex-col border-r border-border bg-bg-sunk">
+      <nav aria-label="Sections" className="flex flex-col gap-0.5 p-2">
+        {ITEMS.map(({ section: id, label, icon: Icon }) => (
+          <Button key={id} className={cn("justify-start", section === id && "bg-active text-fg")} aria-current={section === id ? "page" : undefined} onClick={() => setSection(id)}>
+            <Icon size={15} /> {label}
+            {id === "hosts" && tabCount > 0 && <span className="ml-auto rounded bg-bg-sunk-2 px-1.5 font-mono text-[11px] text-fg-muted">{tabCount}</span>}
+          </Button>
+        ))}
+      </nav>
 
-      {/* Dropping anywhere outside a group takes the host out of its group. */}
-      <div
-        {...{ [DROP_ATTR]: "" }}
-        className={cn("flex-1 overflow-y-auto px-2 pb-2", drag.dropTarget === "" && "bg-accent/5")}
-      >
-        {!loaded && (
-          <p role="status" className="flex items-center gap-2 px-1 text-sm text-fg-muted">
+      <div className="flex-1 px-3">
+        {!loaded && !error && (
+          <p role="status" className="flex items-center gap-2 text-sm text-fg-muted">
             <Lock size={13} className="animate-pulse" /> Unlocking vault…
           </p>
         )}
         {error && (
-          <div role="alert" className="flex flex-col items-start gap-2 px-1 text-sm text-danger">
+          <div role="alert" className="flex flex-col items-start gap-2 text-sm text-danger">
             <p>{error}</p>
             <Button size="sm" variant="outline" onClick={() => void retryVault()}>
               Try again
             </Button>
           </div>
         )}
-        {empty && <p className="px-1 text-sm text-fg-muted">No hosts yet.</p>}
-        {noMatch && <p className="px-1 text-sm text-fg-muted">No host matches “{hostFilter}”.</p>}
-        <ul aria-label="Hosts">
-          {tree.groups.map((g) => groupNode(g, 0))}
-          {tree.ungrouped.map((h) => row(h, 0))}
-        </ul>
       </div>
 
-      <nav aria-label="Sections" className="flex flex-col gap-0.5 border-t border-border p-2">
-        <Button
-          className={cn("justify-start", section === "library" && "bg-active text-fg")}
-          aria-current={section === "library" ? "page" : undefined}
-          onClick={() => setSection("library")}
-        >
-          <Server size={15} /> Hosts
-        </Button>
-        <Button
-          className={cn("justify-start", section === "hosts" && "bg-active text-fg")}
-          aria-current={section === "hosts" ? "page" : undefined}
-          onClick={() => setSection("hosts")}
-        >
-          <SquareTerminal size={15} /> Terminals
-          {tabs.length > 0 && <span className="ml-auto rounded bg-bg-sunk-2 px-1.5 font-mono text-[11px] text-fg-muted">{tabs.length}</span>}
-        </Button>
-        <Button
-          className={cn("justify-start", section === "sftp" && "bg-active text-fg")}
-          aria-current={section === "sftp" ? "page" : undefined}
-          onClick={() => setSection("sftp")}
-        >
-          <FolderTree size={15} /> SFTP
-        </Button>
-        <Button
-          className={cn("justify-start", section === "keychain" && "bg-active text-fg")}
-          aria-current={section === "keychain" ? "page" : undefined}
-          onClick={() => setSection("keychain")}
-        >
-          <KeyRound size={15} /> Keychain
-        </Button>
-        <Button
-          className={cn("justify-start", section === "forwards" && "bg-active text-fg")}
-          aria-current={section === "forwards" ? "page" : undefined}
-          onClick={() => setSection("forwards")}
-        >
-          <Waypoints size={15} /> Port forwarding
-        </Button>
-        <Button
-          className={cn("justify-start", section === "snippets" && "bg-active text-fg")}
-          aria-current={section === "snippets" ? "page" : undefined}
-          onClick={() => setSection("snippets")}
-        >
-          <SquareCode size={15} /> Snippets
-        </Button>
-        <Button className="justify-start" variant="outline" onClick={openNewHost}>
+      <div className="border-t border-border p-2">
+        <Button className="w-full justify-start" variant="outline" onClick={openNewHost}>
           <Plus size={15} /> New host
           <span aria-hidden className="ml-auto">
             <Kbd>{shortcutLabel("newHost", isMacPlatform())}</Kbd>
           </span>
         </Button>
-      </nav>
-
-      {drag.ghost}
-      <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
-      <GroupFormDialog
-        open={editingGroup !== null}
-        group={editingGroup ?? undefined}
-        onOpenChange={(open) => !open && setEditingGroup(null)}
-      />
+      </div>
     </aside>
   );
-}
-
-/** The small coloured square before a group name, in the colour its hosts' tabs get. */
-function GroupSwatch({ group }: { group: GroupView }) {
-  const color = resolveTabColor({ color: null }, group);
-  return <span aria-hidden className="mx-0.5 h-1.5 w-1.5 shrink-0 rounded-[2px]" style={{ background: color ? tabColorVar[color] : "var(--color-fg-faint)" }} />;
 }

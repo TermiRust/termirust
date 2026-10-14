@@ -1,4 +1,4 @@
-import { FolderTree, LayoutGrid, List, Pencil, Plus, Server, Terminal } from "lucide-react";
+import { FileInput, FolderPlus, FolderTree, LayoutGrid, List, Pencil, Plus, Server, Terminal } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
@@ -13,6 +13,7 @@ import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useTabsStore } from "@/stores/tabs-store";
 
+import { GroupFormDialog } from "./group-form-dialog";
 import { hostMatches } from "./host-tree";
 import { hostDot } from "./host-status";
 import { DROP_ATTR, useHostDrag } from "./use-host-drag";
@@ -39,7 +40,9 @@ const address = (h: HostView) => `${h.username ? `${h.username}@` : ""}${h.hostn
 export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
   const { hosts, groups, loaded } = useHostsStore();
   const tabs = useTabsStore((s) => s.tabs);
-  const { openNewHost, openHostEditor } = useDialogsStore();
+  const { openNewHost, openHostEditor, setImportConfigOpen } = useDialogsStore();
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<GroupView | null>(null);
   const drag = useHostDrag((hostId, groupId) => void useHostsStore.getState().moveHost(hostId, groupId));
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState<ViewMode>(readViewMode);
@@ -86,6 +89,12 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
             </button>
           ))}
         </div>
+        <Button size="icon" aria-label="Import from SSH config" title="Import ~/.ssh/config" onClick={() => setImportConfigOpen(true)}>
+          <FileInput size={15} />
+        </Button>
+        <Button size="icon" aria-label="New group" title="New group" onClick={() => setCreatingGroup(true)}>
+          <FolderPlus size={15} />
+        </Button>
         <Button variant="primary" size="sm" onClick={openNewHost}>
           <Plus size={14} /> New host
         </Button>
@@ -106,8 +115,19 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
             {...{ [DROP_ATTR]: group?.id ?? "" }}
             className={cn("mb-5 rounded-lg", drag.dropTarget === (group?.id ?? "") && "bg-accent/5 ring-1 ring-accent")}
           >
-            <h2 className="mb-2 text-[11px] font-semibold tracking-wider text-fg-muted uppercase">
+            <h2 className="group/heading mb-2 flex items-center gap-1 text-[11px] font-semibold tracking-wider text-fg-muted uppercase">
               {group?.name ?? "Ungrouped"} <span className="font-normal">· {items.length}</span>
+              {group && (
+                <button
+                  type="button"
+                  aria-label={`Edit group ${group.name}`}
+                  title="Edit group"
+                  onClick={() => setEditingGroup(group)}
+                  className="rounded p-0.5 opacity-0 group-hover/heading:opacity-100 hover:bg-hover focus-visible:opacity-100"
+                >
+                  <Pencil size={11} />
+                </button>
+              )}
             </h2>
             <ul className={mode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2" : "flex flex-col gap-1"}>
               {items.map((host) => {
@@ -170,11 +190,18 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
           .filter((g) => !sections.some((s) => s.group?.id === g.id))
           .map((g) => (
             <section key={g.id} aria-label={g.name} {...{ [DROP_ATTR]: g.id }} className={cn("mb-3 rounded-lg border border-dashed border-border p-3 text-xs text-fg-muted", drag.dropTarget === g.id && "border-accent bg-accent/5")}>
-              {g.name} · empty — drag hosts here
+              <span className="flex items-center gap-1">
+                {g.name} · empty — drag hosts here
+                <button type="button" aria-label={`Edit group ${g.name}`} title="Edit group" onClick={() => setEditingGroup(g)} className="ml-auto rounded p-0.5 hover:bg-hover">
+                  <Pencil size={11} />
+                </button>
+              </span>
             </section>
           ))}
       </div>
       {drag.ghost}
+      <GroupFormDialog open={creatingGroup} onOpenChange={setCreatingGroup} />
+      <GroupFormDialog open={editingGroup !== null} group={editingGroup ?? undefined} onOpenChange={(open) => !open && setEditingGroup(null)} />
     </section>
   );
 }

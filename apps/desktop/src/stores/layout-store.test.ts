@@ -9,9 +9,9 @@ describe("layout store", () => {
     useLayoutStore.setState(initialState, true);
   });
 
-  it("starts with the sidebar visible and an empty filter", () => {
+  it("starts on the welcome screen with the sidebar visible", () => {
     expect(useLayoutStore.getState().sidebarVisible).toBe(true);
-    expect(useLayoutStore.getState().hostFilter).toBe("");
+    expect(useLayoutStore.getState().section).toBe("hosts");
   });
 
   it("toggles sidebar visibility back and forth", () => {
@@ -19,10 +19,5 @@ describe("layout store", () => {
     expect(useLayoutStore.getState().sidebarVisible).toBe(false);
     useLayoutStore.getState().toggleSidebar();
     expect(useLayoutStore.getState().sidebarVisible).toBe(true);
-  });
-
-  it("stores the host filter text", () => {
-    useLayoutStore.getState().setHostFilter("prod");
-    expect(useLayoutStore.getState().hostFilter).toBe("prod");
   });
 });

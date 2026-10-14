@@ -250,7 +250,7 @@ export function AppShell() {
           aria-hidden={!sidebarVisible}
           data-testid="sidebar-slot"
         >
-          <Sidebar onOpenHost={openHost} onOpenSftp={openSftp} />
+          <Sidebar />
         </div>
         <main className="flex min-w-0 flex-1 flex-col">
           {section === "library" && <HostsView onOpenHost={openHost} onOpenSftp={openSftp} />}
