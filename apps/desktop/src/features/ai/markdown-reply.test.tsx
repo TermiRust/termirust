@@ -70,4 +70,16 @@ describe("MarkdownReply", () => {
     await user.click(screen.getByRole("link", { name: "docs" }));
     expect(openUrl).toHaveBeenCalledWith("https://nginx.org");
   });
+
+  it("wraps long commands instead of scrolling sideways, while Insert keeps the exact command", async () => {
+    const long = "docker run --rm -it -v $(pwd):/work -e A=1 -e B=2 --network host ghcr.io/example/some-very-long-image-name:latest bash -lc 'make test'";
+    const onInsert = vi.fn();
+    const user = userEvent.setup();
+    render(<MarkdownReply text={"```sh\n" + long + "\n```"} commands={[{ command: long, danger: null }]} onInsert={onInsert} />);
+    const block = screen.getByTestId("code-block");
+    expect(block.className).toMatch(/whitespace-pre-wrap/);
+    expect(block.className).not.toMatch(/overflow-x-auto/);
+    await user.click(screen.getByRole("button", { name: `Insert into terminal: ${long}` }));
+    expect(onInsert).toHaveBeenCalledWith(long);
+  });
 });

@@ -39,7 +39,8 @@ export function MarkdownReply({ text, commands, onInsert }: MarkdownReplyProps) 
       const suggestion = isShell ? commands.find((c) => c.command === code.trim()) : undefined;
       return (
         <div className="my-2 overflow-hidden rounded-md border border-border bg-bg-sunk">
-          <pre className="overflow-x-auto p-2 font-mono text-[12px] leading-relaxed">
+          {/* Long commands wrap instead of scrolling sideways; Insert still sends the exact text. */}
+          <pre data-testid="code-block" className="p-2 font-mono text-[12px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere]">
             <code>{code}</code>
           </pre>
           {suggestion && (

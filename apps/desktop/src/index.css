@@ -210,3 +210,29 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Thin, theme-coloured scrollbars everywhere: WebView2's default ones are bulky. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
