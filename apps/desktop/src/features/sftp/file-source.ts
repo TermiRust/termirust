@@ -8,6 +8,10 @@ export interface FileSource {
   sep: PathStyle;
   list: (path: string) => Promise<FileEntry[]>;
   createDir: (path: string) => Promise<void>;
+  /** Creates an empty file; never overwrites. */
+  createFile: (path: string) => Promise<void>;
+  /** Opens with the default app or `app`; a remote file is downloaded to a temporary copy first. */
+  openFile: (path: string, app: string | null) => Promise<void>;
   rename: (from: string, to: string) => Promise<void>;
   remove: (path: string) => Promise<void>;
   /** Whole text file for the built-in editor (refused when binary or over 2 MB). */
@@ -33,6 +37,8 @@ export function localSource(sep: PathStyle): FileSource {
     sep,
     list: (path) => unwrap(commands.localList(path)),
     createDir: (path) => done(commands.localCreateDir(path)),
+    createFile: (path) => done(commands.localCreateFile(path)),
+    openFile: (path, app) => done(commands.localOpenFile(path, app)),
     rename: (from, to) => done(commands.localRename(from, to)),
     remove: (path) => done(commands.localRemove(path)),
     readText: (path) => unwrap(commands.localReadText(path)),
@@ -46,6 +52,10 @@ export function remoteSource(sftpId: number): FileSource {
     sep: "/",
     list: (path) => unwrap(commands.sftpList(sftpId, path)),
     createDir: (path) => done(commands.sftpCreateDir(sftpId, path)),
+    createFile: (path) => done(commands.sftpCreateFile(sftpId, path)),
+    openFile: async (path, app) => {
+      await unwrap(commands.sftpOpenFile(sftpId, path, app));
+    },
     rename: (from, to) => done(commands.sftpRename(sftpId, from, to)),
     remove: (path) => done(commands.sftpRemove(sftpId, path)),
     readText: (path) => unwrap(commands.sftpReadText(sftpId, path)),

@@ -306,7 +306,7 @@ describe("AppShell warning border", () => {
     expect(update).toHaveBeenCalledWith({ appTheme: "tokyo-night" });
   });
 
-  it("opens the palette from the top bar search and settings from its gear", async () => {
+  it("opens the palette from the top bar search and settings from the sidebar", async () => {
     useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
     const user = userEvent.setup();
     render(<AppShell />);
@@ -315,8 +315,8 @@ describe("AppShell warning border", () => {
     await user.keyboard("{Escape}");
     await user.click(screen.getByRole("button", { name: "Settings" }));
     expect(useLayoutStore.getState().section).toBe("settings");
-    await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(useLayoutStore.getState().section).toBe("hosts");
+    await user.click(screen.getByRole("button", { name: "Hosts" }));
+    expect(useLayoutStore.getState().section).toBe("library");
   });
 
   it("splits the active terminal from the tab bar button, and disables it for SFTP tabs", async () => {

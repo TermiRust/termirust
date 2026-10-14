@@ -9,7 +9,6 @@ const { Sidebar } = await import("./sidebar");
 const { useHostsStore } = await import("@/stores/hosts-store");
 const { useLayoutStore } = await import("@/stores/layout-store");
 const { useTabsStore } = await import("@/stores/tabs-store");
-const { useDialogsStore } = await import("@/stores/dialogs-store");
 
 const ok = <T,>(data: T) => ({ status: "ok", data });
 const initialHosts = useHostsStore.getState();
@@ -61,11 +60,13 @@ describe("Sidebar", () => {
     expect(screen.getByRole("button", { name: /Terminals/ })).toHaveTextContent("1");
   });
 
-  it("opens the new host dialog", async () => {
+  it("opens Settings from the bottom of the sidebar instead of a New host button", async () => {
     const user = userEvent.setup();
     render(<Sidebar />);
-    await user.click(screen.getByRole("button", { name: "New host" }));
-    expect(useDialogsStore.getState().hostEditor).toEqual({ mode: "new" });
+    expect(screen.queryByRole("button", { name: "New host" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(useLayoutStore.getState().section).toBe("settings");
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveAttribute("aria-current", "page");
   });
 
   it("says the vault is unlocking until the first load finishes", () => {

@@ -238,10 +238,8 @@ export function AppShell() {
         windowControls={onWindows}
         paletteShortcut={shortcutLabel("palette", onMac)}
         sidebarShortcut={shortcutLabel("sidebar", onMac)}
-        settingsActive={section === "settings"}
         onSearch={() => setPaletteOpen(true)}
         onToggleSidebar={toggleSidebar}
-        onOpenSettings={() => setSection(section === "settings" ? "hosts" : "settings")}
       />
       <div className="flex min-h-0 flex-1">
         {/* Kept mounted so it can slide; hidden from focus and screen readers while collapsed. */}

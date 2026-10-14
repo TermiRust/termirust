@@ -12,6 +12,7 @@ import type { TabStatus } from "@/stores/tabs-store";
 import { useTransfersStore } from "@/stores/transfers-store";
 
 import { ConfirmDialog, NameDialog } from "./file-dialogs";
+import { chooseApp } from "./choose-app";
 import { FileEditor } from "./file-editor";
 import { FilePanel } from "./file-panel";
 import { join, localSource, parent, remoteSource, type FileSource } from "./file-source";
@@ -42,6 +43,7 @@ const tabStatusOf: Record<SftpConnectionState["phase"], TabStatus> = {
 
 type Pending =
   | { kind: "newFolder"; side: Side }
+  | { kind: "newFile"; side: Side }
   | { kind: "rename"; side: Side; entry: FileEntry }
   | { kind: "delete"; side: Side; entries: FileEntry[] }
   | { kind: "edit"; side: Side; path: string }
@@ -94,6 +96,7 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
   const [remoteSelected, setRemoteSelected] = useState<string[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [dropSide, setDropSide] = useState<Side | null>(null);
 
   useEffect(() => {
@@ -194,6 +197,22 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
   const onOsDrop = useCallback((paths: string[]) => transferRef.current("local", paths), []);
   useOsFileDrop(sftpId !== null, onOsDrop, setDropSide);
 
+  const openExternal = async (side: Side, entry: FileEntry, choose: boolean) => {
+    const source = sides[side].source;
+    if (!source) return;
+    const app = choose ? await chooseApp() : null;
+    if (choose && app === null) return;
+    setActionError(null);
+    setNotice(side === "remote" ? `Downloading ${entry.name} to open it…` : null);
+    try {
+      await source.openFile(entry.path, app);
+      setNotice(side === "remote" ? `Opened a copy of ${entry.name}; edits there are not sent back to the server.` : null);
+    } catch (err) {
+      setNotice(null);
+      setActionError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const credentials = credentialsRequestOf(state);
   const endpoint = `${host.hostname}:${host.port}`;
 
@@ -219,6 +238,8 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
         onDelete={(entries) => entries.length > 0 && setPending({ kind: "delete", side, entries })}
         onOpenFile={(entry) => transfer(side, [entry.path])}
         onEdit={(entry) => setPending({ kind: "edit", side, path: entry.path })}
+        onNewFile={() => setPending({ kind: "newFile", side })}
+        onOpenExternal={(entry, choose) => void openExternal(side, entry, choose)}
         onRowPointerDown={onRowPointerDown(side, s.selected)}
       />
     );
@@ -245,6 +266,14 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
         )}
       </header>
 
+      {notice && !actionError && (
+        <p role="status" className="flex items-center border-b border-border bg-bg-sunk px-3 py-1 text-xs text-fg-muted">
+          <span className="flex-1">{notice}</span>
+          <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)} className="rounded px-1 hover:bg-hover">
+            ×
+          </button>
+        </p>
+      )}
       {actionError && (
         <p role="alert" className="border-b border-border bg-danger-soft px-3 py-1 text-xs text-danger">
           {actionError}
@@ -297,6 +326,15 @@ export function SftpView({ host, onStatusChange }: SftpViewProps) {
           where={pending.side === "local" ? "This computer" : host.label}
           onClose={() => setPending(null)}
           onSaved={sides[pending.side].refresh}
+        />
+      )}
+      {pending?.kind === "newFile" && (
+        <NameDialog
+          title="New file"
+          initial=""
+          action="Create"
+          onClose={() => setPending(null)}
+          onSubmit={(name) => runAction(pending.side, (src) => src.createFile(join(src, sides[pending.side].path ?? "", name)))}
         />
       )}
       {pending?.kind === "newFolder" && (

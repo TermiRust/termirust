@@ -38,8 +38,14 @@ const commands = {
   sftpWriteText: vi.fn(),
   localReadText: vi.fn(),
   localWriteText: vi.fn(),
+  sftpCreateFile: vi.fn(),
+  sftpOpenFile: vi.fn(),
+  localCreateFile: vi.fn(),
+  localOpenFile: vi.fn(),
 };
 vi.mock("@/bindings", () => ({ commands }));
+const dialogOpen = vi.fn();
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: (...args: unknown[]) => dialogOpen(...args) }));
 
 const { SftpView } = await import("./sftp-view");
 const { useTransfersStore } = await import("@/stores/transfers-store");
@@ -127,7 +133,18 @@ describe("SftpView", () => {
     await renderConnected();
     fireEvent.contextMenu(row("prod-api", "report.pdf"));
     const menu = within(screen.getByRole("menu", { name: "Actions for report.pdf" }));
-    expect(menu.getAllByRole("menuitem").map((m) => m.textContent?.trim())).toEqual(["Edit", "Download to this computer", "Rename", "Delete"]);
+    expect(menu.getAllByRole("menuitem").map((m) => m.textContent?.trim())).toEqual([
+      "Edit",
+      "Open",
+      "Open with…",
+      "Download to this computer",
+      "Rename",
+      "Delete",
+      "New folder",
+      "New file",
+      "Refresh",
+      "Up one folder",
+    ]);
     expect(row("prod-api", "report.pdf")).toHaveAttribute("aria-selected", "true");
     fireEvent.click(menu.getByRole("menuitem", { name: "Rename" }));
     expect(screen.getByRole("dialog", { name: "Rename report.pdf" })).toBeInTheDocument();
@@ -138,6 +155,40 @@ describe("SftpView", () => {
     expect(dirMenu.getByRole("menuitem", { name: "Open" })).toBeInTheDocument();
     fireEvent.click(dirMenu.getByRole("menuitem", { name: "Delete" }));
     expect(screen.getByRole("dialog", { name: "Delete logs?" })).toBeInTheDocument();
+  });
+
+  it("creates a file or folder from a right-click on empty space", async () => {
+    commands.sftpCreateFile.mockResolvedValue(ok(null));
+    const user = userEvent.setup();
+    await renderConnected();
+    fireEvent.contextMenu(list("prod-api"));
+    const menu = within(screen.getByRole("menu", { name: "Folder actions" }));
+    expect(menu.getAllByRole("menuitem").map((m) => m.textContent?.trim())).toEqual(["New folder", "New file", "Refresh", "Up one folder"]);
+    await user.click(menu.getByRole("menuitem", { name: "New file" }));
+    const dialog = within(screen.getByRole("dialog", { name: "New file" }));
+    await user.type(dialog.getByRole("textbox"), "deploy.sh");
+    await user.click(dialog.getByRole("button", { name: "Create" }));
+    expect(commands.sftpCreateFile).toHaveBeenCalledWith(4, "/home/deploy/deploy.sh");
+  });
+
+  it("opens a remote file with the default app or a chosen one, saying the copy is not synced", async () => {
+    commands.sftpOpenFile.mockResolvedValue(ok("/tmp/termirust-open/x/report.pdf"));
+    dialogOpen.mockResolvedValue("/Applications/Preview.app");
+    const user = userEvent.setup();
+    await renderConnected();
+    fireEvent.contextMenu(row("prod-api", "report.pdf"));
+    await user.click(screen.getByRole("menuitem", { name: "Open" }));
+    expect(commands.sftpOpenFile).toHaveBeenCalledWith(4, "/home/deploy/report.pdf", null);
+    expect(await screen.findByText(/edits there are not sent back/)).toBeInTheDocument();
+
+    fireEvent.contextMenu(row("prod-api", "report.pdf"));
+    await user.click(screen.getByRole("menuitem", { name: "Open with…" }));
+    await vi.waitFor(() => expect(commands.sftpOpenFile).toHaveBeenLastCalledWith(4, "/home/deploy/report.pdf", "/Applications/Preview.app"));
+
+    dialogOpen.mockResolvedValue(null);
+    fireEvent.contextMenu(row("prod-api", "report.pdf"));
+    await user.click(screen.getByRole("menuitem", { name: "Open with…" }));
+    expect(commands.sftpOpenFile).toHaveBeenCalledTimes(2);
   });
 
   it("edits a remote text file in place and asks before discarding changes", async () => {

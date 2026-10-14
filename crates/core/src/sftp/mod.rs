@@ -144,6 +144,19 @@ impl SftpClient {
         self.sftp.create_dir(path).await.map_err(sftp_error)
     }
 
+    /// Creates an empty file; fails when something already has that name.
+    pub async fn create_file(&self, path: &str) -> Result<()> {
+        let mut file = self
+            .sftp
+            .open_with_flags(
+                path,
+                OpenFlags::CREATE | OpenFlags::EXCLUDE | OpenFlags::WRITE,
+            )
+            .await
+            .map_err(sftp_error)?;
+        file.shutdown().await.map_err(sftp_error)
+    }
+
     pub async fn rename(&self, from: &str, to: &str) -> Result<()> {
         self.sftp.rename(from, to).await.map_err(sftp_error)
     }

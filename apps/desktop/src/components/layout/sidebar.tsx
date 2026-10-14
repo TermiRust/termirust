@@ -1,10 +1,7 @@
-import { Activity, FolderTree, KeyRound, Lock, Plus, Server, SquareCode, SquareTerminal, Waypoints, type LucideIcon } from "lucide-react";
+import { Activity, FolderTree, KeyRound, Lock, Server, SlidersHorizontal, SquareCode, SquareTerminal, Waypoints, type LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Kbd } from "@/components/ui/kbd";
-import { isMacPlatform, shortcutLabel } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
-import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore, type Section } from "@/stores/layout-store";
 import { useTabsStore } from "@/stores/tabs-store";
@@ -24,7 +21,6 @@ export function Sidebar() {
   const section = useLayoutStore((s) => s.section);
   const setSection = useLayoutStore((s) => s.setSection);
   const { loaded, error, retryVault } = useHostsStore();
-  const openNewHost = useDialogsStore((s) => s.openNewHost);
   const tabCount = useTabsStore((s) => s.tabs.length);
 
   return (
@@ -54,12 +50,10 @@ export function Sidebar() {
         )}
       </div>
 
+      {/* New host lives on the Hosts screen (and ⌘N); the bottom slot is for Settings. */}
       <div className="border-t border-border p-2">
-        <Button className="w-full justify-start" variant="outline" onClick={openNewHost}>
-          <Plus size={15} /> New host
-          <span aria-hidden className="ml-auto">
-            <Kbd>{shortcutLabel("newHost", isMacPlatform())}</Kbd>
-          </span>
+        <Button className={cn("w-full justify-start", section === "settings" && "bg-active text-fg")} aria-current={section === "settings" ? "page" : undefined} onClick={() => setSection("settings")}>
+          <SlidersHorizontal size={15} /> Settings
         </Button>
       </div>
     </aside>

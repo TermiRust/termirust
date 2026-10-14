@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use tauri::ipc::Channel;
-use termirust_core::sftp::{EntryKind, RemoteEntry, SftpClient, editable_text};
+use termirust_core::sftp::{CancelFlag, EntryKind, RemoteEntry, SftpClient, editable_text};
 
 use super::host_session::{
     HostConnection, HostLoginRequest, OpenHostOutcome, PromptedLogin, connect_host,
@@ -174,6 +174,46 @@ pub async fn sftp_remove(
     path: String,
 ) -> Result<(), CommandError> {
     Ok(client(&sessions, sftp_id).await?.remove(&path).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn sftp_create_file(
+    sessions: State<'_, SftpSessions>,
+    sftp_id: u32,
+    path: String,
+) -> Result<(), CommandError> {
+    Ok(client(&sessions, sftp_id).await?.create_file(&path).await?)
+}
+
+/// Downloads a remote file to a private temporary folder and opens that copy with the default
+/// app or `app`. Changes to the copy are not sent back. Returns the local copy's path.
+#[tauri::command]
+#[specta::specta]
+pub async fn sftp_open_file(
+    sessions: State<'_, SftpSessions>,
+    sftp_id: u32,
+    path: String,
+    app: Option<String>,
+) -> Result<String, CommandError> {
+    let client = client(&sessions, sftp_id).await?;
+    let name = path
+        .rsplit('/')
+        .next()
+        .filter(|n| !n.is_empty())
+        .unwrap_or("file");
+    let dir = std::env::temp_dir()
+        .join("termirust-open")
+        .join(uuid::Uuid::now_v7().to_string());
+    std::fs::create_dir_all(&dir).map_err(|e| {
+        termirust_core::CoreError::InvalidData(format!("cannot create a temporary folder: {e}"))
+    })?;
+    let local = dir.join(name);
+    client
+        .download(&path, &local, &CancelFlag::default(), |_, _| {})
+        .await?;
+    super::local_files::open_with(&local, app)?;
+    Ok(local.to_string_lossy().into_owned())
 }
 
 /// A remote text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused.

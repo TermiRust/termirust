@@ -1,4 +1,4 @@
-import { PanelLeft, Search, SlidersHorizontal } from "lucide-react";
+import { PanelLeft, Search } from "lucide-react";
 
 import { Kbd } from "@/components/ui/kbd";
 import { WindowControls } from "@/components/layout/window-controls";
@@ -10,17 +10,15 @@ interface TopbarProps {
   windowControls?: boolean;
   paletteShortcut: string;
   sidebarShortcut: string;
-  settingsActive: boolean;
   onSearch: () => void;
   onToggleSidebar: () => void;
-  onOpenSettings: () => void;
 }
 
 /**
  * The window's top strip from the mockup. On macOS it sits in the title bar next to the
  * traffic lights (overlay title bar), so empty space drags the window.
  */
-export function Topbar({ onMac, windowControls = false, paletteShortcut, sidebarShortcut, settingsActive, onSearch, onToggleSidebar, onOpenSettings }: TopbarProps) {
+export function Topbar({ onMac, windowControls = false, paletteShortcut, sidebarShortcut, onSearch, onToggleSidebar }: TopbarProps) {
   return (
     <header
       data-tauri-drag-region
@@ -46,16 +44,7 @@ export function Topbar({ onMac, windowControls = false, paletteShortcut, sidebar
         <span className="flex-1 truncate text-left">Search hosts and commands…</span>
         <Kbd>{paletteShortcut}</Kbd>
       </button>
-      <button
-        type="button"
-        aria-label="Settings"
-        aria-pressed={settingsActive}
-        title="Settings"
-        onClick={onOpenSettings}
-        className={cn("ml-auto grid h-7 w-7 place-items-center rounded-md hover:bg-hover hover:text-fg", settingsActive ? "bg-active text-fg" : "text-fg-muted")}
-      >
-        <SlidersHorizontal size={15} />
-      </button>
+      <span className="ml-auto" />
       {windowControls && <WindowControls />}
     </header>
   );

@@ -73,6 +73,16 @@ pub fn create_dir(path: &Path) -> Result<()> {
     std::fs::create_dir(path).map_err(|e| io_error("create", path, e))
 }
 
+/// Creates an empty file; fails when something already has that name.
+pub fn create_file(path: &Path) -> Result<()> {
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map(|_| ())
+        .map_err(|e| io_error("create", path, e))
+}
+
 pub fn rename(from: &Path, to: &Path) -> Result<()> {
     if to.exists() {
         return Err(CoreError::InvalidData(format!(
@@ -143,6 +153,17 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[test]
+    fn creates_an_empty_file_without_overwriting() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("notes.txt");
+        create_file(&file).unwrap();
+        assert_eq!(std::fs::read(&file).unwrap(), b"");
+        std::fs::write(&file, "keep").unwrap();
+        assert!(create_file(&file).is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "keep");
+    }
+
     #[test]
     fn recursive_removal_never_follows_symlinks() {
         let dir = tempfile::tempdir().unwrap();

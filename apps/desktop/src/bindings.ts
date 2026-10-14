@@ -55,6 +55,15 @@ export const commands = {
 	sftpOpen: (request: OpenSftpRequest) => typedError<OpenSftpOutcome, CommandError>(__TAURI_INVOKE("sftp_open", { request })),
 	/**  A remote text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused. */
 	sftpReadText: (sftpId: number, path: string) => typedError<string, CommandError>(__TAURI_INVOKE("sftp_read_text", { sftpId, path })),
+	sftpCreateFile: (sftpId: number, path: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_create_file", { sftpId, path })),
+	/**
+	 *  Downloads a remote file to a private temporary folder and opens that copy with the default
+	 *  app or `app`. Changes to the copy are not sent back. Returns the local copy's path.
+	 */
+	sftpOpenFile: (sftpId: number, path: string, app: string | null) => typedError<string, CommandError>(__TAURI_INVOKE("sftp_open_file", { sftpId, path, app })),
+	localCreateFile: (path: string) => typedError<null, CommandError>(__TAURI_INVOKE("local_create_file", { path })),
+	/**  Opens a file with the default app, or with `app` (an application path chosen by the user). */
+	localOpenFile: (path: string, app: string | null) => typedError<null, CommandError>(__TAURI_INVOKE("local_open_file", { path, app })),
 	sftpWriteText: (sftpId: number, path: string, text: string) => typedError<null, CommandError>(__TAURI_INVOKE("sftp_write_text", { sftpId, path, text })),
 	/**  A text file for the built-in editor; binary, non-UTF-8 and files over 2 MB are refused. */
 	localReadText: (path: string) => typedError<string, CommandError>(__TAURI_INVOKE("local_read_text", { path })),

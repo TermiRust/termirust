@@ -29,6 +29,24 @@ pub async fn local_create_dir(path: String) -> Result<(), CommandError> {
 
 #[tauri::command]
 #[specta::specta]
+pub async fn local_create_file(path: String) -> Result<(), CommandError> {
+    Ok(local_fs::create_file(Path::new(&path))?)
+}
+
+/// Opens a file with the default app, or with `app` (an application path chosen by the user).
+#[tauri::command]
+#[specta::specta]
+pub async fn local_open_file(path: String, app: Option<String>) -> Result<(), CommandError> {
+    open_with(Path::new(&path), app)
+}
+
+pub(crate) fn open_with(path: &Path, app: Option<String>) -> Result<(), CommandError> {
+    tauri_plugin_opener::open_path(path, app.as_deref())
+        .map_err(|e| CoreError::InvalidData(format!("cannot open {}: {e}", path.display())).into())
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn local_rename(from: String, to: String) -> Result<(), CommandError> {
     Ok(local_fs::rename(Path::new(&from), Path::new(&to))?)
 }
