@@ -11,20 +11,22 @@ interface DialogProps {
   description?: string;
   icon?: ReactNode;
   tone?: "default" | "danger";
-  width?: "sm" | "md" | "lg";
+  width?: "sm" | "md" | "lg" | "xl";
   children: ReactNode;
 }
 
-const widths = { sm: "w-[min(420px,calc(100vw-32px))]", md: "w-[min(520px,calc(100vw-32px))]", lg: "w-[min(640px,calc(100vw-32px))]" };
+const widths = { sm: "w-[min(420px,calc(100vw-32px))]", md: "w-[min(520px,calc(100vw-32px))]", lg: "w-[min(640px,calc(100vw-32px))]", xl: "w-[min(1040px,calc(100vw-32px))]" };
 
 export function Dialog({ open, onOpenChange, title, description, icon, tone = "default", width = "md", children }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 bg-scrim" />
+        {/* Centred by grid, not translate(-50%): a half-pixel offset blurs text in WebKit. */}
+        <div className="pointer-events-none fixed inset-0 grid place-items-center p-4">
         <DialogPrimitive.Content
           className={cn(
-            "motion-dialog fixed top-1/2 left-1/2 flex max-h-[85vh] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-bg shadow-dialog",
+            "motion-dialog pointer-events-auto flex max-h-[85vh] flex-col overflow-hidden rounded-xl border bg-bg shadow-dialog",
             tone === "danger" ? "border-danger-border" : "border-border",
             widths[width],
           )}
@@ -52,6 +54,7 @@ export function Dialog({ open, onOpenChange, title, description, icon, tone = "d
           </div>
           <div className="overflow-y-auto px-5 pt-1 pb-4">{children}</div>
         </DialogPrimitive.Content>
+        </div>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
   );

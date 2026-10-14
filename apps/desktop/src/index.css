@@ -168,16 +168,18 @@ select {
   user-select: text;
 }
 
-:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+/* In the base layer so `outline-none` / `focus-visible:outline-none` on a control can replace it. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
 }
 
 /* Motion: short and calm; switched off when the OS asks for reduced motion. */
 @keyframes fade-in {
   from { opacity: 0; }
 }
-/* Tailwind positions dialogs with the separate `translate` property, so only scale here. */
 @keyframes dialog-in {
   from { opacity: 0; transform: translateY(4px) scale(0.98); }
 }

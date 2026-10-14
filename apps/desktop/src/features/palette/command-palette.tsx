@@ -60,7 +60,7 @@ export function CommandPalette({ open, onOpenChange, ...props }: CommandPaletteP
         <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 bg-scrim" />
         <DialogPrimitive.Content
           aria-label="Command palette"
-          className="motion-rise fixed top-[14vh] left-1/2 w-[min(600px,calc(100vw-32px))] -translate-x-1/2 overflow-hidden rounded-xl border border-border bg-bg shadow-dialog"
+          className="motion-rise fixed inset-x-0 top-[14vh] mx-auto w-[min(600px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-bg shadow-dialog"
         >
           <DialogPrimitive.Title className="sr-only">Command palette</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Search hosts and commands</DialogPrimitive.Description>

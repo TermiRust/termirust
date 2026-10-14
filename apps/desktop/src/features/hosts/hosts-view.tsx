@@ -1,5 +1,5 @@
 import { FileInput, FolderPlus, FolderTree, LayoutGrid, List, Pencil, Plus, Server, Terminal } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type PointerEvent } from "react";
 
 import type { GroupView, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -129,7 +129,7 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
                 </button>
               )}
             </h2>
-            <ul className={mode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2" : "flex flex-col gap-1"}>
+            <ul className={mode === "grid" ? "grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2" : "flex flex-col gap-1"}>
               {items.map((host) => {
                 const actions = (
                   <div className="flex shrink-0 gap-0.5">
@@ -144,22 +144,52 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
                     </button>
                   </div>
                 );
+                const dot = <StatusDot state={hostDot(host.id, tabs)} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-bg-elev" />;
+                const common = {
+                  "aria-label": host.label,
+                  onDoubleClick: () => onOpenHost(host),
+                  onPointerDown: (e: PointerEvent<HTMLLIElement>) => drag.onPointerDown(e, host),
+                  title: `${osName(host.os)} · double-click to connect`,
+                };
+                const frame = "group cursor-default rounded-lg border border-border bg-bg-elev hover:border-border-strong";
+                if (mode === "grid") {
+                  // Stacked card: the label gets the full width and may wrap to two lines.
+                  return (
+                    <li key={host.id} {...common} className={cn(frame, "flex min-w-0 flex-col gap-2 p-3", drag.draggingId === host.id && "opacity-50")}>
+                      <div className="flex min-w-0 items-start gap-2.5">
+                        <span className="relative grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-bg-sunk">
+                          <OsIcon os={host.os} size={22} />
+                          {dot}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="flex items-start gap-1.5 text-[13px] leading-5 font-medium">
+                            <span className="line-clamp-2 min-w-0 break-words">{host.label}</span>
+                            <EnvironmentBadge environment={host.environment} className="mt-0.5" />
+                          </p>
+                          <p className="truncate font-mono text-[11px] text-fg-muted" title={address(host)}>
+                            {address(host)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 items-center gap-1">
+                        <p className="flex min-w-0 flex-1 flex-wrap gap-1" title={host.tags.join(", ")}>
+                          {host.tags.slice(0, 3).map((tag) => (
+                            <span key={tag} className="max-w-full truncate rounded border border-border-strong px-1 text-[10px] text-fg-muted">
+                              {tag}
+                            </span>
+                          ))}
+                          {host.tags.length > 3 && <span className="text-[10px] text-fg-muted">+{host.tags.length - 3}</span>}
+                        </p>
+                        {actions}
+                      </div>
+                    </li>
+                  );
+                }
                 return (
-                  <li
-                    key={host.id}
-                    aria-label={host.label}
-                    onDoubleClick={() => onOpenHost(host)}
-                    onPointerDown={(e) => drag.onPointerDown(e, host)}
-                    className={cn(
-                      "group flex cursor-default items-center gap-3 rounded-lg border border-border bg-bg-elev hover:border-border-strong",
-                      drag.draggingId === host.id && "opacity-50",
-                      mode === "grid" ? "p-3" : "px-3 py-1.5",
-                    )}
-                    title={`${osName(host.os)} · double-click to connect`}
-                  >
-                    <span className={cn("relative grid shrink-0 place-items-center rounded-lg bg-bg-sunk", mode === "grid" ? "h-10 w-10" : "h-7 w-7")}>
-                      <OsIcon os={host.os} size={mode === "grid" ? 22 : 16} />
-                      <StatusDot state={hostDot(host.id, tabs)} className="absolute -right-0.5 -bottom-0.5 ring-2 ring-bg-elev" />
+                  <li key={host.id} {...common} className={cn(frame, "flex items-center gap-3 px-3 py-1.5", drag.draggingId === host.id && "opacity-50")}>
+                    <span className="relative grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-bg-sunk">
+                      <OsIcon os={host.os} size={16} />
+                      {dot}
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 text-[13px] font-medium">
@@ -167,17 +197,8 @@ export function HostsView({ onOpenHost, onOpenSftp }: HostsViewProps) {
                         <EnvironmentBadge environment={host.environment} />
                       </p>
                       <p className="truncate font-mono text-[11px] text-fg-muted">{address(host)}</p>
-                      {mode === "grid" && host.tags.length > 0 && (
-                        <p className="mt-1 flex gap-1 overflow-hidden">
-                          {host.tags.slice(0, 3).map((tag) => (
-                            <span key={tag} className="rounded border border-border-strong px-1 text-[10px] text-fg-muted">
-                              {tag}
-                            </span>
-                          ))}
-                        </p>
-                      )}
                     </div>
-                    {mode === "list" && host.tags.length > 0 && <span className="hidden truncate text-[11px] text-fg-muted sm:block">{host.tags.join(", ")}</span>}
+                    {host.tags.length > 0 && <span className="hidden truncate text-[11px] text-fg-muted sm:block">{host.tags.join(", ")}</span>}
                     {actions}
                   </li>
                 );

@@ -40,7 +40,7 @@ export function Topbar({ onMac, windowControls = false, paletteShortcut, sidebar
         type="button"
         aria-label="Search hosts and commands"
         onClick={onSearch}
-        className="absolute left-1/2 flex h-[26px] w-[min(340px,40vw)] -translate-x-1/2 items-center gap-2 rounded-[7px] border border-border bg-bg px-2.5 text-[12.5px] text-fg-muted transition-colors hover:border-border-strong hover:text-fg-2"
+        className="absolute inset-x-0 mx-auto flex h-[26px] w-[min(340px,40vw)] items-center gap-2 rounded-[7px] border border-border bg-bg px-2.5 text-[12.5px] text-fg-muted transition-colors hover:border-border-strong hover:text-fg-2"
       >
         <Search size={13} />
         <span className="flex-1 truncate text-left">Search hosts and commands…</span>
