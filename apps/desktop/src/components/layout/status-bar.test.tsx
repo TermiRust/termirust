@@ -29,6 +29,7 @@ const tab = (overrides: Partial<Tab>): Tab => ({
   color: null,
   size: { cols: 120, rows: 32 },
   layout: { kind: "pane", id: "p" },
+  paneTargets: {},
   focusedPaneId: "p",
   paneStatus: {},
   broadcast: false,

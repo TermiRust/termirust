@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { HostView } from "@/bindings";
 
-import { useTabsStore } from "./tabs-store";
+import { paneTargetOf, useTabsStore } from "./tabs-store";
 
 const host = (id: string): HostView => ({
   id,
@@ -155,6 +155,21 @@ describe("tabs store", () => {
       const sftp = state().tabs[1]!;
       state().splitPane(sftp.id, "row");
       expect(state().tabs[1]!.layout).toEqual(sftp.layout);
+    });
+
+    it("opens a different server in a split pane, and a plain split repeats the focused pane's server", () => {
+      state().openHostTab(host("web"), null);
+      const first = tab().focusedPaneId;
+      state().splitPane(tab().id, "row", { kind: "host", host: host("db") });
+      const second = tab().focusedPaneId;
+      expect(paneTargetOf(tab(), first)).toMatchObject({ kind: "host", host: { id: "web" } });
+      expect(paneTargetOf(tab(), second)).toMatchObject({ kind: "host", host: { id: "db" } });
+
+      state().splitPane(tab().id, "column");
+      expect(paneTargetOf(tab(), tab().focusedPaneId)).toMatchObject({ kind: "host", host: { id: "db" } });
+
+      state().closePane(tab().id, second);
+      expect(tab().paneTargets[second]).toBeUndefined();
     });
 
     it("moves focus between panes and resizes splits", () => {

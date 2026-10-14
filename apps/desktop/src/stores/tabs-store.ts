@@ -10,6 +10,9 @@ export type TabStatus = "connecting" | "connected" | "disconnected" | "error" | 
 
 export type TabTarget = { kind: "host"; host: HostView } | { kind: "sftp"; host: HostView } | { kind: "local" } | { kind: "lab" };
 
+/** What a terminal pane runs; a split can open a different server or a local shell. */
+export type PaneTarget = { kind: "host"; host: HostView } | { kind: "local" };
+
 export interface Tab {
   id: string;
   title: string;
@@ -18,8 +21,10 @@ export interface Tab {
   color: TabColor | null;
   /** Terminal size in characters, once the terminal has measured itself. */
   size: { cols: number; rows: number } | null;
-  /** Terminal tabs can be split; every pane runs its own session to the same target. */
+  /** Terminal tabs can be split; every pane runs its own session. */
   layout: PaneNode;
+  /** Panes opened on something other than the tab's own target (e.g. comparing servers). */
+  paneTargets: Record<string, PaneTarget>;
   focusedPaneId: string;
   paneStatus: Record<string, TabStatus>;
   /** Keystrokes in the focused pane go to every pane of the tab. */
@@ -27,6 +32,13 @@ export interface Tab {
 }
 
 export const splittable = (tab: Tab) => tab.target.kind === "host" || tab.target.kind === "local";
+
+/** The pane's own target, or the tab's for panes that were not opened on something else. */
+export function paneTargetOf(tab: Pick<Tab, "target" | "paneTargets">, paneId: string): PaneTarget | null {
+  const own = tab.paneTargets[paneId];
+  if (own) return own;
+  return tab.target.kind === "host" || tab.target.kind === "local" ? tab.target : null;
+}
 
 /** Connected while any pane is; otherwise whatever the focused pane reports. */
 function aggregateStatus(tab: Pick<Tab, "paneStatus" | "focusedPaneId" | "status">): TabStatus {
@@ -49,7 +61,8 @@ interface TabsState {
   setTabSize: (id: string, cols: number, rows: number) => void;
   renameTab: (id: string, title: string) => void;
   moveTab: (id: string, toIndex: number) => void;
-  splitPane: (tabId: string, direction: "row" | "column") => void;
+  /** Without a target the new pane repeats the focused pane's target. */
+  splitPane: (tabId: string, direction: "row" | "column", target?: PaneTarget) => void;
   closePane: (tabId: string, paneId: string) => void;
   focusPane: (tabId: string, paneId: string) => void;
   focusNeighbour: (tabId: string, direction: Direction) => void;
@@ -62,12 +75,12 @@ let counter = 0;
 const nextId = () => `tab-${Date.now().toString(36)}-${(counter++).toString(36)}`;
 
 export const useTabsStore = create<TabsState>()((set, get) => {
-  type NewTab = Omit<Tab, "id" | "layout" | "focusedPaneId" | "paneStatus" | "broadcast">;
+  type NewTab = Omit<Tab, "id" | "layout" | "paneTargets" | "focusedPaneId" | "paneStatus" | "broadcast">;
   const open = (tab: NewTab) => {
     const id = nextId();
     const paneId = nextId();
     set((s) => ({
-      tabs: [...s.tabs, { ...tab, id, layout: singlePane(paneId), focusedPaneId: paneId, paneStatus: {}, broadcast: false }],
+      tabs: [...s.tabs, { ...tab, id, layout: singlePane(paneId), paneTargets: {}, focusedPaneId: paneId, paneStatus: {}, broadcast: false }],
       activeTabId: id,
     }));
     return id;
@@ -128,11 +141,13 @@ export const useTabsStore = create<TabsState>()((set, get) => {
       set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: trimmed } : t)) }));
     },
 
-    splitPane: (tabId, direction) =>
+    splitPane: (tabId, direction, target) =>
       updateTab(tabId, (tab) => {
         if (!splittable(tab)) return tab;
         const paneId = nextId();
-        return { ...tab, layout: splitPane(tab.layout, tab.focusedPaneId, direction, paneId, nextId()), focusedPaneId: paneId };
+        const chosen = target ?? paneTargetOf(tab, tab.focusedPaneId);
+        const paneTargets = chosen && chosen !== tab.target ? { ...tab.paneTargets, [paneId]: chosen } : tab.paneTargets;
+        return { ...tab, layout: splitPane(tab.layout, tab.focusedPaneId, direction, paneId, nextId()), paneTargets, focusedPaneId: paneId };
       }),
 
     closePane: (tabId, paneId) => {
@@ -145,8 +160,9 @@ export const useTabsStore = create<TabsState>()((set, get) => {
       }
       updateTab(tabId, (t) => {
         const paneStatus = Object.fromEntries(Object.entries(t.paneStatus).filter(([id]) => id !== paneId));
+        const paneTargets = Object.fromEntries(Object.entries(t.paneTargets).filter(([id]) => id !== paneId));
         const focusedPaneId = t.focusedPaneId === paneId ? (neighbour(t.layout, paneId, "left") ?? neighbour(t.layout, paneId, "up") ?? paneIds(layout)[0] ?? "") : t.focusedPaneId;
-        const next = { ...t, layout, paneStatus, focusedPaneId, broadcast: t.broadcast && paneIds(layout).length > 1 };
+        const next = { ...t, layout, paneStatus, paneTargets, focusedPaneId, broadcast: t.broadcast && paneIds(layout).length > 1 };
         return { ...next, status: aggregateStatus(next) };
       });
     },

@@ -7,7 +7,7 @@ import { dotForStatus, hostDot } from "./host-status";
 
 const host = { id: "h1" } as HostView;
 const tab = (status: TabStatus, kind: "host" | "sftp" | "local" = "host", id = "h1"): Tab =>
-  ({ id: `${kind}-${status}`, title: "", status, color: null, size: null, layout: { kind: "pane", id: "p" }, focusedPaneId: "p", paneStatus: {}, broadcast: false, target: kind === "local" ? { kind } : { kind, host: { ...host, id } } }) as Tab;
+  ({ id: `${kind}-${status}`, title: "", status, color: null, size: null, layout: { kind: "pane", id: "p" }, paneTargets: {}, focusedPaneId: "p", paneStatus: {}, broadcast: false, target: kind === "local" ? { kind } : { kind, host: { ...host, id } } }) as Tab;
 
 describe("host status dots", () => {
   it("maps tab states to colours", () => {
@@ -23,5 +23,16 @@ describe("host status dots", () => {
     expect(hostDot("h1", [tab("error"), tab("connecting")])).toBe("warn");
     expect(hostDot("h1", [tab("disconnected"), tab("connected", "sftp")])).toBe("on");
     expect(hostDot("h1", [tab("disconnected")])).toBe("err");
+  });
+
+  it("counts split panes opened on another host", () => {
+    const split = {
+      ...tab("connected", "host", "h2"),
+      layout: { kind: "split", id: "s", direction: "row", ratio: 0.5, first: { kind: "pane", id: "p" }, second: { kind: "pane", id: "q" } },
+      paneTargets: { q: { kind: "host", host: { ...host, id: "h1" } } },
+      paneStatus: { p: "connected", q: "connecting" },
+    } as Tab;
+    expect(hostDot("h1", [split])).toBe("warn");
+    expect(hostDot("h2", [split])).toBe("on");
   });
 });

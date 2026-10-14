@@ -38,7 +38,7 @@ import { useSettingsStore } from "@/stores/settings-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 import { loadRecentHostIds, rememberRecentHost } from "@/stores/recent-hosts";
-import { useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
+import { paneTargetOf, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 export function AppShell() {
   const sidebarVisible = useLayoutStore((s) => s.sidebarVisible);
@@ -388,9 +388,10 @@ function TabPanel({ tab, active, onStatusChange, onSizeChange, onClose, onOpenSf
           renderPane={(paneId, focused, multiple) => {
             const status = (s: TabStatus) => useTabsStore.getState().setPaneStatus(tab.id, paneId, s);
             const size = focused ? reportSize : undefined;
-            return tab.target.kind === "host" ? (
+            const target = paneTargetOf(tab, paneId);
+            return target?.kind === "host" ? (
               <HostSessionView
-                host={tab.target.host}
+                host={target.host}
                 onStatusChange={status}
                 onSizeChange={size}
                 onOpenSftp={onOpenSftp}

@@ -210,7 +210,7 @@ describe("AppShell warning border", () => {
     const { registerTerminalInput } = await import("@/stores/terminal-inputs");
     const { useSnippetsStore } = await import("@/stores/snippets-store");
     useLayoutStore.setState({ section: "hosts", sidebarVisible: true });
-    useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null, layout: { kind: "pane", id: "p1" }, focusedPaneId: "p1", paneStatus: {}, broadcast: false }], activeTabId: "t1" });
+    useTabsStore.setState({ tabs: [{ id: "t1", title: "Local", target: { kind: "local" }, status: "connected", color: null, size: null, layout: { kind: "pane", id: "p1" }, paneTargets: {}, focusedPaneId: "p1", paneStatus: {}, broadcast: false }], activeTabId: "t1" });
     const send = vi.fn();
     const unregister = registerTerminalInput("t1", send);
     render(<AppShell />);
@@ -328,7 +328,11 @@ describe("AppShell warning border", () => {
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Split pane" }));
+    const picker = within(screen.getByRole("dialog", { name: "Split pane" }));
+    await user.click(picker.getByRole("button", { name: "Stacked" }));
+    await user.click(picker.getByRole("option", { name: "Local terminal" }));
     expect(screen.getAllByText("local shell")).toHaveLength(2);
+    expect(useTabsStore.getState().tabs[0]?.layout).toMatchObject({ kind: "split", direction: "column" });
 
     const host = { id: "h1", label: "api", hostname: "10.0.0.1", port: 22, username: null, auth: { method: "agent" as const }, groupId: null, jumpHostId: null, tags: [], notes: "", keepaliveSecs: null, color: null, aiDisabled: false, os: null, environment: null };
     act(() => {

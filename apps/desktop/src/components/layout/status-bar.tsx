@@ -2,7 +2,7 @@ import { FolderTree, KeyRound, Route, SquareTerminal } from "lucide-react";
 
 import type { HostView } from "@/bindings";
 import { cn } from "@/lib/utils";
-import type { Tab, TabStatus } from "@/stores/tabs-store";
+import { paneTargetOf, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 const dot: Record<TabStatus, string> = {
   connecting: "bg-warn",
@@ -25,8 +25,10 @@ export function StatusBar({ tab, hosts }: StatusBarProps) {
   const parts: React.ReactNode[] = [];
 
   const terminal = tab.target.kind !== "sftp";
-  if (tab.target.kind === "host" || tab.target.kind === "sftp") {
-    const opened = tab.target.host;
+  // A split tab describes its focused pane, which may be on another server.
+  const shown = tab.target.kind === "sftp" ? tab.target : paneTargetOf(tab, tab.focusedPaneId);
+  if (shown?.kind === "host" || shown?.kind === "sftp") {
+    const opened = shown.host;
     const host = hosts.find((h) => h.id === opened.id) ?? opened;
     const jump = host.jumpHostId ? hosts.find((h) => h.id === host.jumpHostId) : undefined;
     parts.push(

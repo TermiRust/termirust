@@ -9,7 +9,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { dotForStatus } from "@/features/hosts/host-status";
 import { splitVisibleTabs, tabCapacity } from "@/features/tabs/tab-overflow";
 import { TabSwitcher } from "@/features/tabs/tab-switcher";
-import { splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
+import { SplitPicker } from "@/features/panes/split-picker";
+import { useHostsStore } from "@/stores/hosts-store";
+import { paneTargetOf, splittable, useTabsStore, type Tab, type TabStatus } from "@/stores/tabs-store";
 
 const statusLabel: Record<TabStatus, string> = {
   connecting: "connecting",
@@ -35,6 +37,8 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
   const [renaming, setRenaming] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [picker, setPicker] = useState<{ right: number; top: number } | null>(null);
+  const hosts = useHostsStore((s) => s.hosts);
   const [width, setWidth] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -166,16 +170,33 @@ export function TabBar({ onRequestClose, onNewLocalTab, splitShortcut }: TabBarP
       <Button size="icon" aria-label="New local terminal" title="New local terminal" onClick={onNewLocalTab} className="mb-1">
         <Plus size={15} />
       </Button>
-      <Button
-        size="icon"
-        aria-label="Split pane"
-        title={splitShortcut ? `Split pane (${splitShortcut})` : "Split pane"}
-        disabled={!activeTab || !splittable(activeTab)}
-        onClick={() => activeTab && useTabsStore.getState().splitPane(activeTab.id, "row")}
-        className="mb-1"
-      >
-        <Columns2 size={15} />
-      </Button>
+      {/* Pinned to the right edge so it never moves as tabs open and close. */}
+      <div className="mb-1 ml-auto flex shrink-0 items-center border-l border-border pl-1.5">
+        <Button
+          size="icon"
+          aria-label="Split pane"
+          aria-haspopup="dialog"
+          aria-expanded={picker !== null}
+          title={splitShortcut ? `Split pane… (${splitShortcut} splits with the same host)` : "Split pane…"}
+          disabled={!activeTab || !splittable(activeTab)}
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setPicker({ right: Math.max(8, window.innerWidth - r.right), top: r.bottom + 4 });
+          }}
+        >
+          <Columns2 size={15} />
+        </Button>
+      </div>
+      {picker && activeTab && (
+        <SplitPicker
+          hosts={hosts}
+          current={paneTargetOf(activeTab, activeTab.focusedPaneId)}
+          right={picker.right}
+          top={picker.top}
+          onClose={() => setPicker(null)}
+          onPick={(target, direction) => useTabsStore.getState().splitPane(activeTab.id, direction, target)}
+        />
+      )}
       <TabSwitcher open={switcherOpen} onOpenChange={setSwitcherOpen} tabs={tabs} activeTabId={activeTabId} onSelect={activateTab} />
     </div>
   );
