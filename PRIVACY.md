@@ -20,9 +20,4 @@ Logs never contain passwords, keys, passphrases or terminal content.
 The AI assistant is off until you add a provider and can be disabled per host. Each
 provider's own privacy policy applies to what it receives.
 
-## Paid sync (future)
-
-The planned sync service will be end-to-end encrypted: the server stores only data
-encrypted with keys it never sees. This document will be updated before it launches.
-
 Questions: open an issue, or see [SECURITY.md](SECURITY.md) for private reports.
