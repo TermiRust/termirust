@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes } from "react";
+import type { ComponentProps } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,6 @@ export const controlClass =
  * Usernames, hostnames, paths and commands are case-sensitive: the OS must not capitalise or
  * "correct" them (macOS does so in web inputs when its text substitutions are on).
  */
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...props }: ComponentProps<"input">) {
   return <input autoCapitalize="off" autoCorrect="off" spellCheck={false} className={cn(controlClass, className)} {...props} />;
 }

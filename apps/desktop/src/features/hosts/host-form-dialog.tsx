@@ -1,5 +1,5 @@
 import { ChevronRight, KeyRound, Lock, Plus, Server, UserRound } from "lucide-react";
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import type { CommandError, HostInput, HostView } from "@/bindings";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { useHostsStore } from "@/stores/hosts-store";
 import { useKeysStore } from "@/stores/keys-store";
 
 import { hostFormValues, hostInputFromForm, type HostFormErrors, type HostFormValues } from "./host-form";
+import { PROXY_PRESETS, fillRange, type ProxyPreset } from "./proxy-presets";
 
 type SaveResult = { status: "ok"; data: HostView } | { status: "error"; error: CommandError };
 type DeleteResult = { status: "ok"; data: null } | { status: "error"; error: CommandError };
@@ -78,6 +79,18 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
   }, [keysLoaded, loadKeys]);
 
   const set = <K extends keyof HostFormValues>(key: K, value: HostFormValues[K]) => setValues((v) => ({ ...v, [key]: value }));
+  const proxyRef = useRef<HTMLInputElement>(null);
+  /** Fills a template and selects the part still to replace (e.g. ZONE), ready to type over. */
+  const applyPreset = (preset: ProxyPreset) => {
+    set("proxyCommand", preset.command);
+    const range = fillRange(preset);
+    requestAnimationFrame(() => {
+      const input = proxyRef.current;
+      if (!input) return;
+      input.focus();
+      if (range) input.setSelectionRange(range[0], range[1]);
+    });
+  };
   const text = (key: TextField) => ({
     "aria-label": fieldLabels[key],
     "aria-invalid": errors[key] ? true : undefined,
@@ -262,8 +275,27 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
             className="col-span-6"
             hint="A local command that carries the connection, as OpenSSH ProxyCommand: %h host, %p port, %r user. E.g. Cloudflare Tunnel."
           >
-            <Input {...text("proxyCommand")} spellCheck={false} placeholder="cloudflared access ssh --hostname %h" className="font-mono text-[12px]" />
+            <Input
+              {...text("proxyCommand")}
+              ref={proxyRef}
+              spellCheck={false}
+              placeholder="cloudflared access ssh --hostname %h"
+              className="font-mono text-[12px]"
+            />
           </Field>
+          <div role="group" aria-label="Proxy command templates" className="col-span-6 -mt-1 flex flex-wrap gap-1.5">
+            {PROXY_PRESETS.map((preset) => (
+              <button
+                key={preset.label}
+                type="button"
+                title={preset.command}
+                onClick={() => applyPreset(preset)}
+                className="rounded-full border border-border bg-bg-elev px-2.5 py-0.5 text-[11.5px] text-fg-2 hover:border-accent hover:text-fg"
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
           <Checkbox
             className="col-span-6"
             label="Turn off AI for this host"

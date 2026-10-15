@@ -129,6 +129,28 @@ describe("Managing hosts and groups", () => {
     );
     expect(screen.getByRole("button", { name: "Connect to web-1" })).toBeInTheDocument();
   });
+  it("fills the proxy command from a template and selects the part to replace", async () => {
+    const { user } = await renderWith([]);
+    commands.hostsCreate.mockImplementation(async (input) => ok(host("new", { label: input.label, hostname: input.hostname })));
+    await user.click(screen.getByRole("button", { name: "New host" }));
+    const dialog = within(screen.getByRole("dialog", { name: "New host" }));
+    await user.type(dialog.getByRole("textbox", { name: "Host" }), "debian.example.app");
+    await user.click(dialog.getByText("Advanced"));
+    const templates = within(dialog.getByRole("group", { name: "Proxy command templates" }));
+    const field = dialog.getByRole("textbox", { name: "Proxy command" }) as HTMLInputElement;
+
+    await user.click(templates.getByRole("button", { name: "Google Cloud IAP" }));
+    await waitFor(() => expect(field).toHaveFocus());
+    expect(field.value.slice(field.selectionStart ?? 0, field.selectionEnd ?? 0)).toBe("ZONE");
+
+    await user.click(templates.getByRole("button", { name: "Cloudflare Tunnel" }));
+    expect(field).toHaveValue("cloudflared access ssh --hostname %h");
+    await user.click(dialog.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(commands.hostsCreate).toHaveBeenCalledWith(expect.objectContaining({ proxyCommand: "cloudflared access ssh --hostname %h" })),
+    );
+  });
+
   it("keeps the dialog open with the field error when validation fails", async () => {
     const { user } = await renderWith([]);
     await user.click(screen.getByRole("button", { name: "New host" }));
