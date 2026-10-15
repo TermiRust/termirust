@@ -53,44 +53,47 @@ you to create an account or hand your credentials to anyone's cloud.
 
 ## Features
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <b>Monitor your servers at a glance</b><br>
-      CPU, memory, swap, disk, uptime and top processes for several servers, refreshed every 10 seconds — read over a separate channel, so nothing appears in your terminals.<br><br>
-      <img src="assets/screenshots/monitor.webp" alt="Monitor grid with CPU, memory and disk per server">
-    </td>
-    <td width="50%" valign="top">
-      <b>A host library that stays organised</b><br>
-      Groups, tags, OS icons detected on first connect, PROD / STAGING markers with a terminal watermark, and one-click import from <code>~/.ssh/config</code>.<br><br>
-      <img src="assets/screenshots/hosts.webp" alt="Host library grouped into Production, Staging and Home lab">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <b>SFTP without leaving the app</b><br>
-      Two-panel browser with drag and drop, a transfer queue, a right-click menu, in-place editing of text files and “open with” any app.<br><br>
-      <img src="assets/screenshots/sftp.webp" alt="Two-panel SFTP browser">
-    </td>
-    <td width="50%" valign="top">
-      <b>An AI assistant that respects your secrets</b><br>
-      Optional and bring-your-own-key (Anthropic, OpenAI, DeepSeek, Gemini, Ollama or any OpenAI-compatible endpoint). Quote terminal lines, get commands you can insert; secrets are masked before anything is sent.<br><br>
-      <img src="assets/screenshots/ai.webp" alt="AI assistant explaining a failed container next to the terminal">
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <b>Connections that explain themselves</b><br>
-      Step-by-step connection progress and a plain-language log: which route, which server identity, which key — and what to fix when a login fails.<br><br>
-      <img src="assets/screenshots/connect.webp" alt="Connection steps and login log">
-    </td>
-    <td width="50%" valign="top">
-      <b>Keys in an encrypted keychain</b><br>
-      Import or generate Ed25519 keys, keep passphrases encrypted, see which hosts use which key. Private keys never reach the UI.<br><br>
-      <img src="assets/screenshots/keychain.webp" alt="Keychain with SSH keys">
-    </td>
-  </tr>
-</table>
+### 📊 Monitor your servers at a glance
+
+CPU, memory, swap, disk, uptime and top processes for several servers, refreshed every 10 seconds —
+read over a separate channel, so nothing appears in your terminals.
+
+<img src="assets/screenshots/monitor.webp" alt="Monitor grid with CPU, memory and disk per server">
+
+### 🗂️ A host library that stays organised
+
+Groups, tags, OS icons detected on first connect, PROD / STAGING markers with a terminal watermark,
+and one-click import from `~/.ssh/config`.
+
+<img src="assets/screenshots/hosts.webp" alt="Host library grouped into Production, Staging and Home lab">
+
+### 📁 SFTP without leaving the app
+
+Two-panel browser with drag and drop, a transfer queue, a right-click menu, in-place editing of text
+files and “open with” any app.
+
+<img src="assets/screenshots/sftp.webp" alt="Two-panel SFTP browser">
+
+### 🤖 An AI assistant that respects your secrets
+
+Optional and bring-your-own-key (Anthropic, OpenAI, DeepSeek, Gemini, Ollama or any OpenAI-compatible
+endpoint). Quote terminal lines, get commands you can insert; secrets are masked before anything is sent.
+
+<img src="assets/screenshots/ai.webp" alt="AI assistant explaining a failed container next to the terminal">
+
+### 🔌 Connections that explain themselves
+
+Step-by-step connection progress and a plain-language log: which route, which server identity, which
+key — and what to fix when a login fails.
+
+<img src="assets/screenshots/connect.webp" alt="Connection steps and login log">
+
+### 🔑 Keys in an encrypted keychain
+
+Import or generate Ed25519 keys, keep passphrases encrypted, see which hosts use which key. Private
+keys never reach the UI.
+
+<img src="assets/screenshots/keychain.webp" alt="Keychain with SSH keys">
 
 **Also inside:** split panes with broadcast input · tabs that shrink into a searchable switcher ·
 jump hosts and OpenSSH `ProxyCommand` (Cloudflare Tunnel, AWS SSM, GCP IAP templates) · local,
