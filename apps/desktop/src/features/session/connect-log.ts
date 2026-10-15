@@ -33,8 +33,13 @@ export function stepOf(progress: ConnectProgress): StepIndex {
   }
 }
 
-/** One plain-language log line per progress event. */
-export function describeProgress(progress: ConnectProgress): Omit<LogLine, "at"> {
+/** The offered key as the user knows it: `"vps" (SHA256:…)`, or just the fingerprint. */
+function keyName(fingerprint: string, label: string | null | undefined): string {
+  return label ? `"${label}" (${fingerprint})` : fingerprint;
+}
+
+/** One plain-language log line per progress event; `labelOf` names a key by its fingerprint. */
+export function describeProgress(progress: ConnectProgress, labelOf: (fingerprint: string) => string | null = () => null): Omit<LogLine, "at"> {
   switch (progress.kind) {
     case "started": {
       const where = `${progress.host}:${progress.port}`;
@@ -46,8 +51,13 @@ export function describeProgress(progress: ConnectProgress): Omit<LogLine, "at">
       return { level: "ok", text: `Reached ${progress.host}; starting a secure session` };
     case "serverIdentity":
       return { level: "info", text: `Server identity: ${progress.algorithm} ${progress.fingerprint}` };
-    case "authenticating":
-      return { level: "info", text: `Logging in as ${progress.user} with ${METHOD[progress.method] ?? progress.method}…` };
+    case "authenticating": {
+      const how =
+        progress.method === "key" && progress.keyFingerprint
+          ? `SSH key ${keyName(progress.keyFingerprint, labelOf(progress.keyFingerprint))}`
+          : (METHOD[progress.method] ?? progress.method);
+      return { level: "info", text: `Logging in as ${progress.user} with ${how}…` };
+    }
     case "authenticated":
       return { level: "ok", text: `Logged in to ${progress.host} as ${progress.user}` };
     case "openingShell":
@@ -61,9 +71,20 @@ interface Target {
   username: string | null;
 }
 
-/** A failure in plain words, with what to try next. */
-export function explainError(error: Pick<CommandError, "code" | "message">, target: Target): Omit<LogLine, "at"> {
-  const m = error.message;
+export interface OfferedKey {
+  fingerprint: string;
+  label: string | null;
+}
+
+/** "invalid data: port must be…" → "Port must be…": the error kind is not for people. */
+function plainMessage(message: string): string {
+  const text = message.replace(/^invalid data:\s*/i, "");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** A failure in plain words, with what to try next; `offered` names the key the server refused. */
+export function explainError(error: Pick<CommandError, "code" | "message">, target: Target, offered?: OfferedKey | null): Omit<LogLine, "at"> {
+  const m = plainMessage(error.message);
   const lower = m.toLowerCase();
   const where = `${target.hostname}:${target.port}`;
   const user = target.username ?? "the user";
@@ -104,8 +125,10 @@ export function explainError(error: Pick<CommandError, "code" | "message">, targ
       if (lower.includes("did not accept the key")) {
         return {
           level: "error",
-          text: m.charAt(0).toUpperCase() + m.slice(1),
-          hint: `Check that the username "${user}" is right (case-sensitive) and that this key's public half is in ~/.ssh/authorized_keys for that user.`,
+          text: offered ? `${target.hostname} rejected the key ${keyName(offered.fingerprint, offered.label)} for user ${user}.` : m,
+          hint:
+            `That key's public half must be in ~/.ssh/authorized_keys for "${user}" on the server (usernames are case-sensitive). ` +
+            "If ssh works from a terminal, it is probably using a different key: import that one (often ~/.ssh/id_ed25519) and choose it for this host.",
         };
       }
       return { level: "error", text: m };

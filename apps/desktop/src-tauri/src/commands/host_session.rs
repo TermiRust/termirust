@@ -376,11 +376,13 @@ pub enum ConnectProgress {
         algorithm: String,
         fingerprint: String,
     },
-    /// `method`: "password", "key" or "agent".
+    /// `method`: "password", "key" or "agent"; `keyFingerprint` for key logins.
+    #[serde(rename_all = "camelCase")]
     Authenticating {
         host: String,
         user: String,
         method: String,
+        key_fingerprint: Option<String>,
     },
     Authenticated {
         host: String,
@@ -411,10 +413,16 @@ impl From<ConnectStep> for ConnectProgress {
                 algorithm,
                 fingerprint,
             },
-            ConnectStep::Authenticating { host, user, method } => ConnectProgress::Authenticating {
+            ConnectStep::Authenticating {
+                host,
+                user,
+                method,
+                key_fingerprint,
+            } => ConnectProgress::Authenticating {
                 host,
                 user,
                 method: method.into(),
+                key_fingerprint,
             },
             ConnectStep::Authenticated { host, user } => {
                 ConnectProgress::Authenticated { host, user }

@@ -5,7 +5,9 @@ import { commands, type ConnectProgress, type HostView, type PromptedLogin } fro
 import type { TerminalSize } from "@/features/terminal/terminal-view";
 import { toBytes } from "@/features/terminal/to-bytes";
 
-import { describeProgress, explainError, stepOf, type LogLine, type StepIndex } from "./connect-log";
+import { useKeysStore } from "@/stores/keys-store";
+
+import { describeProgress, explainError, stepOf, type LogLine, type OfferedKey, type StepIndex } from "./connect-log";
 import { hostPromptOf, type HostPrompt } from "./host-prompt";
 
 /** What the step-by-step display shows for the current connection attempt. */
@@ -19,6 +21,15 @@ export interface ConnectTrace {
 }
 
 const EMPTY_TRACE: ConnectTrace = { lines: [], step: 0, waiting: false, failed: false };
+
+/** The key the server refused, named now if the Keychain list arrived after it was offered. */
+function offeredKey(ref: { current: OfferedKey | null }): OfferedKey | null {
+  const key = ref.current;
+  return key && { ...key, label: key.label ?? keyLabel(key.fingerprint) };
+}
+
+/** Names a key by fingerprint from the app's Keychain, when it is there. */
+const keyLabel = (fingerprint: string) => useKeysStore.getState().keys.find((k) => k.fingerprint === fingerprint)?.label ?? null;
 
 const PROMPT_LINES: Record<HostPrompt["phase"], { step: StepIndex; text: string }> = {
   needsPassword: { step: 3, text: "Waiting for your password" },
@@ -60,6 +71,8 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
   const sessionIdRef = useRef<number | null>(null);
   const unsentAckRef = useRef(0);
   const attemptRef = useRef<Attempt>({ prompted: null, confirmedFingerprint: null, rememberHostKey: true });
+  // The key last offered to the server, so a rejection can say which one.
+  const offeredRef = useRef<OfferedKey | null>(null);
   const startedRef = useRef(false);
   const unmountedRef = useRef(false);
   const everConnectedRef = useRef(false);
@@ -85,6 +98,9 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
       attemptRef.current = attempt;
       const add = (line: Omit<LogLine, "at">, patch: Partial<ConnectTrace> = {}) =>
         setTrace((t) => ({ ...t, ...patch, lines: [...t.lines, { ...line, at: Date.now() }] }));
+      offeredRef.current = null;
+      // Key labels make the log readable; the Keychain list may not be loaded yet.
+      if (!useKeysStore.getState().loaded) void useKeysStore.getState().load().catch(() => {});
       if (fresh) setTrace({ ...EMPTY_TRACE, lines: [{ at: Date.now(), level: "info", text: `Opening a session to ${hostRef.current.label}` }] });
       else setTrace((t) => ({ ...t, waiting: false, failed: false }));
 
@@ -105,10 +121,13 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
       const onProgress = new Channel<ConnectProgress>();
       onProgress.onmessage = (progress) => {
         const step = stepOf(progress);
+        if (progress.kind === "authenticating" && progress.keyFingerprint) {
+          offeredRef.current = { fingerprint: progress.keyFingerprint, label: keyLabel(progress.keyFingerprint) };
+        }
         setTrace((t) => ({
           ...t,
           step: (Math.max(t.step, step) as StepIndex),
-          lines: [...t.lines, { ...describeProgress(progress), at: Date.now() }],
+          lines: [...t.lines, { ...describeProgress(progress, keyLabel), at: Date.now() }],
         }));
       };
 
@@ -128,7 +147,7 @@ export function useHostSession(host: HostView, getTerminal: () => HostSessionTer
       );
 
       if (result.status === "error") {
-        add(explainError(result.error, hostRef.current), { failed: true });
+        add(explainError(result.error, hostRef.current, offeredKey(offeredRef)), { failed: true });
         setState({ phase: "error", message: result.error.message });
         return;
       }

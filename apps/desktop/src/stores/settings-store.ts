@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 import { commands, type TerminalSettings } from "@/bindings";
+import { loadThemeCache, saveThemeCache } from "@/lib/theme-cache";
 
 /** Terminal settings with every field present (the generated type marks them optional). */
 export type ResolvedTerminalSettings = { [K in keyof TerminalSettings]-?: NonNullable<TerminalSettings[K]> };
@@ -37,13 +38,21 @@ interface SettingsState {
   updateTerminal: (patch: Partial<ResolvedTerminalSettings>) => Promise<void>;
 }
 
+/** Settings as read from the vault; the theme is also copied for the next start-up. */
+function stored(raw: TerminalSettings): ResolvedTerminalSettings {
+  const terminal = resolveTerminalSettings(raw);
+  saveThemeCache({ appTheme: terminal.appTheme, customThemes: terminal.customThemes });
+  return terminal;
+}
+
 export const useSettingsStore = create<SettingsState>()((set, get) => ({
-  terminal: DEFAULT_TERMINAL_SETTINGS,
+  // Until the vault opens, use the theme seen last time instead of flashing the default.
+  terminal: { ...DEFAULT_TERMINAL_SETTINGS, ...loadThemeCache() },
   error: null,
 
   load: async () => {
     const result = await commands.settingsTerminalGet();
-    if (result.status === "ok") set({ terminal: resolveTerminalSettings(result.data), error: null });
+    if (result.status === "ok") set({ terminal: stored(result.data), error: null });
     else set({ error: result.error.message });
   },
 
@@ -51,7 +60,7 @@ export const useSettingsStore = create<SettingsState>()((set, get) => ({
     const next = { ...get().terminal, ...patch };
     set({ terminal: next });
     const result = await commands.settingsTerminalSet(next);
-    if (result.status === "ok") set({ terminal: resolveTerminalSettings(result.data), error: null });
+    if (result.status === "ok") set({ terminal: stored(result.data), error: null });
     else set({ error: result.error.message });
   },
 }));

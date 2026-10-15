@@ -277,3 +277,32 @@ async fn stops_at_authentication_when_the_password_is_wrong() {
         })
     ));
 }
+
+#[tokio::test]
+async fn names_the_key_it_offered_when_the_server_rejects_it() {
+    use termirust_core::ssh::{ConnectStep, SshConnection, generate_ed25519};
+
+    let stranger = generate_ed25519("not-authorized").unwrap();
+    let (observe, steps) = recorder();
+    let login = jump_login(LoginMethod::PrivateKey {
+        pem: stranger.private_key.clone(),
+        passphrase: None,
+    });
+    let err = SshConnection::open_observed(None, &login, accept_all(), TIMEOUT, Some(observe))
+        .await
+        .err()
+        .unwrap();
+    assert!(matches!(err, CoreError::AuthenticationFailed));
+    let steps = steps.lock().unwrap();
+    match steps.last() {
+        Some(ConnectStep::Authenticating {
+            method: "key",
+            key_fingerprint,
+            ..
+        }) => assert_eq!(
+            key_fingerprint.as_deref(),
+            Some(stranger.info.fingerprint.as_str())
+        ),
+        other => panic!("unexpected last step: {other:?}"),
+    }
+}

@@ -241,8 +241,8 @@ export type CommandErrorCode = "unreachable" | "timeout" | "authentication_faile
 export type ConnectProgress = 
 /**  `via`: "direct", "proxy" or the jump host's address. */
 { kind: "started"; host: string; port: number; via: string } | { kind: "reached"; host: string } | { kind: "serverIdentity"; host: string; algorithm: string; fingerprint: string } | 
-/**  `method`: "password", "key" or "agent". */
-{ kind: "authenticating"; host: string; user: string; method: string } | { kind: "authenticated"; host: string; user: string } | { kind: "openingShell" };
+/**  `method`: "password", "key" or "agent"; `keyFingerprint` for key logins. */
+{ kind: "authenticating"; host: string; user: string; method: string; keyFingerprint: string | null } | { kind: "authenticated"; host: string; user: string } | { kind: "openingShell" };
 
 export type CursorStyle = "block" | "bar" | "underline";
 

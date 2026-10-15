@@ -30,6 +30,26 @@ describe("settings store", () => {
     expect(commands.settingsTerminalSet).toHaveBeenCalledWith(expect.objectContaining({ fontSize: 99 }));
   });
 
+  it("copies the app theme aside on every load and save, for the next start-up", async () => {
+    localStorage.clear();
+    commands.settingsTerminalGet.mockResolvedValue({ status: "ok", data: { ...DEFAULT_TERMINAL_SETTINGS, appTheme: "tokyo-night" } });
+    await useSettingsStore.getState().load();
+    expect(JSON.parse(localStorage.getItem("termirust.theme") ?? "{}")).toMatchObject({ appTheme: "tokyo-night" });
+
+    commands.settingsTerminalSet.mockResolvedValue({ status: "ok", data: { ...DEFAULT_TERMINAL_SETTINGS, appTheme: "light" } });
+    await useSettingsStore.getState().updateTerminal({ appTheme: "light" });
+    expect(JSON.parse(localStorage.getItem("termirust.theme") ?? "{}")).toMatchObject({ appTheme: "light" });
+  });
+
+  it("starts with the cached theme before the vault answers", async () => {
+    localStorage.setItem("termirust.theme", JSON.stringify({ appTheme: "tokyo-night", customThemes: [] }));
+    vi.resetModules();
+    const fresh = await import("./settings-store");
+    expect(fresh.useSettingsStore.getState().terminal.appTheme).toBe("tokyo-night");
+    expect(fresh.useSettingsStore.getState().terminal.fontSize).toBe(DEFAULT_TERMINAL_SETTINGS.fontSize);
+    localStorage.clear();
+  });
+
   it("fills fields the backend left out or null with defaults", () => {
     expect(resolveTerminalSettings({ fontSize: 16, lineHeight: null })).toEqual({ ...DEFAULT_TERMINAL_SETTINGS, fontSize: 16 });
   });

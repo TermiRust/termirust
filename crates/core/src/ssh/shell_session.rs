@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use russh::client::{self, Handle, Handler};
 use russh::keys::agent::AgentIdentity;
-use russh::keys::{PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
+use russh::keys::{HashAlg, PrivateKey, PrivateKeyWithHashAlg, PublicKeyOrCertificate};
 use russh::{ChannelMsg, ChannelWriteHalf, Disconnect};
 use tokio::sync::mpsc;
 
@@ -140,10 +140,12 @@ pub enum ConnectStep {
         algorithm: String,
         fingerprint: String,
     },
+    /// `key_fingerprint`: the SHA256 fingerprint of the key offered, for key logins.
     Authenticating {
         host: String,
         user: String,
         method: &'static str,
+        key_fingerprint: Option<String>,
     },
     Authenticated {
         host: String,
@@ -442,6 +444,9 @@ async fn establish(
             LoginMethod::PrivateKey { .. } => "key",
             LoginMethod::Agent { .. } => "agent",
         },
+        key_fingerprint: private_key
+            .as_ref()
+            .map(|k| k.public_key().fingerprint(HashAlg::Sha256).to_string()),
     });
     if !authenticate(&mut connection, login, private_key).await? {
         return Err(CoreError::AuthenticationFailed);

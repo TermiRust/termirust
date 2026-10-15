@@ -273,8 +273,24 @@ describe("HostSessionView", () => {
     render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
     await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("error"));
     const panel = within(screen.getByRole("region", { name: "Connection progress" }));
-    expect(panel.getByRole("list", { name: "Connection log" })).toHaveTextContent("agent not supported");
+    expect(panel.getByRole("list", { name: "Connection log" })).toHaveTextContent("Agent not supported");
     expect(panel.getByRole("listitem", { current: "step" })).toHaveAttribute("data-state", "failed");
+  });
+
+  it("names the refused key by its Keychain label", async () => {
+    const { useKeysStore } = await import("@/stores/keys-store");
+    useKeysStore.setState({ loaded: true, keys: [{ id: "k1", label: "vps", keyType: "ssh-ed25519", fingerprint: "SHA256:abc", publicKey: "", encrypted: false, hasSavedPassphrase: false, usedBy: [] }] });
+    FakeChannel.created = [];
+    let respond: (v: unknown) => void = () => {};
+    commands.sessionOpenHost.mockReturnValueOnce(new Promise((r) => (respond = r)));
+    render(<HostSessionView host={host} />);
+    const panel = within(await screen.findByRole("region", { name: "Connection progress" }));
+    act(() => (FakeChannel.created.at(-1) as FakeChannel<unknown>).emit({ kind: "authenticating", host: "10.0.0.1", user: "root", method: "key", keyFingerprint: "SHA256:abc" }));
+    const log = panel.getByRole("list", { name: "Connection log" });
+    expect(log).toHaveTextContent('Logging in as root with SSH key "vps" (SHA256:abc)…');
+    await act(async () => respond({ status: "error", error: { code: "invalid_data", message: "invalid data: 10.0.0.1 did not accept the key for user root" } }));
+    expect(log).toHaveTextContent('10.0.0.1 rejected the key "vps" (SHA256:abc)');
+    useKeysStore.setState({ loaded: false, keys: [] });
   });
 
   it("walks the steps and explains a rejected login in plain words", async () => {
@@ -292,17 +308,19 @@ describe("HostSessionView", () => {
       progress.emit({ kind: "started", host: "10.0.0.1", port: 22, via: "direct" });
       progress.emit({ kind: "reached", host: "10.0.0.1" });
       progress.emit({ kind: "serverIdentity", host: "10.0.0.1", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" });
-      progress.emit({ kind: "authenticating", host: "10.0.0.1", user: "Root", method: "key" });
+      progress.emit({ kind: "authenticating", host: "10.0.0.1", user: "Root", method: "key", keyFingerprint: "SHA256:abc" });
     });
     expect(steps().map((li) => li.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "pending"]);
     const log = panel.getByRole("list", { name: "Connection log" });
     expect(log).toHaveTextContent("Connecting to 10.0.0.1:22…");
     expect(log).toHaveTextContent("Server identity: ssh-ed25519 SHA256:abc");
-    expect(log).toHaveTextContent("Logging in as Root with SSH key…");
+    expect(log).toHaveTextContent("Logging in as Root with SSH key SHA256:abc…");
 
-    await act(async () => respond({ status: "error", error: { code: "invalid_data", message: "10.0.0.1 did not accept the key for user Root" } }));
+    await act(async () => respond({ status: "error", error: { code: "invalid_data", message: "invalid data: 10.0.0.1 did not accept the key for user Root" } }));
     expect(steps()[3]).toHaveAttribute("data-state", "failed");
-    expect(log).toHaveTextContent('Check that the username "Root" is right (case-sensitive)');
+    expect(log).toHaveTextContent("10.0.0.1 rejected the key SHA256:abc for user Root.");
+    expect(log).not.toHaveTextContent(/invalid data/i);
+    expect(log).toHaveTextContent("authorized_keys");
 
     await user.click(panel.getByRole("button", { name: "Try again" }));
     expect(await screen.findByRole("button", { name: "Disconnect" })).toBeInTheDocument();
