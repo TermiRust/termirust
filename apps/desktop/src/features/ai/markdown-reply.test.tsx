@@ -41,6 +41,14 @@ describe("MarkdownReply", () => {
     expect(screen.getByText("sudo lsof -i :80")).toBeInTheDocument();
   });
 
+  it("keeps numbering across a code block between list items", () => {
+    const steps = ["1. Check it:", "```sh", "uptime", "```", "2. Then restart:", "```sh", "sudo systemctl restart app", "```"].join("\n");
+    const { container } = render(<MarkdownReply text={steps} commands={[]} onInsert={vi.fn()} />);
+    const lists = container.querySelectorAll("ol");
+    expect(lists).toHaveLength(2);
+    expect(lists[1]).toHaveAttribute("start", "2");
+  });
+
   it("never renders raw HTML", () => {
     const { container } = render(<MarkdownReply text={reply} commands={[]} onInsert={vi.fn()} />);
     expect(container.querySelector("script")).toBeNull();

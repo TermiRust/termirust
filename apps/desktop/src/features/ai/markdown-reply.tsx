@@ -72,7 +72,12 @@ const COMPONENTS: Components = {
   pre: ({ children }) => <>{children}</>,
   code: ({ className, children }) => <CodeRenderer className={className}>{children}</CodeRenderer>,
   ul: ({ children }) => <ul className="my-1.5 list-disc pl-5">{children}</ul>,
-  ol: ({ children }) => <ol className="my-1.5 list-decimal pl-5">{children}</ol>,
+  // `start` continues the numbering when a code block splits one list in two.
+  ol: ({ children, start }) => (
+    <ol start={start} className="my-1.5 list-decimal pl-5">
+      {children}
+    </ol>
+  ),
   li: ({ children }) => <li className="my-0.5">{children}</li>,
   p: ({ children }) => <p className="my-1.5">{children}</p>,
   h1: ({ children }) => <h3 className="mt-3 mb-1 text-[14px] font-semibold">{children}</h3>,
