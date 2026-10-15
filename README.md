@@ -103,8 +103,6 @@ signed automatic updates.
 
 ## Security
 
-<img src="assets/screenshots/onboarding.webp" alt="First launch explaining how Termirust protects your data" align="right" width="46%">
-
 - **Per-item encryption.** Each vault item is encrypted on its own with XChaCha20-Poly1305.
 - **Key in the OS keychain.** macOS Keychain, Windows Credential Manager or the Secret Service on
   Linux hold the vault key; Termirust never sees your login password.
@@ -120,7 +118,7 @@ signed automatic updates.
 See [PRIVACY.md](PRIVACY.md) for everything that leaves your machine, and [SECURITY.md](SECURITY.md)
 to report a vulnerability privately.
 
-<br clear="right">
+<img src="assets/screenshots/onboarding.webp" alt="First launch explaining how Termirust protects your data">
 
 ## Platforms
 
