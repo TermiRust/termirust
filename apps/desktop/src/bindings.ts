@@ -6,7 +6,7 @@ import { invoke as __TAURI_INVOKE, Channel } from "@tauri-apps/api/core";
 export const commands = {
 	appVersion: () => __TAURI_INVOKE<string>("app_version"),
 	sessionOpenWithPassword: (request: PasswordSessionRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenSessionOutcome, CommandError>(__TAURI_INVOKE("session_open_with_password", { request, onOutput, onClosed })),
-	sessionOpenHost: (request: OpenHostRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<OpenHostOutcome, CommandError>(__TAURI_INVOKE("session_open_host", { request, onOutput, onClosed })),
+	sessionOpenHost: (request: OpenHostRequest, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>, onProgress: Channel<ConnectProgress>) => typedError<OpenHostOutcome, CommandError>(__TAURI_INVOKE("session_open_host", { request, onOutput, onClosed, onProgress })),
 	/**  Opens the user's login shell on this machine in a new session. */
 	sessionOpenLocal: (cols: number, rows: number, onOutput: Channel<number[]>, onClosed: Channel<SessionClosed>) => typedError<number, CommandError>(__TAURI_INVOKE("session_open_local", { cols, rows, onOutput, onClosed })),
 	sessionWrite: (sessionId: number, data: string) => typedError<null, CommandError>(__TAURI_INVOKE("session_write", { sessionId, data })),
@@ -236,6 +236,13 @@ export type CommandError = {
 };
 
 export type CommandErrorCode = "unreachable" | "timeout" | "authentication_failed" | "host_key_rejected" | "session_not_found" | "session_closed" | "ssh" | "storage" | "vault_key_missing" | "wrong_vault_key" | "keychain" | "decryption_failed" | "not_found" | "invalid_data" | "passphrase_required" | "wrong_passphrase" | "agent_unavailable" | "local_shell" | "sftp" | "cancelled" | "port_forward" | "ai" | "internal";
+
+/**  One step of connecting, for the terminal's step-by-step display and login log. */
+export type ConnectProgress = 
+/**  `via`: "direct", "proxy" or the jump host's address. */
+{ kind: "started"; host: string; port: number; via: string } | { kind: "reached"; host: string } | { kind: "serverIdentity"; host: string; algorithm: string; fingerprint: string } | 
+/**  `method`: "password", "key" or "agent". */
+{ kind: "authenticating"; host: string; user: string; method: string } | { kind: "authenticated"; host: string; user: string } | { kind: "openingShell" };
 
 export type CursorStyle = "block" | "bar" | "underline";
 

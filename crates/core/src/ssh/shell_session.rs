@@ -114,6 +114,45 @@ impl From<&PasswordLogin> for SshLogin {
     }
 }
 
+/// How a connection reaches its server.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectRoute {
+    Direct,
+    /// Through an SSH jump host, named by its address.
+    Jump(String),
+    ProxyCommand,
+}
+
+/// Milestones of connecting, for a step-by-step display. The jump hop reports its own.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectStep {
+    Started {
+        host: String,
+        port: u16,
+        route: ConnectRoute,
+    },
+    /// A network path to the SSH server exists (TCP, tunnel or proxy command).
+    Reached {
+        host: String,
+    },
+    ServerIdentity {
+        host: String,
+        algorithm: String,
+        fingerprint: String,
+    },
+    Authenticating {
+        host: String,
+        user: String,
+        method: &'static str,
+    },
+    Authenticated {
+        host: String,
+        user: String,
+    },
+}
+
+pub type ConnectObserver = Arc<dyn Fn(ConnectStep) + Send + Sync>;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ShellEvent {
     Output(Vec<u8>),
@@ -175,6 +214,18 @@ impl SshConnection {
         verify_host_key: HostKeyVerifier,
         connect_timeout: Duration,
     ) -> Result<Self> {
+        Self::open_observed(jump, login, verify_host_key, connect_timeout, None).await
+    }
+
+    /// Like [`open`](Self::open), reporting each milestone to `observer`.
+    pub async fn open_observed(
+        jump: Option<JumpHop<'_>>,
+        login: &SshLogin,
+        verify_host_key: HostKeyVerifier,
+        connect_timeout: Duration,
+        observer: Option<ConnectObserver>,
+    ) -> Result<Self> {
+        let jump_name = jump.as_ref().map(|hop| hop.login.host.clone());
         let jump = match jump {
             Some(hop) => Some(
                 establish(
@@ -183,6 +234,8 @@ impl SshConnection {
                     connect_timeout,
                     None,
                     Default::default(),
+                    observer.clone(),
+                    None,
                 )
                 .await
                 .map_err(|e| CoreError::JumpHost(Box::new(e)))?,
@@ -196,6 +249,8 @@ impl SshConnection {
             connect_timeout,
             jump.as_ref(),
             remote_forwards.clone(),
+            observer,
+            jump_name,
         )
         .await?;
         Ok(Self {
@@ -249,13 +304,47 @@ fn keepalive_interval(secs: Option<u32>) -> Option<Duration> {
 }
 
 /// Connects (directly or through an open jump connection) and authenticates.
+#[allow(clippy::too_many_arguments)]
 async fn establish(
     login: &SshLogin,
     verify_host_key: HostKeyVerifier,
     connect_timeout: Duration,
     through: Option<&Handle<ClientHandler>>,
     remote_forwards: crate::forward::RemoteForwardRouter,
+    observer: Option<ConnectObserver>,
+    jump_name: Option<String>,
 ) -> Result<Handle<ClientHandler>> {
+    let report = |step: ConnectStep| {
+        if let Some(observe) = &observer {
+            observe(step);
+        }
+    };
+    let route = match (&jump_name, &login.proxy_command) {
+        (Some(jump), _) if through.is_some() => ConnectRoute::Jump(jump.clone()),
+        (_, Some(_)) if through.is_none() => ConnectRoute::ProxyCommand,
+        _ => ConnectRoute::Direct,
+    };
+    report(ConnectStep::Started {
+        host: login.host.clone(),
+        port: login.port,
+        route,
+    });
+    // The host key check is the moment the server's identity is known.
+    let verify_host_key: HostKeyVerifier = match &observer {
+        Some(observe) => {
+            let observe = observe.clone();
+            let host = login.host.clone();
+            Arc::new(move |info: &HostKeyInfo| {
+                observe(ConnectStep::ServerIdentity {
+                    host: host.clone(),
+                    algorithm: info.algorithm.clone(),
+                    fingerprint: info.fingerprint.clone(),
+                });
+                verify_host_key(info)
+            })
+        }
+        None => verify_host_key,
+    };
     // Fail on a bad key or passphrase before touching the network.
     let private_key = match &login.method {
         LoginMethod::PrivateKey { pem, passphrase } => {
@@ -290,6 +379,9 @@ async fn establish(
                 let command =
                     expand_proxy_command(template, &login.host, login.port, &login.username);
                 let (stream, stderr) = spawn_proxy(&command)?;
+                report(ConnectStep::Reached {
+                    host: login.host.clone(),
+                });
                 client::connect_stream(config, stream, handler)
                     .await
                     .map_err(|err| match err {
@@ -305,9 +397,18 @@ async fn establish(
                         other => map_connect_error(other),
                     })
             }
-            (None, None) => client::connect(config, (login.host.as_str(), login.port), handler)
-                .await
-                .map_err(map_connect_error),
+            (None, None) => {
+                let tcp = tokio::net::TcpStream::connect((login.host.as_str(), login.port))
+                    .await
+                    .map_err(|e| unreachable(e.to_string()))?;
+                let _ = tcp.set_nodelay(true);
+                report(ConnectStep::Reached {
+                    host: login.host.clone(),
+                });
+                client::connect_stream(config, tcp, handler)
+                    .await
+                    .map_err(map_connect_error)
+            }
             (Some(jump), _) => {
                 let tunnel = jump
                     .channel_open_direct_tcpip(
@@ -320,6 +421,9 @@ async fn establish(
                     .map_err(|e| {
                         unreachable(format!("the jump host could not open a tunnel: {e}"))
                     })?;
+                report(ConnectStep::Reached {
+                    host: login.host.clone(),
+                });
                 client::connect_stream(config, tunnel.into_stream(), handler)
                     .await
                     .map_err(map_connect_error)
@@ -330,9 +434,22 @@ async fn establish(
         .await
         .map_err(|_| CoreError::Timeout(connect_timeout))??;
 
+    report(ConnectStep::Authenticating {
+        host: login.host.clone(),
+        user: login.username.clone(),
+        method: match login.method {
+            LoginMethod::Password(_) => "password",
+            LoginMethod::PrivateKey { .. } => "key",
+            LoginMethod::Agent { .. } => "agent",
+        },
+    });
     if !authenticate(&mut connection, login, private_key).await? {
         return Err(CoreError::AuthenticationFailed);
     }
+    report(ConnectStep::Authenticated {
+        host: login.host.clone(),
+        user: login.username.clone(),
+    });
     Ok(connection)
 }
 

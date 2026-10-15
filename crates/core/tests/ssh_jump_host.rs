@@ -185,3 +185,95 @@ async fn target_failures_are_not_blamed_on_the_jump_host() {
     .await;
     assert!(matches!(rejected.err(), Some(CoreError::HostKeyRejected)));
 }
+
+fn recorder() -> (
+    termirust_core::ssh::ConnectObserver,
+    Arc<Mutex<Vec<termirust_core::ssh::ConnectStep>>>,
+) {
+    let steps = Arc::new(Mutex::new(Vec::new()));
+    let sink = steps.clone();
+    (Arc::new(move |step| sink.lock().unwrap().push(step)), steps)
+}
+
+#[tokio::test]
+async fn reports_each_milestone_of_a_direct_and_a_jump_connection() {
+    use termirust_core::ssh::{ConnectRoute, ConnectStep, SshConnection};
+
+    let (observe, steps) = recorder();
+    let direct = jump_login(jump_key());
+    let connection =
+        SshConnection::open_observed(None, &direct, accept_all(), TIMEOUT, Some(observe))
+            .await
+            .unwrap();
+    connection.disconnect().await.unwrap();
+    let kinds: Vec<_> = steps
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|s| match s {
+            ConnectStep::Started { route, .. } => format!("started {route:?}"),
+            ConnectStep::Reached { .. } => "reached".into(),
+            ConnectStep::ServerIdentity { fingerprint, .. } => {
+                assert!(fingerprint.starts_with("SHA256:"));
+                "identity".into()
+            }
+            ConnectStep::Authenticating { method, .. } => format!("auth {method}"),
+            ConnectStep::Authenticated { user, .. } => format!("ok {user}"),
+        })
+        .collect();
+    assert_eq!(
+        kinds,
+        [
+            "started Direct",
+            "reached",
+            "identity",
+            "auth key",
+            "ok termirust"
+        ]
+    );
+
+    let (observe, steps) = recorder();
+    let jump = jump_login(jump_key());
+    let connection = SshConnection::open_observed(
+        Some(JumpHop {
+            login: &jump,
+            verify_host_key: accept_all(),
+        }),
+        &target("ssh-target"),
+        accept_all(),
+        TIMEOUT,
+        Some(observe),
+    )
+    .await
+    .unwrap();
+    connection.disconnect().await.unwrap();
+    let steps = steps.lock().unwrap();
+    assert!(
+        matches!(&steps[0], ConnectStep::Started { host, route: ConnectRoute::Direct, .. } if host == "127.0.0.1")
+    );
+    assert!(steps.iter().any(|s| matches!(s, ConnectStep::Started { host, route: ConnectRoute::Jump(j), .. } if host == "ssh-target" && j == "127.0.0.1")));
+    assert!(
+        matches!(steps.last(), Some(ConnectStep::Authenticated { user, .. }) if user == "target")
+    );
+}
+
+#[tokio::test]
+async fn stops_at_authentication_when_the_password_is_wrong() {
+    use termirust_core::ssh::{ConnectStep, SshConnection};
+
+    let (observe, steps) = recorder();
+    let jump = jump_login(LoginMethod::Password("wrong".into()));
+    let err = SshConnection::open_observed(None, &jump, accept_all(), TIMEOUT, Some(observe))
+        .await
+        .err()
+        .unwrap();
+    assert!(matches!(err, CoreError::AuthenticationFailed));
+    let steps = steps.lock().unwrap();
+    assert!(matches!(
+        steps.last(),
+        Some(ConnectStep::Authenticating {
+            method: "password",
+            ..
+        })
+    ));
+}

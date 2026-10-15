@@ -13,5 +13,6 @@ pub use host_stats::{HostStats, TopProcess, parse_stats};
 pub use keys::{GeneratedKey, KeyInfo, generate_ed25519, inspect_private_key, load_private_key};
 pub use proxy_command::{ProxyStderr, ProxyStream, expand_proxy_command, spawn_proxy};
 pub use shell_session::{
-    JumpHop, LoginMethod, PasswordLogin, PtySize, ShellEvent, ShellSession, SshConnection, SshLogin,
+    ConnectObserver, ConnectRoute, ConnectStep, JumpHop, LoginMethod, PasswordLogin, PtySize,
+    ShellEvent, ShellSession, SshConnection, SshLogin,
 };

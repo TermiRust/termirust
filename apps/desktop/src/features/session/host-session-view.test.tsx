@@ -219,8 +219,11 @@ describe("HostSessionView", () => {
     expect(within(dialog).getByRole("button", { name: "I understand, update the key" })).toBeDisabled();
 
     await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    expect(await screen.findByRole("status")).toHaveTextContent("Not connected");
-    expect(screen.getByRole("button", { name: "Reconnect" })).toBeInTheDocument();
+    const panel = within(await screen.findByRole("region", { name: "Connection progress" }));
+    expect(panel.getByRole("heading", { name: "Could not connect to prod-api" })).toBeInTheDocument();
+    expect(panel.getByRole("list", { name: "Connection log" })).toHaveTextContent("identity changed since last time");
+    expect(panel.getByRole("list", { name: "Connection log" })).toHaveTextContent("Cancelled");
+    expect(panel.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 
   it("updates a changed key only after the user confirms they verified it", async () => {
@@ -269,7 +272,41 @@ describe("HostSessionView", () => {
     const onStatusChange = vi.fn();
     render(<HostSessionView host={host} onStatusChange={onStatusChange} />);
     await vi.waitFor(() => expect(onStatusChange).toHaveBeenLastCalledWith("error"));
-    expect(screen.getByRole("status")).toHaveTextContent("agent not supported");
+    const panel = within(screen.getByRole("region", { name: "Connection progress" }));
+    expect(panel.getByRole("list", { name: "Connection log" })).toHaveTextContent("agent not supported");
+    expect(panel.getByRole("listitem", { current: "step" })).toHaveAttribute("data-state", "failed");
+  });
+
+  it("walks the steps and explains a rejected login in plain words", async () => {
+    FakeChannel.created = [];
+    let respond: (v: unknown) => void = () => {};
+    commands.sessionOpenHost.mockReturnValueOnce(new Promise((r) => (respond = r))).mockResolvedValueOnce(ok({ status: "opened", sessionId: 3 }));
+    const user = userEvent.setup();
+    render(<HostSessionView host={{ ...host, username: "Root" }} />);
+    const panel = within(await screen.findByRole("region", { name: "Connection progress" }));
+    const steps = () => panel.getAllByRole("listitem").filter((li) => li.hasAttribute("data-state"));
+    expect(steps().map((li) => li.getAttribute("data-state"))).toEqual(["current", "pending", "pending", "pending", "pending"]);
+
+    const progress = FakeChannel.created.at(-1) as FakeChannel<unknown>;
+    act(() => {
+      progress.emit({ kind: "started", host: "10.0.0.1", port: 22, via: "direct" });
+      progress.emit({ kind: "reached", host: "10.0.0.1" });
+      progress.emit({ kind: "serverIdentity", host: "10.0.0.1", algorithm: "ssh-ed25519", fingerprint: "SHA256:abc" });
+      progress.emit({ kind: "authenticating", host: "10.0.0.1", user: "Root", method: "key" });
+    });
+    expect(steps().map((li) => li.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "pending"]);
+    const log = panel.getByRole("list", { name: "Connection log" });
+    expect(log).toHaveTextContent("Connecting to 10.0.0.1:22…");
+    expect(log).toHaveTextContent("Server identity: ssh-ed25519 SHA256:abc");
+    expect(log).toHaveTextContent("Logging in as Root with SSH key…");
+
+    await act(async () => respond({ status: "error", error: { code: "invalid_data", message: "10.0.0.1 did not accept the key for user Root" } }));
+    expect(steps()[3]).toHaveAttribute("data-state", "failed");
+    expect(log).toHaveTextContent('Check that the username "Root" is right (case-sensitive)');
+
+    await user.click(panel.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("button", { name: "Disconnect" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Connection progress" })).not.toBeInTheDocument();
   });
 
   describe("after the connection is lost", () => {

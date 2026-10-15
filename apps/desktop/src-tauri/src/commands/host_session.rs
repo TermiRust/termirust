@@ -6,8 +6,8 @@ use tauri::ipc::Channel;
 use tauri::{AppHandle, State};
 use termirust_core::CoreError;
 use termirust_core::ssh::{
-    HostKeyInfo, HostKeyVerifier, JumpHop, LoginMethod, PtySize, ShellSession, SshConnection,
-    SshLogin, inspect_private_key,
+    ConnectObserver, ConnectRoute, ConnectStep, HostKeyInfo, HostKeyVerifier, JumpHop, LoginMethod,
+    PtySize, ShellSession, SshConnection, SshLogin, inspect_private_key,
 };
 use termirust_core::vault::{
     Host, HostAuth, HostKeyStatus, Identity, IdentityRecord, KnownHostRecord, Secret, Vault,
@@ -353,6 +353,82 @@ pub async fn connect_host(
     vault: &Vault,
     request: &HostLoginRequest,
 ) -> Result<HostConnection, CommandError> {
+    connect_host_observed(vault, request, None).await
+}
+
+/// One step of connecting, for the terminal's step-by-step display and login log.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ConnectProgress {
+    /// `via`: "direct", "proxy" or the jump host's address.
+    #[serde(rename_all = "camelCase")]
+    Started {
+        host: String,
+        port: u16,
+        via: String,
+    },
+    Reached {
+        host: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    ServerIdentity {
+        host: String,
+        algorithm: String,
+        fingerprint: String,
+    },
+    /// `method`: "password", "key" or "agent".
+    Authenticating {
+        host: String,
+        user: String,
+        method: String,
+    },
+    Authenticated {
+        host: String,
+        user: String,
+    },
+    OpeningShell,
+}
+
+impl From<ConnectStep> for ConnectProgress {
+    fn from(step: ConnectStep) -> Self {
+        match step {
+            ConnectStep::Started { host, port, route } => ConnectProgress::Started {
+                host,
+                port,
+                via: match route {
+                    ConnectRoute::Direct => "direct".into(),
+                    ConnectRoute::ProxyCommand => "proxy".into(),
+                    ConnectRoute::Jump(jump) => jump,
+                },
+            },
+            ConnectStep::Reached { host } => ConnectProgress::Reached { host },
+            ConnectStep::ServerIdentity {
+                host,
+                algorithm,
+                fingerprint,
+            } => ConnectProgress::ServerIdentity {
+                host,
+                algorithm,
+                fingerprint,
+            },
+            ConnectStep::Authenticating { host, user, method } => ConnectProgress::Authenticating {
+                host,
+                user,
+                method: method.into(),
+            },
+            ConnectStep::Authenticated { host, user } => {
+                ConnectProgress::Authenticated { host, user }
+            }
+        }
+    }
+}
+
+/// [`connect_host`], reporting each milestone to `observer`.
+pub async fn connect_host_observed(
+    vault: &Vault,
+    request: &HostLoginRequest,
+    observer: Option<ConnectObserver>,
+) -> Result<HostConnection, CommandError> {
     let host_id = Uuid::parse_str(&request.host_id)
         .map_err(|_| CoreError::InvalidData(format!("invalid host id: {}", request.host_id)))?;
     let host = vault
@@ -445,7 +521,7 @@ pub async fn connect_host(
     } else {
         CONNECT_TIMEOUT
     };
-    let result = SshConnection::open(hop, &login, verifier, timeout).await;
+    let result = SshConnection::open_observed(hop, &login, verifier, timeout, observer).await;
 
     // The jump hop proved its key as soon as it let us through, even if the target then failed.
     if let Some(j) = &jump
@@ -551,12 +627,18 @@ pub async fn session_open_host(
     request: OpenHostRequest,
     on_output: Channel<RawChunk>,
     on_closed: Channel<SessionClosed>,
+    on_progress: Channel<ConnectProgress>,
 ) -> Result<OpenHostOutcome, CommandError> {
     let vault = vault_state.vault().await?;
-    let connection = match connect_host(&vault, &request.login()).await? {
+    let progress = on_progress.clone();
+    let observer: ConnectObserver = Arc::new(move |step| {
+        let _ = progress.send(step.into());
+    });
+    let connection = match connect_host_observed(&vault, &request.login(), Some(observer)).await? {
         HostConnection::Connected(connection) => connection,
         HostConnection::NeedsInput(outcome) => return Ok(outcome),
     };
+    let _ = on_progress.send(ConnectProgress::OpeningShell);
     let size = PtySize {
         cols: request.cols,
         rows: request.rows,

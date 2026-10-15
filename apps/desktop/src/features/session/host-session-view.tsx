@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EnvironmentBadge } from "@/components/ui/environment-badge";
 import { OsIcon } from "@/components/ui/os-icon";
 import { useAiAllowed } from "@/features/ai/use-ai-allowed";
+import { useDialogsStore } from "@/stores/dialogs-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useTerminalAi } from "@/features/ai/use-terminal-ai";
 import { aiShortcutLabel, isMacPlatform } from "@/lib/shortcuts";
@@ -16,6 +17,7 @@ import type { TabStatus } from "@/stores/tabs-store";
 
 import { EnvironmentWatermark } from "./environment-watermark";
 import { HostKeyDialog } from "./host-key-dialog";
+import { ConnectPanel } from "./connect-progress";
 import { ConnectionBanner } from "./connection-banner";
 import { CredentialsPrompt } from "./credentials-prompt";
 import { credentialsRequestOf } from "./host-prompt";
@@ -64,6 +66,7 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
   const aiAllowed = useAiAllowed(host);
   // The OS is learned on first connect; show it from the refreshed host list.
   const latestHost = useHostsStore((s) => s.hosts.find((h) => h.id === host.id)) ?? host;
+  const openHostEditor = useDialogsStore((s) => s.openHostEditor);
   const ai = useTerminalAi({
     allowed: aiAllowed,
     target: "remote",
@@ -134,14 +137,21 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
         </div>
       </header>
 
-      <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
-      {state.phase === "connecting" && !session.recovering && host.proxyCommand && (
-        <p role="status" className="shrink-0 border-b border-border bg-bg-sunk px-3 py-1 text-xs text-fg-muted">
-          Connecting through the proxy command… If a browser window opens (e.g. Cloudflare Access), finish signing in there.
-        </p>
+      {/* Before the first connection the step panel explains everything; afterwards the banner. */}
+      {(session.everConnected || session.recovering) && (
+        <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
       )}
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selectionExcerpt() ?? null)}>
+          {!session.everConnected && state.phase !== "connected" && (
+            <ConnectPanel
+              title={state.phase === "error" || state.phase === "cancelled" ? `Could not connect to ${host.label}` : `Connecting to ${host.label}`}
+              trace={session.trace}
+              proxyHint={Boolean(latestHost.proxyCommand)}
+              onRetry={session.reconnect}
+              onEditHost={() => openHostEditor(latestHost)}
+            />
+          )}
           <TerminalView
             ref={terminalRef}
             onData={sendTyped}
