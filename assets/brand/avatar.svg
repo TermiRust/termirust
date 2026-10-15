@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#b8370a"/>
+    </linearGradient>
+  </defs>
+  <!-- Full-bleed square: GitHub rounds organisation avatars itself. -->
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <path d="M290 330 L490 512 L290 694" fill="none" stroke="#ffffff" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="545" y="642" width="260" height="92" rx="46" fill="#ffffff"/>
+</svg>
