@@ -140,9 +140,10 @@ itself up to date (Settings › About).
 |---|---|---|
 | **macOS** (Apple Silicon) | `Termirust_x.y.z_aarch64.dmg` | Drag Termirust to Applications, then run `xattr -dr com.apple.quarantine /Applications/Termirust.app` in Terminal (macOS otherwise says the app “is damaged”). |
 | **macOS** (Intel) | `Termirust_x.y.z_x64.dmg` | Same as above. |
-| **Windows** | `Termirust_x.y.z_x64-setup.exe` | SmartScreen shows “Windows protected your PC”: click **More info → Run anyway**. |
+| **Windows** | `Termirust_x.y.z_x64-setup.exe` (or the `.msi`) | SmartScreen shows “Windows protected your PC”: click **More info → Run anyway**. |
 | **Linux** (AppImage) | `Termirust_x.y.z_amd64.AppImage` | `chmod +x Termirust_*.AppImage && ./Termirust_*.AppImage` |
 | **Linux** (Debian/Ubuntu) | `Termirust_x.y.z_amd64.deb` | `sudo apt install ./Termirust_*.deb` |
+| **Linux** (Fedora/RHEL) | `Termirust-x.y.z-1.x86_64.rpm` | `sudo dnf install ./Termirust-*.rpm` |
 
 ## Build from source
 
