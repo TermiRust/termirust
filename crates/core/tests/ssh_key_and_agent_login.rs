@@ -1,6 +1,7 @@
 //! Needs `docker compose -f docker/test-ssh.yml up -d` and OpenSSH's ssh-agent/ssh-add.
 #![cfg(feature = "integration")]
 
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::Arc;
@@ -120,23 +121,34 @@ impl TestAgent {
             }
             std::thread::sleep(Duration::from_millis(20));
         }
-        for name in keys {
-            let status = Command::new("ssh-add")
-                .arg(fixture(name))
-                .env("SSH_AUTH_SOCK", &socket)
-                .output()
-                .unwrap();
-            assert!(
-                status.status.success(),
-                "ssh-add failed: {}",
-                String::from_utf8_lossy(&status.stderr)
-            );
-        }
-        Self {
+        // Owned from here on, so a failing ssh-add below still kills the agent.
+        let agent = Self {
             _dir: dir,
             socket,
             process,
+        };
+        for name in keys {
+            agent.add(&fixture(name));
         }
+        agent
+    }
+
+    /// Adds a key through a 0600 copy: git does not keep file modes, and ssh-add refuses a key
+    /// others can read.
+    fn add(&self, key: &Path) {
+        let copy = self._dir.path().join(key.file_name().unwrap_or_default());
+        std::fs::copy(key, &copy).unwrap();
+        std::fs::set_permissions(&copy, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let out = Command::new("ssh-add")
+            .arg(&copy)
+            .env("SSH_AUTH_SOCK", &self.socket)
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "ssh-add failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
 }
 
@@ -162,27 +174,10 @@ async fn tries_agent_keys_until_the_server_accepts_one() {
     let stranger = termirust_core::ssh::generate_ed25519("stranger").unwrap();
     let stranger_path = dir.path().join("stranger");
     std::fs::write(&stranger_path, &stranger.private_key).unwrap();
-    // ssh-add refuses private keys readable by others.
-    #[cfg(unix)]
-    std::fs::set_permissions(
-        &stranger_path,
-        std::os::unix::fs::PermissionsExt::from_mode(0o600),
-    )
-    .unwrap();
 
     let agent = TestAgent::start(&[]);
-    for path in [stranger_path.as_path(), fixture("ecdsa").as_path()] {
-        let out = Command::new("ssh-add")
-            .arg(path)
-            .env("SSH_AUTH_SOCK", &agent.socket)
-            .output()
-            .unwrap();
-        assert!(
-            out.status.success(),
-            "{}",
-            String::from_utf8_lossy(&out.stderr)
-        );
-    }
+    agent.add(&stranger_path);
+    agent.add(&fixture("ecdsa"));
     assert_shell_works(LoginMethod::Agent {
         socket: Some(agent.socket.clone()),
     })
