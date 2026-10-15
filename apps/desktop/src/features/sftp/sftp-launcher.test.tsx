@@ -24,7 +24,7 @@ const host = (id: string, overrides: Partial<HostView> = {}): HostView => ({
   color: null,
   aiDisabled: false,
   os: null,
-  environment: null,
+  environment: null, proxyCommand: null,
   ...overrides,
 });
 

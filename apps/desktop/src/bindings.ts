@@ -316,6 +316,8 @@ export type HostInput = {
 	color: string | null,
 	aiDisabled: boolean,
 	environment: EnvironmentView | null,
+	/**  OpenSSH ProxyCommand; empty means none. */
+	proxyCommand?: string | null,
 };
 
 /**  Sizes are KiB as f64 so they stay plain numbers in TypeScript. */
@@ -356,6 +358,7 @@ export type HostView = {
 	aiDisabled: boolean,
 	os: string | null,
 	environment: EnvironmentView | null,
+	proxyCommand: string | null,
 };
 
 /**  A private key in the Keychain as the UI sees it; the private half never leaves Rust. */
@@ -480,6 +483,7 @@ export type SshConfigCandidate = {
 	user: string | null,
 	identityFiles: string[],
 	proxyJump: string | null,
+	proxyCommand: string | null,
 	alreadySaved: boolean,
 };
 

@@ -21,7 +21,7 @@ const candidate = (alias: string, overrides: Partial<SshConfigCandidate> = {}): 
   port: 22,
   user: "deploy",
   identityFiles: [],
-  proxyJump: null,
+  proxyJump: null, proxyCommand: null,
   alreadySaved: false,
   ...overrides,
 });
@@ -46,15 +46,17 @@ describe("ImportSshConfigDialog", () => {
     renderWith([
       candidate("prod", { port: 2222, identityFiles: ["/Users/me/.ssh/prod_ed25519"], proxyJump: "bastion" }),
       candidate("old", { alreadySaved: true }),
+      candidate("debian", { proxyCommand: "cloudflared access ssh --hostname %h" }),
     ]);
     const list = await screen.findByRole("list", { name: "Hosts in config" });
+    expect(within(list).getByTitle("cloudflared access ssh --hostname %h")).toHaveTextContent("cloudflared");
     expect(within(list).getByRole("checkbox", { name: "prod" })).toBeChecked();
     expect(within(list).getByRole("checkbox", { name: "old" })).not.toBeChecked();
     expect(list).toHaveTextContent("deploy@prod.example.com:2222");
     expect(list).toHaveTextContent("prod_ed25519");
     expect(list).toHaveTextContent("via bastion");
     expect(list).toHaveTextContent("already saved");
-    expect(screen.getByRole("button", { name: "Import 1 host" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Import 2 hosts" })).toBeEnabled();
   });
 
   it("warns about settings it does not apply", async () => {

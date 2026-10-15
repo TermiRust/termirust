@@ -15,6 +15,7 @@ export interface HostFormValues {
   keyId: string;
   groupId: string;
   jumpHostId: string;
+  proxyCommand: string;
   tags: string;
   notes: string;
   keepaliveSecs: string;
@@ -42,6 +43,7 @@ export function hostFormValues(host?: HostView): HostFormValues {
     keyId: host?.auth.method === "identity" ? host.auth.identityId : "",
     groupId: host?.groupId ?? "",
     jumpHostId: host?.jumpHostId ?? "",
+    proxyCommand: host?.proxyCommand ?? "",
     tags: host?.tags.join(", ") ?? "",
     notes: host?.notes ?? "",
     keepaliveSecs: host?.keepaliveSecs == null ? "" : String(host.keepaliveSecs),
@@ -88,6 +90,8 @@ export function hostInputFromForm(values: HostFormValues, hasSavedPassword = fal
     errors.password = "Enter the new password";
   }
   if (values.authMethod === "key" && !values.keyId) errors.keyId = "Choose a key";
+  const proxyCommand = values.proxyCommand.trim();
+  if (proxyCommand && values.jumpHostId) errors.proxyCommand = "Use either a jump host or a proxy command, not both";
   if (Object.keys(errors).length > 0) return { ok: false, errors };
 
   return {
@@ -100,6 +104,7 @@ export function hostInputFromForm(values: HostFormValues, hasSavedPassword = fal
       auth: authInput(values, hasSavedPassword),
       groupId: values.groupId || null,
       jumpHostId: values.jumpHostId || null,
+      proxyCommand: proxyCommand || null,
       tags: values.tags.split(",").map((t) => t.trim()).filter(Boolean),
       notes: values.notes,
       keepaliveSecs,

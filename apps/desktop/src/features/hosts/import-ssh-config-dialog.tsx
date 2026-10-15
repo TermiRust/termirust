@@ -154,6 +154,11 @@ function ImportSshConfig({ onClose }: { onClose: () => void }) {
                         <Route size={11} /> via {c.proxyJump}
                       </span>
                     )}
+                    {c.proxyCommand && (
+                      <span className="flex min-w-0 items-center gap-1" title={c.proxyCommand}>
+                        <Route size={11} /> <span className="truncate font-mono">{c.proxyCommand.split(/\s+/)[0]}</span>
+                      </span>
+                    )}
                   </span>
                 </span>
               </label>

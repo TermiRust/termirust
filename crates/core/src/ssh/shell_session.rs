@@ -9,6 +9,7 @@ use tokio::sync::mpsc;
 
 use super::host_key::{HostKeyInfo, HostKeyVerifier};
 use super::keys::load_private_key;
+use super::proxy_command::{expand_proxy_command, spawn_proxy};
 use crate::{CoreError, Result};
 
 const TERM: &str = "xterm-256color";
@@ -69,7 +70,7 @@ impl std::fmt::Debug for LoginMethod {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct SshLogin {
     pub host: String,
     pub port: u16,
@@ -77,6 +78,27 @@ pub struct SshLogin {
     pub method: LoginMethod,
     /// Seconds between keepalives; `None` means 30, `Some(0)` disables them.
     pub keepalive_secs: Option<u32>,
+    /// OpenSSH `ProxyCommand` template (`%h`, `%p`, `%r`): the SSH stream runs over the
+    /// command's stdin/stdout instead of a TCP connection. Ignored behind a jump host.
+    pub proxy_command: Option<String>,
+}
+
+/// The proxy command may carry tokens (e.g. a Cloudflare service token), so only its presence
+/// is printed.
+impl std::fmt::Debug for SshLogin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SshLogin")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("username", &self.username)
+            .field("method", &self.method)
+            .field("keepalive_secs", &self.keepalive_secs)
+            .field(
+                "proxy_command",
+                &self.proxy_command.as_ref().map(|_| "[set]"),
+            )
+            .finish()
+    }
 }
 
 impl From<&PasswordLogin> for SshLogin {
@@ -87,6 +109,7 @@ impl From<&PasswordLogin> for SshLogin {
             username: login.username.clone(),
             method: LoginMethod::Password(login.password.clone()),
             keepalive_secs: None,
+            proxy_command: None,
         }
     }
 }
@@ -262,11 +285,30 @@ async fn establish(
     };
 
     let connecting = async {
-        match through {
-            None => client::connect(config, (login.host.as_str(), login.port), handler)
+        match (through, login.proxy_command.as_deref()) {
+            (None, Some(template)) => {
+                let command =
+                    expand_proxy_command(template, &login.host, login.port, &login.username);
+                let (stream, stderr) = spawn_proxy(&command)?;
+                client::connect_stream(config, stream, handler)
+                    .await
+                    .map_err(|err| match err {
+                        // The command exited or never spoke SSH: its stderr says why.
+                        russh::Error::IO(_) | russh::Error::Disconnect => {
+                            let said = stderr.text();
+                            unreachable(if said.is_empty() {
+                                "the proxy command closed the connection".into()
+                            } else {
+                                format!("the proxy command failed: {said}")
+                            })
+                        }
+                        other => map_connect_error(other),
+                    })
+            }
+            (None, None) => client::connect(config, (login.host.as_str(), login.port), handler)
                 .await
                 .map_err(map_connect_error),
-            Some(jump) => {
+            (Some(jump), _) => {
                 let tunnel = jump
                     .channel_open_direct_tcpip(
                         login.host.clone(),
@@ -518,6 +560,7 @@ mod tests {
     async fn a_wrong_passphrase_fails_before_any_network_access() {
         let login = SshLogin {
             keepalive_secs: None,
+            proxy_command: None,
             host: "203.0.113.1".into(),
             port: 22,
             username: "x".into(),
@@ -545,6 +588,7 @@ mod tests {
         drop(listener);
         let login = SshLogin {
             keepalive_secs: None,
+            proxy_command: None,
             host: "127.0.0.1".into(),
             port,
             username: "x".into(),

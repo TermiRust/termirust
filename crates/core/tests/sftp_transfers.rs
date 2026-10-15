@@ -25,6 +25,7 @@ fn key_login() -> SshLogin {
             passphrase: None,
         },
         keepalive_secs: None,
+        proxy_command: None,
     }
 }
 
@@ -206,6 +207,7 @@ async fn works_through_a_jump_host() {
         username: "target".into(),
         method: LoginMethod::Password("target-test".into()),
         keepalive_secs: None,
+        proxy_command: None,
     };
     let connection = SshConnection::open(
         Some(JumpHop {

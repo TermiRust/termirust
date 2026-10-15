@@ -135,6 +135,11 @@ export function HostSessionView({ host, onStatusChange, onSizeChange, onOpenSftp
       </header>
 
       <ConnectionBanner state={state} recovering={session.recovering} auto={auto} onReconnect={session.reconnect} />
+      {state.phase === "connecting" && !session.recovering && host.proxyCommand && (
+        <p role="status" className="shrink-0 border-b border-border bg-bg-sunk px-3 py-1 text-xs text-fg-muted">
+          Connecting through the proxy command… If a browser window opens (e.g. Cloudflare Access), finish signing in there.
+        </p>
+      )}
       <div className="flex min-h-0 flex-1">
         <div className="relative min-h-0 flex-1 overflow-hidden" onContextMenu={(e) => ai.onContextMenu(e, terminalRef.current?.selectionExcerpt() ?? null)}>
           <TerminalView

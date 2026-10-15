@@ -33,6 +33,7 @@ async fn a_silent_server_is_reported_as_lost_after_missed_keepalives() {
             passphrase: None,
         },
         keepalive_secs: Some(1),
+        proxy_command: None,
     };
     let target = SshLogin {
         host: "ssh-target".into(),
@@ -40,6 +41,7 @@ async fn a_silent_server_is_reported_as_lost_after_missed_keepalives() {
         username: "target".into(),
         method: LoginMethod::Password("target-test".into()),
         keepalive_secs: Some(1),
+        proxy_command: None,
     };
     let (_session, mut events) = ShellSession::open_through(
         Some(JumpHop {

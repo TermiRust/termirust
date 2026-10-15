@@ -12,6 +12,8 @@ pub struct SshConfigHost {
     pub user: Option<String>,
     pub identity_files: Vec<PathBuf>,
     pub proxy_jump: Option<String>,
+    /// Kept as written (tokens such as `%h` are expanded when connecting).
+    pub proxy_command: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -36,6 +38,7 @@ const APPLIED: &[&str] = &[
     "user",
     "identityfile",
     "proxyjump",
+    "proxycommand",
     "include",
     "match",
 ];
@@ -184,7 +187,6 @@ fn canonical_name(key: &str) -> String {
         "DynamicForward",
         "ForwardAgent",
         "ForwardX11",
-        "ProxyCommand",
         "CertificateFile",
         "ControlMaster",
         "ControlPath",
@@ -310,6 +312,14 @@ fn resolve(blocks: &[Block], home: &Path, unsupported: BTreeSet<String>) -> SshC
             };
             let user = first("user");
             let proxy_jump = first("proxyjump").filter(|p| !p.eq_ignore_ascii_case("none"));
+            // The whole rest of the line is the command.
+            let proxy_command = blocks
+                .iter()
+                .filter(|b| block_matches(b, &alias))
+                .flat_map(|b| &b.options)
+                .find(|(k, _)| k == "proxycommand")
+                .map(|(_, v)| v.trim().to_owned())
+                .filter(|v| !v.is_empty() && !v.eq_ignore_ascii_case("none"));
             let identity_files = blocks
                 .iter()
                 .filter(|b| block_matches(b, &alias))
@@ -335,6 +345,7 @@ fn resolve(blocks: &[Block], home: &Path, unsupported: BTreeSet<String>) -> SshC
                 user,
                 identity_files,
                 proxy_jump,
+                proxy_command,
             })
         })
         .collect();
@@ -371,6 +382,7 @@ mod tests {
                 user: Some("deploy".into()),
                 identity_files: vec![PathBuf::from("/home/me/.ssh/prod_ed25519")],
                 proxy_jump: None,
+                proxy_command: None,
             }]
         );
     }
@@ -442,6 +454,18 @@ mod tests {
                 PathBuf::from("/home/me/.ssh/x_key")
             ]
         );
+    }
+
+    #[test]
+    fn keeps_the_whole_proxy_command() {
+        let parsed = hosts(
+            "Host debian\n  HostName debian.example.app\n  ProxyCommand cloudflared access ssh --hostname %h\n\nHost plain\n  ProxyCommand none\n",
+        );
+        assert_eq!(
+            parsed[0].proxy_command.as_deref(),
+            Some("cloudflared access ssh --hostname %h")
+        );
+        assert_eq!(parsed[1].proxy_command, None);
     }
 
     #[test]

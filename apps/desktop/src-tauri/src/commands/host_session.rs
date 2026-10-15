@@ -20,6 +20,8 @@ use crate::raw_chunk::RawChunk;
 use crate::vault_state::VaultState;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+/// A proxy command may stop for a browser sign-in first (e.g. Cloudflare Access).
+const PROXY_CONNECT_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// What the user typed because the vault had nothing (or something that was rejected).
 #[derive(Debug, Clone, Default, Deserialize, specta::Type)]
@@ -295,6 +297,7 @@ async fn resolve_jump(vault: &Vault, host: &Host) -> Result<Option<ResolvedJump>
         } => Ok(Some(ResolvedJump {
             login: SshLogin {
                 keepalive_secs: jump.keepalive_secs,
+                proxy_command: jump.proxy_command.clone(),
                 host: jump.hostname.clone(),
                 port: jump.port,
                 username,
@@ -417,6 +420,12 @@ pub async fn connect_host(
 
     let login = SshLogin {
         keepalive_secs: host.keepalive_secs,
+        // OpenSSH semantics: a jump host replaces the proxy command.
+        proxy_command: if jump.is_some() {
+            None
+        } else {
+            host.proxy_command.clone()
+        },
         host: host.hostname.clone(),
         port: host.port,
         username: username.clone(),
@@ -427,7 +436,16 @@ pub async fn connect_host(
         login: &j.login,
         verify_host_key: jump_verifier,
     });
-    let result = SshConnection::open(hop, &login, verifier, CONNECT_TIMEOUT).await;
+    let proxied = login.proxy_command.is_some()
+        || jump
+            .as_ref()
+            .is_some_and(|j| j.login.proxy_command.is_some());
+    let timeout = if proxied {
+        PROXY_CONNECT_TIMEOUT
+    } else {
+        CONNECT_TIMEOUT
+    };
+    let result = SshConnection::open(hop, &login, verifier, timeout).await;
 
     // The jump hop proved its key as soon as it let us through, even if the target then failed.
     if let Some(j) = &jump

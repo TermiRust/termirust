@@ -29,6 +29,7 @@ describe("hostFormValues", () => {
       aiDisabled: true,
       os: null,
       environment: null,
+      proxyCommand: "cloudflared access ssh --hostname %h",
     };
     expect(hostFormValues(host)).toEqual({
       label: "db",
@@ -41,6 +42,7 @@ describe("hostFormValues", () => {
       keyId: "",
       groupId: "g",
       jumpHostId: "",
+      proxyCommand: "cloudflared access ssh --hostname %h",
       tags: "a, b",
       notes: "n",
       keepaliveSecs: "60",
@@ -66,7 +68,7 @@ describe("hostInputFromForm", () => {
         jumpHostId: null,
         tags: ["prod", "eu"],
         notes: "",
-        keepaliveSecs: null, aiDisabled: false, environment: null,
+        keepaliveSecs: null, aiDisabled: false, environment: null, proxyCommand: null,
         color: null,
       },
     });
@@ -103,7 +105,7 @@ describe("hostInputFromForm", () => {
       jumpHostId: null,
       tags: [],
       notes: "",
-      keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
+      keepaliveSecs: null, aiDisabled: false, os: null, environment: null, proxyCommand: null,
     color: null,
     });
     expect([values.authMethod, values.keyId]).toEqual(["key", "k1"]);
@@ -113,6 +115,17 @@ describe("hostInputFromForm", () => {
     const chosen = hostInputFromForm({ ...filled, authMethod: "key", keyId: "k1" });
     expect(chosen.ok && chosen.input.auth).toEqual({ method: "identity", identityId: "k1" });
     expect(hostInputFromForm({ ...filled, authMethod: "key", keyId: "" })).toEqual({ ok: false, errors: { keyId: "Choose a key" } });
+  });
+
+  it("saves a trimmed proxy command, and refuses one together with a jump host", () => {
+    const result = hostInputFromForm({ ...filled, proxyCommand: "  cloudflared access ssh --hostname %h " });
+    expect(result.ok && result.input.proxyCommand).toBe("cloudflared access ssh --hostname %h");
+    const blank = hostInputFromForm({ ...filled, proxyCommand: "  " });
+    expect(blank.ok && blank.input.proxyCommand).toBeNull();
+    expect(hostInputFromForm({ ...filled, proxyCommand: "nc %h %p", jumpHostId: "j1" })).toEqual({
+      ok: false,
+      errors: { proxyCommand: "Use either a jump host or a proxy command, not both" },
+    });
   });
 
   it("carries the tab colour override", () => {

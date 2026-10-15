@@ -18,6 +18,7 @@ pub struct SshConfigCandidate {
     pub user: Option<String>,
     pub identity_files: Vec<String>,
     pub proxy_jump: Option<String>,
+    pub proxy_command: Option<String>,
     pub already_saved: bool,
 }
 
@@ -73,6 +74,7 @@ async fn candidates(
                 .map(|p| p.display().to_string())
                 .collect(),
             proxy_jump: host.proxy_jump.clone(),
+            proxy_command: host.proxy_command.clone(),
             already_saved: is_already_saved(vault, host).await?,
         });
     }

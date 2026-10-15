@@ -80,3 +80,14 @@ describe("Dialog", () => {
     expect(screen.getByRole("dialog").className).toContain("border-danger-border");
   });
 });
+
+describe("Input", () => {
+  it("never lets the OS capitalise or autocorrect what is typed (usernames are case-sensitive)", async () => {
+    const { Input } = await import("./input");
+    render(<Input aria-label="Username" />);
+    const input = screen.getByRole("textbox", { name: "Username" });
+    expect(input).toHaveAttribute("autocapitalize", "off");
+    expect(input).toHaveAttribute("autocorrect", "off");
+    expect(input).toHaveAttribute("spellcheck", "false");
+  });
+});

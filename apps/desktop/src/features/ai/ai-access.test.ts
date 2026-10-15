@@ -20,7 +20,7 @@ const host = (overrides: Partial<HostView> = {}): HostView => ({
   color: null,
   aiDisabled: false,
   os: null,
-  environment: null,
+  environment: null, proxyCommand: null,
   ...overrides,
 });
 const group = (aiDisabled: boolean): GroupView => ({ id: "g", name: "prod", parentId: null, color: null, warningBorder: false, aiDisabled });

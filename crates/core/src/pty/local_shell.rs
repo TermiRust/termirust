@@ -102,7 +102,16 @@ impl LocalShell {
                         }
                     }
                 }
-                let exit_status = lock(&waiter).wait().ok().map(|s| s.exit_code());
+                // Poll instead of `wait()`: holding the lock while blocked would deadlock
+                // `close()`, which needs it to kill a shell that has not exited.
+                let exit_status = loop {
+                    match lock(&waiter).try_wait() {
+                        Ok(Some(status)) => break Some(status.exit_code()),
+                        Ok(None) => {}
+                        Err(_) => break None,
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                };
                 let _ = events_tx.blocking_send(ShellEvent::Closed { exit_status });
             })
             .map_err(pty_error)?;
@@ -244,6 +253,22 @@ mod tests {
         shell.close().unwrap();
         wait_closed(&mut events).await;
         assert!(shell.write(b"echo hi\n").is_err() || events.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn closing_after_the_output_stopped_does_not_hang() {
+        // The reader stops once nobody listens, then waits for the shell to exit; closing the
+        // shell at that moment must still kill it instead of waiting on the same lock.
+        let (shell, events) = LocalShell::spawn(&sh(), SIZE).unwrap();
+        drop(events);
+        shell.write(b"echo wake-the-reader\n").unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let closed = tokio::task::spawn_blocking(move || shell.close());
+        tokio::time::timeout(Duration::from_secs(5), closed)
+            .await
+            .expect("close() hung")
+            .unwrap()
+            .unwrap();
     }
 
     #[tokio::test]

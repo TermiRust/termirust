@@ -62,6 +62,7 @@ pub async fn import_ssh_config_hosts(
             username: entry.user.clone(),
             port: entry.port,
             auth,
+            proxy_command: entry.proxy_command.clone(),
             ..Host::new(entry.hostname.clone())
         };
         match vault.hosts().create(&host).await {

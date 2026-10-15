@@ -27,6 +27,7 @@ async fn connection() -> Arc<SshConnection> {
             passphrase: None,
         },
         keepalive_secs: None,
+        proxy_command: None,
     };
     Arc::new(
         SshConnection::open(None, &login, Arc::new(|_| true), TIMEOUT)

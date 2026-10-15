@@ -40,8 +40,12 @@ const host: HostView = {
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
-color: null,
+  keepaliveSecs: null,
+  aiDisabled: false,
+  os: null,
+  environment: null,
+  proxyCommand: null,
+  color: null,
 };
 const ok = (data: unknown) => ({ status: "ok", data });
 
@@ -119,6 +123,23 @@ describe("HostSessionView", () => {
     await screen.findByRole("button", { name: "Disconnect" });
     expect(screen.queryByRole("button", { name: "AI" })).not.toBeInTheDocument();
     useAiStore.setState({ settings: null });
+  });
+
+  it("tells the user to finish a browser sign-in while connecting through a proxy command", async () => {
+    let open: (v: unknown) => void = () => {};
+    commands.sessionOpenHost.mockReturnValue(new Promise((resolve) => (open = resolve)));
+    render(<HostSessionView host={{ ...host, proxyCommand: "cloudflared access ssh --hostname %h" }} />);
+    expect(await screen.findByText(/finish signing in there/)).toBeInTheDocument();
+    await act(async () => open(ok({ status: "opened", sessionId: 1 })));
+    await screen.findByRole("button", { name: "Disconnect" });
+    expect(screen.queryByText(/finish signing in there/)).not.toBeInTheDocument();
+  });
+
+  it("does not mention a browser for ordinary hosts", async () => {
+    commands.sessionOpenHost.mockReturnValue(new Promise(() => {}));
+    render(<HostSessionView host={host} />);
+    await Promise.resolve();
+    expect(screen.queryByText(/finish signing in there/)).not.toBeInTheDocument();
   });
 
   it("watermarks the terminal of a production host", async () => {

@@ -56,6 +56,7 @@ pub struct HostView {
     pub ai_disabled: bool,
     pub os: Option<String>,
     pub environment: Option<EnvironmentView>,
+    pub proxy_command: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -88,6 +89,9 @@ pub struct HostInput {
     pub color: Option<String>,
     pub ai_disabled: bool,
     pub environment: Option<EnvironmentView>,
+    /// OpenSSH ProxyCommand; empty means none.
+    #[serde(default)]
+    pub proxy_command: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -163,6 +167,7 @@ impl From<&HostRecord> for HostView {
             ai_disabled: host.ai_disabled,
             os: host.os.clone(),
             environment: host.environment.map(Into::into),
+            proxy_command: host.proxy_command.clone(),
         }
     }
 }
@@ -214,6 +219,10 @@ fn host_from_input(input: HostInput, previous: Option<&Host>) -> Result<Host, Co
         // Detected, not typed: editing a host must not forget it.
         os: previous.and_then(|h| h.os.clone()),
         environment: input.environment.map(Into::into),
+        proxy_command: input
+            .proxy_command
+            .map(|c| c.trim().to_owned())
+            .filter(|c| !c.is_empty()),
     })
 }
 
@@ -390,7 +399,28 @@ mod tests {
             color: None,
             ai_disabled: false,
             environment: None,
+            proxy_command: None,
         }
+    }
+
+    #[test]
+    fn stores_a_trimmed_proxy_command_and_drops_a_blank_one() {
+        let with = HostInput {
+            proxy_command: Some("  cloudflared access ssh --hostname %h ".into()),
+            ..input(AuthInput::Agent)
+        };
+        assert_eq!(
+            host_from_input(with, None)
+                .unwrap()
+                .proxy_command
+                .as_deref(),
+            Some("cloudflared access ssh --hostname %h")
+        );
+        let blank = HostInput {
+            proxy_command: Some("   ".into()),
+            ..input(AuthInput::Agent)
+        };
+        assert_eq!(host_from_input(blank, None).unwrap().proxy_command, None);
     }
 
     #[tokio::test]

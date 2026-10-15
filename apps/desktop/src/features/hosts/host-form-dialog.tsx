@@ -133,7 +133,11 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
         <Field label={fieldLabels.port} error={errors.port} className="col-span-2">
           <Input {...text("port")} inputMode="numeric" />
         </Field>
-        <Field label={fieldLabels.username} className="col-span-6">
+        <Field
+          label={fieldLabels.username}
+          className="col-span-6"
+          hint={/[A-Z]/.test(values.username) ? `Usernames are case-sensitive — most servers expect “${values.username.toLowerCase()}”.` : undefined}
+        >
           <Input {...text("username")} placeholder="root" />
         </Field>
       </Section>
@@ -234,7 +238,7 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
         </div>
       </Section>
 
-      <details className="group border-t border-border pt-3" open={Boolean(errors.keepaliveSecs)}>
+      <details className="group border-t border-border pt-3" open={Boolean(errors.keepaliveSecs || errors.proxyCommand) || values.proxyCommand !== ""}>
         <summary className="flex cursor-pointer list-none items-center gap-1 text-[11px] font-semibold tracking-wider text-fg-muted uppercase select-none">
           <ChevronRight size={13} className="transition-transform group-open:rotate-90" /> Advanced
         </summary>
@@ -251,6 +255,14 @@ function HostForm({ host, onClose, onSave, onDelete, onConnect }: HostFormProps)
           </Field>
           <Field label={fieldLabels.keepaliveSecs} error={errors.keepaliveSecs} className="col-span-2">
             <Input {...text("keepaliveSecs")} inputMode="numeric" placeholder="30" />
+          </Field>
+          <Field
+            label={fieldLabels.proxyCommand}
+            error={errors.proxyCommand}
+            className="col-span-6"
+            hint="A local command that carries the connection, as OpenSSH ProxyCommand: %h host, %p port, %r user. E.g. Cloudflare Tunnel."
+          >
+            <Input {...text("proxyCommand")} spellCheck={false} placeholder="cloudflared access ssh --hostname %h" className="font-mono text-[12px]" />
           </Field>
           <Checkbox
             className="col-span-6"
@@ -325,6 +337,7 @@ const fieldLabels: Record<keyof HostFormValues, string> = {
   keyId: "Key",
   groupId: "Group",
   jumpHostId: "Jump host",
+  proxyCommand: "Proxy command",
   tags: "Tags",
   notes: "Notes",
   keepaliveSecs: "Keepalive (s)",

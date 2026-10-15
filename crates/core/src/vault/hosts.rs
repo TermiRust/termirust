@@ -53,6 +53,10 @@ pub struct Host {
     /// Production hosts get a "PROD" watermark on their terminals.
     #[serde(default)]
     pub environment: Option<HostEnvironment>,
+    /// OpenSSH `ProxyCommand` (e.g. `cloudflared access ssh --hostname %h`): a local command
+    /// that carries the connection. Not used when a jump host is set.
+    #[serde(default)]
+    pub proxy_command: Option<String>,
 }
 
 /// Colours a host or group may use for its tabs.
@@ -86,6 +90,7 @@ impl Host {
             ai_disabled: false,
             os: None,
             environment: None,
+            proxy_command: None,
         }
     }
 

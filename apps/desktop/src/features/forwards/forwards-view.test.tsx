@@ -32,7 +32,7 @@ const host: HostView = {
   jumpHostId: null,
   tags: [],
   notes: "",
-  keepaliveSecs: null, aiDisabled: false, os: null, environment: null,
+  keepaliveSecs: null, aiDisabled: false, os: null, environment: null, proxyCommand: null,
   color: null,
 };
 const dbRule: ForwardRuleView = {

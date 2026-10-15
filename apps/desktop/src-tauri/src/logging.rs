@@ -95,6 +95,7 @@ mod tests {
             username: "deploy".into(),
             method,
             keepalive_secs: None,
+            proxy_command: None,
         }
     }
 
@@ -115,6 +116,17 @@ mod tests {
                 true,
             );
             log_connect_attempt("h3", &login(LoginMethod::Agent { socket: None }), false);
+            log_connect_attempt(
+                "h4",
+                &SshLogin {
+                    proxy_command: Some(
+                        "cloudflared access ssh --hostname %h --service-token-secret tok-secret"
+                            .into(),
+                    ),
+                    ..login(LoginMethod::Agent { socket: None })
+                },
+                false,
+            );
         });
 
         for secret in [
@@ -122,6 +134,7 @@ mod tests {
             "BEGIN OPENSSH",
             "AAAAprivate",
             "pass-phrase-secret",
+            "tok-secret",
         ] {
             assert!(!output.contains(secret), "log leaked {secret:?}:\n{output}");
         }
@@ -129,6 +142,10 @@ mod tests {
         assert!(output.contains("method=\"password\"") || output.contains("method=password"));
         assert!(output.contains("through_jump=true"));
         assert!(output.contains("[REDACTED]"));
+        assert!(
+            output.contains("[set]"),
+            "proxy command presence is logged:\n{output}"
+        );
     }
 
     #[test]
