@@ -1,5 +1,5 @@
 /** Where the project lives; change REPO when the GitHub organisation is created. */
-const REPO = "https://github.com/termirust/termirust";
+const REPO = "https://github.com/TermiRust/termirust";
 
 export const PROJECT = {
   name: "Termirust",

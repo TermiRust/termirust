@@ -34,7 +34,7 @@ describe("UpdateNotice", () => {
     const banner = within(screen.getByRole("status", { name: "Update available" }));
     expect(banner.getByText(/Termirust 0.2.0/)).toBeInTheDocument();
     await user.click(banner.getByRole("button", { name: "What's new" }));
-    expect(openUrl).toHaveBeenCalledWith("https://github.com/termirust/termirust/releases/tag/v0.2.0");
+    expect(openUrl).toHaveBeenCalledWith("https://github.com/TermiRust/termirust/releases/tag/v0.2.0");
     await user.click(banner.getByRole("button", { name: /Install & restart/ }));
     expect(install).toHaveBeenCalled();
     await user.click(banner.getByRole("button", { name: "Remind me later" }));

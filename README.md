@@ -5,7 +5,7 @@ Lightweight, fast and fully offline — no account required.
 End-to-end encrypted sync and team features will be the paid tier (open-core).
 
 > **Status: pre-release (0.x).** Usable day to day, but expect rough edges and breaking
-> changes until 1.0. Please [report problems](https://github.com/termirust/termirust/issues/new/choose).
+> changes until 1.0. Please [report problems](https://github.com/TermiRust/termirust/issues/new/choose).
 
 ## Features
 
@@ -28,7 +28,7 @@ End-to-end encrypted sync and team features will be the paid tier (open-core).
 ## Install
 
 Download the installer for your platform from the
-[latest release](https://github.com/termirust/termirust/releases/latest)
+[latest release](https://github.com/TermiRust/termirust/releases/latest)
 (macOS Apple Silicon / Intel, Windows, Linux AppImage / .deb). The app checks for updates
 itself (Settings › About).
 

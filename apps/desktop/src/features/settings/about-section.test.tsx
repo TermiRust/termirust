@@ -28,7 +28,7 @@ describe("AboutSection", () => {
     expect(screen.getByText(/GNU Affero General Public License v3\.0/)).toHaveTextContent("ABSOLUTELY NO WARRANTY");
     await user.click(screen.getByRole("button", { name: "Source code" }));
     await user.click(screen.getByRole("button", { name: "License (AGPL-3.0)" }));
-    expect(openUrl.mock.calls.map((c) => c[0])).toEqual(["https://github.com/termirust/termirust", "https://github.com/termirust/termirust/blob/main/LICENSE"]);
+    expect(openUrl.mock.calls.map((c) => c[0])).toEqual(["https://github.com/TermiRust/termirust", "https://github.com/TermiRust/termirust/blob/main/LICENSE"]);
   });
 
   it("checks for updates on demand and offers to install", async () => {
