@@ -19,8 +19,14 @@ pub fn version() -> &'static str {
 
 #[cfg(test)]
 mod tests {
+    /// The app shows the version from apps/desktop/package.json; both must move together.
     #[test]
-    fn version_matches_manifest() {
-        assert_eq!(super::version(), "0.0.1");
+    fn version_matches_the_desktop_package() {
+        let package = include_str!("../../../apps/desktop/package.json");
+        assert!(
+            package.contains(&format!("\"version\": \"{}\"", super::version())),
+            "Cargo.toml says {} but apps/desktop/package.json differs",
+            super::version()
+        );
     }
 }

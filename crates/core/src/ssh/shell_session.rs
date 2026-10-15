@@ -699,8 +699,10 @@ mod tests {
             Duration::from_secs(10),
         )
         .await;
+        // 203.0.113.1 never answers: had it gone to the network, this would be a Timeout after
+        // 10 s, not WrongPassphrase. The bound only leaves room for a slow debug-build KDF.
         assert!(matches!(result.err(), Some(CoreError::WrongPassphrase)));
-        assert!(started.elapsed() < Duration::from_secs(1));
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     #[tokio::test]

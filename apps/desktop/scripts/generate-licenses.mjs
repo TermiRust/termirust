@@ -61,7 +61,13 @@ function cargoPackages() {
 }
 
 function npmPackages() {
-  const raw = execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], { cwd: appDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  // On Windows pnpm is a .cmd shim, which only runs through a shell.
+  const raw = execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], {
+    cwd: appDir,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    shell: process.platform === "win32",
+  });
   return Object.values(JSON.parse(raw))
     .flat()
     .flatMap((p) =>
