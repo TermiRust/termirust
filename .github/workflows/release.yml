@@ -66,9 +66,16 @@ jobs:
           releaseName: Termirust ${{ github.ref_name }}
           # The notes become the updater's release notes. To force everyone below a version to
           # update (security fixes only), add a line: <!-- minimum-version: 0.2.0 -->
-          releaseBody: See CHANGELOG.md for what changed. Download the installer for your platform below.
+          releaseBody: |
+            See [CHANGELOG.md](https://github.com/TermiRust/termirust/blob/main/CHANGELOG.md) for what changed.
+
+            **Builds are not code-signed yet** — your OS warns the first time:
+            - **macOS**: open the `.dmg`, drag Termirust to Applications, then run
+              `xattr -dr com.apple.quarantine /Applications/Termirust.app` (otherwise macOS says the app "is damaged").
+            - **Windows**: run the `-setup.exe`; on "Windows protected your PC" click **More info → Run anyway**.
+            - **Linux**: `chmod +x Termirust_*.AppImage && ./Termirust_*.AppImage`, or `sudo apt install ./Termirust_*.deb`.
           releaseDraft: true
-          prerelease: true
+          prerelease: false
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }} --config src-tauri/tauri.release.conf.json

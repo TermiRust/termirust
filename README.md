@@ -130,9 +130,19 @@ to report a vulnerability privately.
 
 ## Install
 
-Download the installer for your platform from the
-**[latest release](https://github.com/TermiRust/termirust/releases/latest)**. The app updates itself
-(Settings › About).
+Download the file for your platform from the
+**[latest release](https://github.com/TermiRust/termirust/releases/latest)**. The app then keeps
+itself up to date (Settings › About).
+
+> Builds are not code-signed yet, so your OS will warn the first time. Each step below is needed once.
+
+| Platform | File | First launch |
+|---|---|---|
+| **macOS** (Apple Silicon) | `Termirust_x.y.z_aarch64.dmg` | Drag Termirust to Applications, then run `xattr -dr com.apple.quarantine /Applications/Termirust.app` in Terminal (macOS otherwise says the app “is damaged”). |
+| **macOS** (Intel) | `Termirust_x.y.z_x64.dmg` | Same as above. |
+| **Windows** | `Termirust_x.y.z_x64-setup.exe` | SmartScreen shows “Windows protected your PC”: click **More info → Run anyway**. |
+| **Linux** (AppImage) | `Termirust_x.y.z_amd64.AppImage` | `chmod +x Termirust_*.AppImage && ./Termirust_*.AppImage` |
+| **Linux** (Debian/Ubuntu) | `Termirust_x.y.z_amd64.deb` | `sudo apt install ./Termirust_*.deb` |
 
 ## Build from source
 
