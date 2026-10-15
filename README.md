@@ -127,17 +127,6 @@ to report a vulnerability privately.
 | Windows 10 / 11 (x64) | ✅ Supported |
 | Linux (AppImage, .deb) | 🧪 Preview |
 
-## Free and paid
-
-| | Free (open source) | Pro (planned) |
-|---|:---:|:---:|
-| Everything above, unlimited hosts | ✅ | ✅ |
-| End-to-end encrypted sync between devices | | ✅ |
-| Team vaults and shared hosts | | ✅ |
-| AI agent mode (runs and checks commands for you) | | ✅ |
-
-The free app is complete on its own and stays open source. Paid features fund development.
-
 ## Install
 
 Download the installer for your platform from the
