@@ -1,2 +1,5 @@
 packages:
   - "apps/*"
+# Must match the tauri-plugin-updater crate's minor version; official Tauri package.
+minimumReleaseAgeExclude:
+  - '@tauri-apps/plugin-updater@2.14.0'
