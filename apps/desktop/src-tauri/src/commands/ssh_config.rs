@@ -4,7 +4,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use termirust_core::CoreError;
 use termirust_core::ssh::{SshConfigImport, read_ssh_config};
-use termirust_core::vault::{import_ssh_config_hosts, is_already_saved};
+use termirust_core::vault::{import_ssh_config_hosts, missing_settings, saved_match};
 
 use crate::command_error::CommandError;
 use crate::vault_state::VaultState;
@@ -20,6 +20,8 @@ pub struct SshConfigCandidate {
     pub proxy_jump: Option<String>,
     pub proxy_command: Option<String>,
     pub already_saved: bool,
+    /// For a saved host: settings from the config it lacks, which importing it again adds.
+    pub adds: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
@@ -41,6 +43,7 @@ pub struct SkippedHost {
 #[serde(rename_all = "camelCase")]
 pub struct SshConfigImportResult {
     pub created_hosts: Vec<String>,
+    pub updated_hosts: Vec<String>,
     pub imported_keys: Vec<String>,
     pub skipped: Vec<SkippedHost>,
 }
@@ -63,6 +66,16 @@ async fn candidates(
 ) -> Result<Vec<SshConfigCandidate>, CommandError> {
     let mut out = Vec::with_capacity(parsed.hosts.len());
     for host in &parsed.hosts {
+        let saved = saved_match(vault, host).await?;
+        let adds = saved
+            .as_ref()
+            .map(|r| {
+                missing_settings(&r.payload, host)
+                    .into_iter()
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default();
         out.push(SshConfigCandidate {
             alias: host.alias.clone(),
             hostname: host.hostname.clone(),
@@ -75,7 +88,8 @@ async fn candidates(
                 .collect(),
             proxy_jump: host.proxy_jump.clone(),
             proxy_command: host.proxy_command.clone(),
-            already_saved: is_already_saved(vault, host).await?,
+            already_saved: saved.is_some(),
+            adds,
         });
     }
     Ok(out)
@@ -113,6 +127,7 @@ pub async fn ssh_config_import(
         import_ssh_config_hosts(&state.vault().await?, &parsed.hosts, &aliases, &home).await?;
     Ok(SshConfigImportResult {
         created_hosts: summary.created_hosts,
+        updated_hosts: summary.updated_hosts,
         imported_keys: summary.imported_keys,
         skipped: summary
             .skipped
@@ -174,5 +189,29 @@ mod tests {
             [("old", true), ("new", false)]
         );
         assert_eq!(list[1].identity_files, ["/k"]);
+        assert!(list[0].adds.is_empty());
+    }
+
+    #[tokio::test]
+    async fn says_what_importing_a_saved_host_again_would_add() {
+        let db = Database::open_in_memory().await.unwrap();
+        let vault = Vault::open_or_create(db, &MemoryKeyStore::default())
+            .await
+            .unwrap();
+        vault
+            .hosts()
+            .create(&Host {
+                username: Some("deploy".into()),
+                ..Host::new("debian.example.app")
+            })
+            .await
+            .unwrap();
+        let parsed = parse_ssh_config(
+            "Host debian\n  HostName debian.example.app\n  User deploy\n  ProxyCommand cloudflared access ssh --hostname %h\n",
+            std::path::Path::new("/home/me"),
+        );
+        let list = candidates(&vault, &parsed).await.unwrap();
+        assert!(list[0].already_saved);
+        assert_eq!(list[0].adds, ["proxy command"]);
     }
 }

@@ -21,8 +21,10 @@ const candidate = (alias: string, overrides: Partial<SshConfigCandidate> = {}): 
   port: 22,
   user: "deploy",
   identityFiles: [],
-  proxyJump: null, proxyCommand: null,
+  proxyJump: null,
+  proxyCommand: null,
   alreadySaved: false,
+  adds: [],
   ...overrides,
 });
 const ok = <T,>(data: T) => ({ status: "ok", data });
@@ -59,6 +61,20 @@ describe("ImportSshConfigDialog", () => {
     expect(screen.getByRole("button", { name: "Import 2 hosts" })).toBeEnabled();
   });
 
+  it("offers to complete a saved host the config has more settings for, and reports it as updated", async () => {
+    commands.sshConfigImport.mockResolvedValue(ok({ createdHosts: [], updatedHosts: ["debian"], importedKeys: [], skipped: [] }));
+    const { user } = renderWith([
+      candidate("debian", { alreadySaved: true, adds: ["proxy command"], proxyCommand: "cloudflared access ssh --hostname %h" }),
+      candidate("old", { alreadySaved: true }),
+    ]);
+    const list = await screen.findByRole("list", { name: "Hosts in config" });
+    expect(within(list).getByRole("checkbox", { name: "debian" })).toBeChecked();
+    expect(within(list).getByRole("checkbox", { name: "old" })).not.toBeChecked();
+    expect(list).toHaveTextContent("already saved · adds proxy command");
+    await user.click(screen.getByRole("button", { name: "Import 1 host" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Updated 1 host (debian).");
+  });
+
   it("warns about settings it does not apply", async () => {
     renderWith([candidate("a")], ["LocalForward", "Match"]);
     expect(await screen.findByText(/Not applied yet: LocalForward, Match/)).toBeInTheDocument();
@@ -66,7 +82,7 @@ describe("ImportSshConfigDialog", () => {
 
   it("imports the selected hosts in file order and reports the outcome", async () => {
     commands.sshConfigImport.mockResolvedValue(
-      ok({ createdHosts: ["a", "c"], importedKeys: ["id_ed25519"], skipped: [{ alias: "b", reason: "already saved" }] }),
+      ok({ createdHosts: ["a", "c"], updatedHosts: [], importedKeys: ["id_ed25519"], skipped: [{ alias: "b", reason: "already saved" }] }),
     );
     const { user } = renderWith([candidate("a"), candidate("b"), candidate("c")]);
     await user.click(await screen.findByRole("checkbox", { name: "b" }));

@@ -30,7 +30,10 @@ pub use port_forwards::{
 };
 pub use secret::Secret;
 pub use snippets::{Snippet, SnippetRecord, SnippetRepository};
-pub use ssh_config_import::{SshConfigImportSummary, import_ssh_config_hosts, is_already_saved};
+pub use ssh_config_import::{
+    SshConfigImportSummary, import_ssh_config_hosts, is_already_saved, missing_settings,
+    saved_match,
+};
 
 pub(crate) fn now_ms() -> i64 {
     std::time::SystemTime::now()

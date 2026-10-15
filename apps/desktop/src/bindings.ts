@@ -492,10 +492,13 @@ export type SshConfigCandidate = {
 	proxyJump: string | null,
 	proxyCommand: string | null,
 	alreadySaved: boolean,
+	/**  For a saved host: settings from the config it lacks, which importing it again adds. */
+	adds: string[],
 };
 
 export type SshConfigImportResult = {
 	createdHosts: string[],
+	updatedHosts: string[],
 	importedKeys: string[],
 	skipped: SkippedHost[],
 };

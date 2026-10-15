@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use uuid::Uuid;
 
-use super::hosts::{Host, HostAuth};
+use super::hosts::{Host, HostAuth, HostRecord};
 use super::identities::Identity;
 use super::open::Vault;
 use super::secret::Secret;
@@ -15,6 +15,8 @@ const DEFAULT_KEYS: &[&str] = &[".ssh/id_ed25519", ".ssh/id_ecdsa", ".ssh/id_rsa
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct SshConfigImportSummary {
     pub created_hosts: Vec<String>,
+    /// Saved hosts that were missing a setting the config has (filled in, never overwritten).
+    pub updated_hosts: Vec<String>,
     pub imported_keys: Vec<String>,
     /// `(alias, reason)` for every selected host that was not created.
     pub skipped: Vec<(String, String)>,
@@ -22,12 +24,40 @@ pub struct SshConfigImportSummary {
 
 /// True when the vault already has a host reaching the same account on the same server.
 pub async fn is_already_saved(vault: &Vault, host: &SshConfigHost) -> Result<bool> {
+    Ok(saved_match(vault, host).await?.is_some())
+}
+
+/// The saved host reaching the same account on the same server, if any.
+pub async fn saved_match(vault: &Vault, host: &SshConfigHost) -> Result<Option<HostRecord>> {
     let saved = vault.hosts().list().await?;
-    Ok(saved.iter().any(|r| {
+    Ok(saved.into_iter().find(|r| {
         r.payload.hostname.eq_ignore_ascii_case(&host.hostname)
             && r.payload.port == host.port
             && r.payload.username == host.user
     }))
+}
+
+/// Settings the config has that the saved host lacks, e.g. a ProxyCommand added to the
+/// config (or supported by Termirust) after the host was imported. Only empty settings count:
+/// anything the user set in the app wins.
+pub fn missing_settings(saved: &Host, entry: &SshConfigHost) -> Vec<&'static str> {
+    let mut missing = Vec::new();
+    // A jump host and a proxy command exclude each other.
+    if entry.proxy_command.is_some()
+        && saved.proxy_command.is_none()
+        && saved.jump_host_id.is_none()
+    {
+        missing.push("proxy command");
+    }
+    missing
+}
+
+fn fill_missing(saved: &Host, entry: &SshConfigHost) -> Host {
+    let mut host = saved.clone();
+    if missing_settings(saved, entry).contains(&"proxy command") {
+        host.proxy_command = entry.proxy_command.clone();
+    }
+    host
 }
 
 /// Creates hosts (and the keys they use) for the chosen aliases of a parsed ssh config.
@@ -47,10 +77,21 @@ pub async fn import_ssh_config_hosts(
                 .push((alias.clone(), "not found in the config".into()));
             continue;
         };
-        if is_already_saved(vault, entry).await? {
-            summary
-                .skipped
-                .push((alias.clone(), "already saved".into()));
+        if let Some(record) = saved_match(vault, entry).await? {
+            if missing_settings(&record.payload, entry).is_empty() {
+                summary
+                    .skipped
+                    .push((alias.clone(), "already saved".into()));
+            } else {
+                match vault
+                    .hosts()
+                    .update(record.meta.id, &fill_missing(&record.payload, entry))
+                    .await
+                {
+                    Ok(_) => summary.updated_hosts.push(alias.clone()),
+                    Err(e) => summary.skipped.push((alias.clone(), e.to_string())),
+                }
+            }
             continue;
         }
         let auth = match key_for(vault, entry, home, &mut summary).await? {
@@ -373,5 +414,92 @@ mod tests {
             vault.hosts().list().await.unwrap()[0].payload.jump_host_id,
             None
         );
+    }
+
+    const CLOUDFLARE: &str = "Host debian\n  HostName debian.example.app\n  User deploy\n  ProxyCommand cloudflared access ssh --hostname %h\n";
+
+    #[tokio::test]
+    async fn adds_a_proxy_command_to_a_host_saved_before_it_was_supported() {
+        let vault = vault().await;
+        let home = home_with_keys(&[]);
+        let old = Host {
+            label: "debian".into(),
+            username: Some("deploy".into()),
+            ..Host::new("debian.example.app")
+        };
+        let id = vault.hosts().create(&old).await.unwrap().meta.id;
+        let config = parse_ssh_config(CLOUDFLARE, home.path());
+        assert_eq!(missing_settings(&old, &config.hosts[0]), ["proxy command"]);
+
+        let summary =
+            import_ssh_config_hosts(&vault, &config.hosts, &aliases(&["debian"]), home.path())
+                .await
+                .unwrap();
+        assert_eq!(summary.updated_hosts, ["debian"]);
+        assert!(summary.created_hosts.is_empty() && summary.skipped.is_empty());
+        let saved = vault.hosts().get(id).await.unwrap().unwrap().payload;
+        assert_eq!(
+            saved.proxy_command.as_deref(),
+            Some("cloudflared access ssh --hostname %h")
+        );
+        assert_eq!(
+            vault.hosts().list().await.unwrap().len(),
+            1,
+            "no duplicate host"
+        );
+    }
+
+    #[tokio::test]
+    async fn never_overwrites_what_the_user_set_in_the_app() {
+        let vault = vault().await;
+        let home = home_with_keys(&[]);
+        let mine = Host {
+            label: "debian".into(),
+            username: Some("deploy".into()),
+            proxy_command: Some("my-own-proxy %h".into()),
+            ..Host::new("debian.example.app")
+        };
+        let id = vault.hosts().create(&mine).await.unwrap().meta.id;
+        let config = parse_ssh_config(CLOUDFLARE, home.path());
+        assert!(missing_settings(&mine, &config.hosts[0]).is_empty());
+
+        let summary =
+            import_ssh_config_hosts(&vault, &config.hosts, &aliases(&["debian"]), home.path())
+                .await
+                .unwrap();
+        assert_eq!(summary.skipped, [("debian".into(), "already saved".into())]);
+        assert_eq!(
+            vault
+                .hosts()
+                .get(id)
+                .await
+                .unwrap()
+                .unwrap()
+                .payload
+                .proxy_command
+                .as_deref(),
+            Some("my-own-proxy %h")
+        );
+    }
+
+    #[tokio::test]
+    async fn does_not_add_a_proxy_command_to_a_host_using_a_jump_host() {
+        let vault = vault().await;
+        let home = home_with_keys(&[]);
+        let bastion = vault
+            .hosts()
+            .create(&Host::new("bastion"))
+            .await
+            .unwrap()
+            .meta
+            .id;
+        let jumped = Host {
+            label: "debian".into(),
+            username: Some("deploy".into()),
+            jump_host_id: Some(bastion),
+            ..Host::new("debian.example.app")
+        };
+        let config = parse_ssh_config(CLOUDFLARE, home.path());
+        assert!(missing_settings(&jumped, &config.hosts[0]).is_empty());
     }
 }

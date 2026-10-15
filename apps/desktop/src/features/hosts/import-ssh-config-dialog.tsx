@@ -46,7 +46,8 @@ function ImportSshConfig({ onClose }: { onClose: () => void }) {
         setLoad({ status: "error", message: r.error.message });
       } else {
         setLoad({ status: "ready", preview: r.data });
-        setSelected(new Set(r.data.candidates.filter((c) => !c.alreadySaved).map((c) => c.alias)));
+        // New hosts, and saved ones the config can complete (e.g. a ProxyCommand added later).
+        setSelected(new Set(r.data.candidates.filter((c) => !c.alreadySaved || c.adds.length > 0).map((c) => c.alias)));
       }
     });
     return () => {
@@ -80,8 +81,13 @@ function ImportSshConfig({ onClose }: { onClose: () => void }) {
     return (
       <div className="flex flex-col gap-2 text-[13px]">
         <p role="status">
-          Imported {result.createdHosts.length} host{result.createdHosts.length === 1 ? "" : "s"}
-          {result.importedKeys.length > 0 && ` and ${result.importedKeys.length} key${result.importedKeys.length === 1 ? "" : "s"}`}.
+          {(result.createdHosts.length > 0 || result.updatedHosts.length === 0) && (
+            <>
+              Imported {result.createdHosts.length} host{result.createdHosts.length === 1 ? "" : "s"}
+              {result.importedKeys.length > 0 && ` and ${result.importedKeys.length} key${result.importedKeys.length === 1 ? "" : "s"}`}.{" "}
+            </>
+          )}
+          {result.updatedHosts.length > 0 && `Updated ${result.updatedHosts.length} host${result.updatedHosts.length === 1 ? "" : "s"} (${result.updatedHosts.join(", ")}).`}
         </p>
         {result.skipped.length > 0 && (
           <ul aria-label="Skipped hosts" className="list-disc pl-5 text-fg-muted">
@@ -138,7 +144,11 @@ function ImportSshConfig({ onClose }: { onClose: () => void }) {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="font-medium">{c.alias}</span>
-                    {c.alreadySaved && <span className="rounded bg-bg-sunk px-1.5 text-[11px] text-fg-muted">already saved</span>}
+                    {c.alreadySaved && (
+                      <span className={`rounded px-1.5 text-[11px] ${c.adds.length > 0 ? "bg-accent-soft text-fg-2" : "bg-bg-sunk text-fg-muted"}`}>
+                        already saved{c.adds.length > 0 && ` · adds ${c.adds.join(", ")}`}
+                      </span>
+                    )}
                   </span>
                   <span className="block truncate font-mono text-xs text-fg-muted">
                     {c.user ? `${c.user}@` : ""}
