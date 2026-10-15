@@ -6,6 +6,8 @@ In short: be respectful and constructive, assume good faith, and keep discussion
 the work. Harassment, insults and personal attacks are not tolerated in issues, pull
 requests, discussions or any other project space.
 
-Report unacceptable behaviour privately to the TermiRust organisation owners on GitHub.
+Report unacceptable behaviour privately through the repository's private reporting form
+(Security › Report a vulnerability — say it is a conduct report) or to the TermiRust
+organisation owners on GitHub.
 Reports are handled confidentially. Maintainers may remove content and restrict or ban
 participants who break these rules, following the Covenant's enforcement guidelines.

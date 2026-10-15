@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tokens mirror docs/mockups/app-ui.html (ADR-014). */
+/* Design tokens of the app (light and dark). */
 @theme {
   --color-page: var(--page);
   --color-bg: var(--bg);
