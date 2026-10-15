@@ -6,7 +6,7 @@ members = ["crates/*", "apps/desktop/src-tauri"]
 version = "0.0.1"
 edition = "2024"
 license = "AGPL-3.0-only"
-repository = "https://github.com/<owner>/termirust"
+repository = "https://github.com/termirust/termirust"
 
 [workspace.dependencies]
 thiserror = "2"

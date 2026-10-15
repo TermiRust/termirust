@@ -28,6 +28,7 @@ import { appThemeChoices, applyAppTheme } from "@/lib/app-theme";
 import { appShortcut, isMacPlatform, isToggleSidebarShortcut, paneShortcut, shortcutLabel, tabShortcut } from "@/lib/shortcuts";
 import { paneIds } from "@/features/panes/pane-tree";
 import { PaneLayout } from "@/components/layout/pane-layout";
+import { UpdateNotice } from "@/components/layout/update-notice";
 import { useAppVersion } from "@/lib/use-app-version";
 import { cn } from "@/lib/utils";
 import { useAiStore } from "@/stores/ai-store";
@@ -35,6 +36,7 @@ import { useSnippetsStore } from "@/stores/snippets-store";
 import { sendToTerminal, sendWhenReady } from "@/stores/terminal-inputs";
 import { useDialogsStore } from "@/stores/dialogs-store";
 import { useSettingsStore } from "@/stores/settings-store";
+import { useUpdateStore } from "@/stores/update-store";
 import { useHostsStore } from "@/stores/hosts-store";
 import { useLayoutStore } from "@/stores/layout-store";
 import { loadRecentHostIds, rememberRecentHost } from "@/stores/recent-hosts";
@@ -68,6 +70,21 @@ export function AppShell() {
     void loadAi();
     void loadSnippets();
   }, [loadHosts, loadSettings, loadAi, loadSnippets]);
+
+  // Release builds look for a new version shortly after start, then every six hours.
+  useEffect(() => {
+    if (!import.meta.env.PROD) return;
+    const run = () => {
+      const updates = useUpdateStore.getState();
+      if (updates.autoCheck) void updates.check({ silent: true });
+    };
+    const first = window.setTimeout(run, 5_000);
+    const every = window.setInterval(run, 6 * 60 * 60 * 1000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(every);
+    };
+  }, []);
 
   const [snippetRun, setSnippetRun] = useState<{ snippet: SnippetView; tab: Tab } | null>(null);
   const [multiRun, setMultiRun] = useState<SnippetView | null>(null);
@@ -241,6 +258,7 @@ export function AppShell() {
         onSearch={() => setPaletteOpen(true)}
         onToggleSidebar={toggleSidebar}
       />
+      <UpdateNotice />
       <div className="flex min-h-0 flex-1">
         {/* Kept mounted so it can slide; hidden from focus and screen readers while collapsed. */}
         <div

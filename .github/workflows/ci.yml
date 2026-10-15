@@ -34,6 +34,16 @@ jobs:
       - name: Integration tests against real SSH servers
         run: cargo test -p termirust-core --features integration
 
+  deny:
+    name: Dependencies (advisories, licenses)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
   frontend:
     name: Frontend (lint, typecheck, test)
     runs-on: ubuntu-24.04

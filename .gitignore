@@ -22,3 +22,6 @@ apps/*/src-tauri/gen/
 
 # Claude Code scratch
 .claude/tmp/
+
+# Generated at build time by apps/desktop/scripts/generate-licenses.mjs
+apps/desktop/public/third-party-licenses.json

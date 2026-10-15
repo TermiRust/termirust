@@ -1,0 +1,47 @@
+name: Bug report
+description: Something does not work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report! **Security problems must not be reported here** — see SECURITY.md.
+        Please remove hostnames, usernames, IPs and other private details from logs and screenshots.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Settings › About, e.g. "v0.1.0 · 7f9703a"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [macOS (Apple Silicon), macOS (Intel), Windows, Linux]
+    validations:
+      required: true
+  - type: input
+    id: server
+    attributes:
+      label: Server (if relevant)
+      description: e.g. Ubuntu 24.04 with OpenSSH 9.6, via a jump host
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Open a host…\n2. …"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Settings › Open log folder. Logs never contain passwords, keys or terminal content.
+      render: text

@@ -12,12 +12,14 @@ interface DialogProps {
   icon?: ReactNode;
   tone?: "default" | "danger";
   width?: "sm" | "md" | "lg" | "xl";
+  /** False hides the close button, for a dialog the user must answer. */
+  dismissible?: boolean;
   children: ReactNode;
 }
 
 const widths = { sm: "w-[min(420px,calc(100vw-32px))]", md: "w-[min(520px,calc(100vw-32px))]", lg: "w-[min(640px,calc(100vw-32px))]", xl: "w-[min(1040px,calc(100vw-32px))]" };
 
-export function Dialog({ open, onOpenChange, title, description, icon, tone = "default", width = "md", children }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, description, icon, tone = "default", width = "md", dismissible = true, children }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -48,9 +50,11 @@ export function Dialog({ open, onOpenChange, title, description, icon, tone = "d
                 {description ?? title}
               </DialogPrimitive.Description>
             </div>
-            <DialogPrimitive.Close aria-label="Close" className="rounded p-1 text-fg-muted hover:bg-hover">
-              <X size={16} />
-            </DialogPrimitive.Close>
+            {dismissible && (
+              <DialogPrimitive.Close aria-label="Close" className="rounded p-1 text-fg-muted hover:bg-hover">
+                <X size={16} />
+              </DialogPrimitive.Close>
+            )}
           </div>
           <div className="overflow-y-auto px-5 pt-1 pb-4">{children}</div>
         </DialogPrimitive.Content>

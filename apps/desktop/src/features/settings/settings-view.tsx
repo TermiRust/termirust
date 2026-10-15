@@ -15,10 +15,9 @@ import { mergeThemes, parseThemeFile } from "@/lib/theme-import";
 import { cn } from "@/lib/utils";
 import { useSettingsStore, type ResolvedTerminalSettings } from "@/stores/settings-store";
 
+import { AboutSection } from "./about-section";
 import { AiSettingsSection } from "./ai-settings-section";
 import { AppearancePicker } from "./appearance-picker";
-import { versionLabel } from "@/lib/build-info";
-import { useAppVersion } from "@/lib/use-app-version";
 
 import { FONT_CHOICES } from "./font-choices";
 
@@ -45,7 +44,6 @@ export function SettingsView() {
       theme: terminal.theme === id ? MATCH_APP : terminal.theme,
       appTheme: terminal.appTheme === id ? "system" : terminal.appTheme,
     });
-  const appVersion = useAppVersion();
   const fontLabel = FONT_CHOICES.find((f) => f.stack === terminal.fontFamily)?.label ?? "Custom";
 
   return (
@@ -201,8 +199,8 @@ export function SettingsView() {
               <FolderOpen size={13} /> Open log folder
             </Button>
             <p className="mt-1 text-xs text-fg-muted">Logs never contain passwords, keys or terminal content.</p>
-            <p className="mt-3 font-mono text-[11px] text-fg-faint">Termirust {versionLabel(appVersion) ?? ""}</p>
           </div>
+          <AboutSection />
         </div>
       </div>
     </section>
