@@ -23,9 +23,10 @@ export function Dialog({ open, onOpenChange, title, description, icon, tone = "d
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 bg-scrim" />
+        {/* Dialogs sit above everything in the app (panels use z-10, menus z-30/40). */}
+        <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 z-50 bg-scrim" />
         {/* Centred by grid, not translate(-50%): a half-pixel offset blurs text in WebKit. */}
-        <div className="pointer-events-none fixed inset-0 grid place-items-center p-4">
+        <div data-dialog-layer className="pointer-events-none fixed inset-0 z-50 grid place-items-center p-4">
         <DialogPrimitive.Content
           className={cn(
             "motion-dialog pointer-events-auto flex max-h-[85vh] flex-col overflow-hidden rounded-xl border bg-bg shadow-dialog",

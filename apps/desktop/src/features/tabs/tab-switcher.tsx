@@ -35,10 +35,10 @@ export function TabSwitcher({ open, onOpenChange, tabs, activeTabId, onSelect }:
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 bg-scrim" />
+        <DialogPrimitive.Overlay className="motion-overlay fixed inset-0 z-50 bg-scrim" />
         <DialogPrimitive.Content
           aria-label="Open tabs"
-          className="motion-rise fixed inset-x-0 top-[14vh] mx-auto w-[min(560px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-bg shadow-dialog"
+          className="motion-rise fixed inset-x-0 top-[14vh] z-50 mx-auto w-[min(560px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-bg shadow-dialog"
         >
           <DialogPrimitive.Title className="sr-only">Open tabs</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">Search and switch between open tabs</DialogPrimitive.Description>
