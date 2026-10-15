@@ -41,7 +41,7 @@ jobs:
           rustup show active-toolchain || rustup toolchain install
           if [ "${{ runner.os }}" = "macOS" ]; then rustup target add aarch64-apple-darwin x86_64-apple-darwin; fi
       - uses: Swatinem/rust-cache@v2
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v4
         with:
           node-version: 22
